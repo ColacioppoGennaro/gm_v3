@@ -1,6 +1,12 @@
 RewriteEngine On
+RewriteBase /gm_v3/api/
 
-# Routing verso api.php
+# CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+
+# Routing
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ /gm_v3/api/api.php [L]
+RewriteRule ^(.*)$ api.php [QSA,L]

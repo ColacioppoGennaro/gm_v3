@@ -4,7 +4,7 @@
 
 # Abilita Rewrite Engine
 RewriteEngine On
-RewriteBase /api/
+RewriteBase /gm_v3/api/
 
 # ============================================
 # CORS (Cross-Origin Resource Sharing)
@@ -74,3 +74,4 @@ php_value post_max_size 150M
 php_value memory_limit 256M
 php_value max_execution_time 300
 php_value max_input_time 300
+

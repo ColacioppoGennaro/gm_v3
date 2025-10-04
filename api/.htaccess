@@ -1,0 +1,76 @@
+# ============================================
+# GM_V3 API - Configurazione Apache
+# ============================================
+
+# Abilita Rewrite Engine
+RewriteEngine On
+RewriteBase /api/
+
+# ============================================
+# CORS (Cross-Origin Resource Sharing)
+# Permette chiamate dal frontend React
+# ============================================
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+Header always set Access-Control-Max-Age "3600"
+
+# Rispondi alle richieste OPTIONS (preflight)
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# ============================================
+# SICUREZZA
+# ============================================
+
+# Previeni accesso diretto ai file di configurazione
+<FilesMatch "^(db_config|constants|cors)\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Previeni listato directory
+Options -Indexes
+
+# Proteggi file sensibili
+<FilesMatch "\.(sql|log|md|json|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ============================================
+# ROUTING
+# Tutte le richieste vanno a api.php
+# ============================================
+
+# Non riscrivere file esistenti
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Reindirizza tutto a api.php
+RewriteRule ^(.*)$ api.php [QSA,L]
+
+# ============================================
+# PERFORMANCE
+# ============================================
+
+# Comprimi risposte JSON
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE text/plain
+</IfModule>
+
+# Cache per risorse statiche (se ce ne sono)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType application/json "access plus 0 seconds"
+</IfModule>
+
+# ============================================
+# LIMIT UPLOAD SIZE (150MB per Pro)
+# ============================================
+php_value upload_max_filesize 150M
+php_value post_max_size 150M
+php_value memory_limit 256M
+php_value max_execution_time 300
+php_value max_input_time 300

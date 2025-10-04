@@ -1,8 +1,8 @@
 <?php
 /**
- * GM_V3 - Document Controller
+ * GM_V3 - Document Model
  * 
- * Gestisce endpoint API per documenti
+ * Gestisce operazioni database per i documenti
  */
 
 if (!defined('GM_V3_INIT')) {
@@ -10,187 +10,186 @@ if (!defined('GM_V3_INIT')) {
     die('Accesso negato');
 }
 
-require_once __DIR__ . '/../models/Document.php';
-
-class DocumentController {
+class Document {
     
     /**
-     * GET /api/documents
-     * Lista tutti i documenti dell'utente
+     * Ottieni tutti i documenti di un utente
      */
-    public static function index() {
-        // ⚠️ TODO: Implementare autenticazione vera
-        // Per ora usiamo l'utente di test
-        $userId = 'user-test-001'; // Mario Rossi
+    public static function getAllByUser($userId) {
+        $sql = "SELECT 
+                    d.id,
+                    d.name,
+                    d.original_name,
+                    d.size,
+                    d.type,
+                    d.upload_date,
+                    d.category_id,
+                    c.name as category
+                FROM documents d
+                LEFT JOIN categories c ON d.category_id = c.id
+                WHERE d.user_id = ?
+                ORDER BY d.upload_date DESC";
         
-        try {
-            $documents = Document::getAllByUser($userId);
-            
-            Response::success($documents, 'Documenti recuperati con successo');
-            
-        } catch (Exception $e) {
-            Response::handleException($e);
+        $result = executeQuery($sql, "s", [$userId]);
+        
+        if (!$result) {
+            return [];
         }
-    }
-    
-    /**
-     * POST /api/documents
-     * Carica nuovo documento
-     */
-    public static function store() {
-        // ⚠️ TODO: Implementare autenticazione vera
-        $userId = 'user-test-001';
-        $userTier = 'Free'; // ⚠️ Recuperare dal DB in autenticazione vera
         
-        try {
-            // Verifica file caricato
-            if (!isset($_FILES['file']) || $_FILES['file']['error'] === UPLOAD_ERR_NO_FILE) {
-                Response::validationError('Nessun file caricato', ['file' => 'File richiesto']);
-            }
-            
-            $file = $_FILES['file'];
-            
-            // Validazione
-            $validator = new Validator();
-            if (!$validator->validateUpload($file, $userTier)) {
-                Response::validationError('Validazione fallita', $validator->getErrors());
-            }
-            
-            // Verifica limite documenti
-            if (Document::hasReachedLimit($userId, $userTier)) {
-                $limits = getLimitsForTier($userTier);
-                Response::error(
-                    "Hai raggiunto il limite di {$limits['maxDocs']} documenti. Elimina vecchi file o passa a Pro.",
-                    403
-                );
-            }
-            
-            // Categoria (solo Pro)
-            $categoryId = null;
-            if ($userTier === 'Pro' && !empty($_POST['category'])) {
-                $categoryId = (int)$_POST['category'];
-            }
-            
-            // Crea cartella uploads se non esiste
-            if (!is_dir(UPLOAD_DIR)) {
-                mkdir(UPLOAD_DIR, 0755, true);
-            }
-            
-            // Crea sottocartella per utente
-            $userUploadDir = UPLOAD_DIR . $userId . '/';
-            if (!is_dir($userUploadDir)) {
-                mkdir($userUploadDir, 0755, true);
-            }
-            
-            // Genera nome file sicuro
-            $documentId = Document::generateId();
-            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $safeFileName = $documentId . '.' . $extension;
-            $filePath = $userUploadDir . $safeFileName;
-            
-            // Sposta file caricato
-            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-                Response::serverError('Errore durante il salvataggio del file');
-            }
-            
-            // Salva nel database
-            $documentData = [
-                'id' => $documentId,
-                'user_id' => $userId,
-                'name' => $safeFileName,
-                'original_name' => $file['name'],
-                'file_path' => $filePath,
-                'size' => $file['size'],
-                'type' => $file['type'],
-                'category_id' => $categoryId,
-                'docanalyzer_id' => null // ⚠️ TODO: Integrare docAnalyzer.ai
+        $documents = [];
+        while ($row = $result->fetch_assoc()) {
+            $documents[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'size' => (int)$row['size'],
+                'type' => $row['type'],
+                'uploadDate' => $row['upload_date'],
+                'category' => $row['category']
             ];
-            
-            if (!Document::create($documentData)) {
-                // Rimuovi file se inserimento DB fallisce
-                unlink($filePath);
-                Response::serverError('Errore durante il salvataggio dei dati');
-            }
-            
-            // ⚠️ TODO: Inviare file a docAnalyzer.ai per vettorializzazione
-            // $docanalyzerId = DocAnalyzerService::uploadDocument($filePath, $userId);
-            // Document::updateDocAnalyzerId($documentId, $docanalyzerId);
-            
-            // Risposta successo
-            Response::success([
-                'id' => $documentId,
-                'name' => $safeFileName,
-                'size' => $file['size'],
-                'type' => $file['type'],
-                'uploadDate' => date('Y-m-d H:i:s'),
-                'category' => $categoryId
-            ], 'Documento caricato con successo', 201);
-            
-        } catch (Exception $e) {
-            Response::handleException($e);
         }
+        
+        return $documents;
     }
     
     /**
-     * DELETE /api/documents/{id}
+     * Ottieni documenti filtrati per categoria
+     */
+    public static function getByCategory($userId, $categoryId) {
+        $sql = "SELECT 
+                    d.id,
+                    d.name,
+                    d.original_name,
+                    d.size,
+                    d.type,
+                    d.upload_date
+                FROM documents d
+                WHERE d.user_id = ? AND d.category_id = ?
+                ORDER BY d.upload_date DESC";
+        
+        $result = executeQuery($sql, "si", [$userId, $categoryId]);
+        
+        if (!$result) {
+            return [];
+        }
+        
+        $documents = [];
+        while ($row = $result->fetch_assoc()) {
+            $documents[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'size' => (int)$row['size'],
+                'type' => $row['type'],
+                'uploadDate' => $row['upload_date']
+            ];
+        }
+        
+        return $documents;
+    }
+    
+    /**
+     * Ottieni singolo documento
+     */
+    public static function getById($documentId, $userId) {
+        $sql = "SELECT * FROM documents WHERE id = ? AND user_id = ?";
+        $result = executeQuery($sql, "ss", [$documentId, $userId]);
+        
+        if (!$result || $result->num_rows === 0) {
+            return null;
+        }
+        
+        return $result->fetch_assoc();
+    }
+    
+    /**
+     * Conta documenti utente
+     */
+    public static function countByUser($userId) {
+        $sql = "SELECT COUNT(*) as total FROM documents WHERE user_id = ?";
+        $result = executeQuery($sql, "s", [$userId]);
+        
+        if (!$result) {
+            return 0;
+        }
+        
+        $row = $result->fetch_assoc();
+        return (int)$row['total'];
+    }
+    
+    /**
+     * Inserisci nuovo documento
+     */
+    public static function create($data) {
+        $sql = "INSERT INTO documents 
+                (id, user_id, name, original_name, file_path, size, type, category_id, docanalyzer_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        
+        $categoryId = $data['category_id'] ?? null;
+        $docanalyzerId = $data['docanalyzer_id'] ?? null;
+        
+        $result = executeQuery($sql, "sssssisis", [
+            $data['id'],
+            $data['user_id'],
+            $data['name'],
+            $data['original_name'],
+            $data['file_path'],
+            $data['size'],
+            $data['type'],
+            $categoryId,
+            $docanalyzerId
+        ]);
+        
+        return $result !== false;
+    }
+    
+    /**
      * Elimina documento
      */
-    public static function destroy($documentId) {
-        // ⚠️ TODO: Implementare autenticazione vera
-        $userId = 'user-test-001';
+    public static function delete($documentId, $userId) {
+        // Prima recupera il path del file
+        $doc = self::getById($documentId, $userId);
         
-        try {
-            // Verifica che documento esista e appartenga all'utente
-            $document = Document::getById($documentId, $userId);
-            
-            if (!$document) {
-                Response::notFound('Documento non trovato');
-            }
-            
-            // ⚠️ TODO: Eliminare da docAnalyzer.ai
-            // if ($document['docanalyzer_id']) {
-            //     DocAnalyzerService::deleteDocument($document['docanalyzer_id']);
-            // }
-            
-            // Elimina da DB e file system
-            if (!Document::delete($documentId, $userId)) {
-                Response::serverError('Errore durante l\'eliminazione del documento');
-            }
-            
-            Response::success(null, 'Documento eliminato con successo');
-            
-        } catch (Exception $e) {
-            Response::handleException($e);
+        if (!$doc) {
+            return false;
         }
+        
+        // Elimina dal database
+        $sql = "DELETE FROM documents WHERE id = ? AND user_id = ?";
+        $result = executeQuery($sql, "ss", [$documentId, $userId]);
+        
+        if ($result === false) {
+            return false;
+        }
+        
+        // Elimina file fisico
+        if (file_exists($doc['file_path'])) {
+            unlink($doc['file_path']);
+        }
+        
+        return true;
     }
     
     /**
-     * GET /api/documents/{id}
-     * Dettagli singolo documento
+     * Aggiorna docanalyzer_id dopo vettorializzazione
      */
-    public static function show($documentId) {
-        // ⚠️ TODO: Implementare autenticazione vera
-        $userId = 'user-test-001';
+    public static function updateDocAnalyzerId($documentId, $docanalyzerId) {
+        $sql = "UPDATE documents SET docanalyzer_id = ? WHERE id = ?";
+        return executeQuery($sql, "ss", [$docanalyzerId, $documentId]) !== false;
+    }
+    
+    /**
+     * Verifica se utente ha raggiunto limite documenti
+     */
+    public static function hasReachedLimit($userId, $userTier) {
+        $count = self::countByUser($userId);
+        $limits = getLimitsForTier($userTier);
         
-        try {
-            $document = Document::getById($documentId, $userId);
-            
-            if (!$document) {
-                Response::notFound('Documento non trovato');
-            }
-            
-            Response::success([
-                'id' => $document['id'],
-                'name' => $document['name'],
-                'originalName' => $document['original_name'],
-                'size' => (int)$document['size'],
-                'type' => $document['type'],
-                'uploadDate' => $document['upload_date'],
-                'category' => $document['category_id']
-            ]);
-            
-        } catch (Exception $e) {
-            Response::handleException($e);
-        }
+        return $count >= $limits['maxDocs'];
+    }
+    
+    /**
+     * Genera ID univoco per documento
+     */
+    public static function generateId() {
+        return 'doc-' . uniqid() . '-' . bin2hex(random_bytes(8));
     }
 }

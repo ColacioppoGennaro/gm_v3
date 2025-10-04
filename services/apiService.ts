@@ -7,8 +7,7 @@ import { Document } from '../types';
 // POST /api/documents -> Carica un nuovo documento
 // DELETE /api/documents/{id} -> Elimina un documento
 
-const API_BASE_URL = '/api'; // Prefisso per tutte le chiamate API
-
+const API_BASE_URL = 'https://www.gruppogea.net/gm_v3/api';
 /**
  * Effettua il fetch dei documenti dell'utente dal backend reale.
  */

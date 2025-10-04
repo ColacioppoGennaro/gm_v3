@@ -50,7 +50,7 @@ $uri = $_SERVER['REQUEST_URI'];
 $uri = parse_url($uri, PHP_URL_PATH);
 
 // Rimuovi /api/ dal path
-$uri = preg_replace('#^/api/?#', '', $uri);
+$uri = preg_replace('#^/gm_v3/api/?#', '', $uri);
 
 // Dividi path in segmenti
 $segments = array_filter(explode('/', $uri));
@@ -155,3 +155,4 @@ try {
 
 // Chiudi connessione database
 closeDatabaseConnection();
+

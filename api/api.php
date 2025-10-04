@@ -63,7 +63,7 @@ $segments = array_values($segments); // Re-index array
 try {
     
     // Test endpoint
-    if (empty($segments) && $method === 'GET') {
+    if ((empty($segments) || (count($segments) === 1 && empty($segments[0]))) && $method === 'GET') {
         Response::success([
             'version' => '1.0.0',
             'status' => 'online',
@@ -155,4 +155,5 @@ try {
 
 // Chiudi connessione database
 closeDatabaseConnection();
+
 

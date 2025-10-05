@@ -1,5 +1,6 @@
 <?php
-session_start();
+session_start(); // IMPORTANTE: sessione prima di tutto
+
 require_once __DIR__.'/../_core/bootstrap.php';
 require_once __DIR__.'/../_core/helpers.php';
 

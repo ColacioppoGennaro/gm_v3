@@ -31,7 +31,8 @@ main{flex:1;padding:24px 32px;overflow-y:auto}
 .btn.secondary{background:#374151}
 .btn.warn{background:var(--warn)}
 .btn.del{background:var(--danger);padding:8px 14px;font-size:13px}
-.banner{background:#1f2937;border:1px solid #374151;border-left:4px solid var(--warn);padding:16px;border-radius:10px;color:#fbbf24;margin:20px 0}
+.banner{background:#1f2937;border:1px solid #374151;border-left:4px solid var(--warn);padding:16px;border-radius:10px;color:#fbbf24;margin:20px 0;cursor:pointer;transition:all .2s}
+.banner:hover{background:#252f3f;transform:translateX(4px)}
 .ads{height:90px;background:linear-gradient(135deg,#1f2937,#0b1220);border:1px dashed #374151;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:13px;margin:20px 0}
 .hidden{display:none}
 .auth-container{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px}
@@ -53,6 +54,9 @@ table{width:100%;border-collapse:collapse;margin-top:16px}
 th,td{border-bottom:1px solid #1f2937;padding:12px 8px;text-align:left}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
 h1{margin-bottom:8px}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:400px;width:90%}
+.badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
 </style>
 </head>
 <body>
@@ -62,7 +66,8 @@ const S = {
   user: null, 
   docs: [], 
   events: [],
-  view: 'login'
+  view: 'login',
+  stats: {chatToday: 0, totalSize: 0}
 };
 
 const api = (p, fd=null) => fetch(p, {method: fd?'POST':'GET', body: fd}).then(r=>r.json());
@@ -140,10 +145,15 @@ function forgotView(){
 }
 
 function appView(){
+  const isPro = S.user.role === 'pro';
+  const maxDocs = isPro ? 200 : 5;
+  const maxChat = isPro ? 200 : 20;
+  const maxSize = isPro ? 150 : 10;
+  
   return `
   <div class="app">
     <aside>
-      <div class="logo">✨ <b>gm_v3</b></div>
+      <div class="logo">✨ <b>gm_v3</b> ${isPro ? '<span class="badge-pro">PRO</span>' : ''}</div>
       <div class="nav">
         <a href="#" data-route="dashboard" class="active">📊 Dashboard</a>
         <a href="#" data-route="chat">💬 Chat AI</a>
@@ -154,19 +164,19 @@ function appView(){
     <main>
       <section data-page="dashboard">
         <h1>Dashboard</h1>
-        <div class="banner">⚡ Stai usando il piano <b>Free</b>. Upgrade a Pro per funzionalità avanzate.</div>
+        ${!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         <div class="cards">
           <div class="card">
             <div style="color:var(--muted);font-size:12px">Documenti Archiviati</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="docCount">0</span> / <span id="docLimit">5</span></div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="docCount">0</span> / ${maxDocs}</div>
           </div>
           <div class="card">
             <div style="color:var(--muted);font-size:12px">Domande AI Oggi</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="qCount">0</span> / <span id="qLimit">20</span></div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="qCount">0</span> / ${maxChat}</div>
           </div>
           <div class="card">
-            <div style="color:var(--muted);font-size:12px">Dimensione Max File</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px">10 MB</div>
+            <div style="color:var(--muted);font-size:12px">Storage Usato</div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="storageUsed">0</span> MB / ${maxSize} MB</div>
           </div>
         </div>
 
@@ -176,19 +186,19 @@ function appView(){
             <div style="text-align:center">
               <div style="font-size:48px;margin-bottom:8px">📁</div>
               <div>Trascina qui un file o clicca per selezionare</div>
-              <div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG</div>
+              <div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max ${maxSize}MB)</div>
             </div>
           </div>
           <input type="file" id="file" class="hidden"/>
           <button class="btn" id="uploadBtn" style="width:100%">Carica File</button>
         </div>
 
-        <div class="ads">🎯 [Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>
+        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
 
         <div class="card">
           <h3>📚 I Tuoi Documenti</h3>
           <table id="docsTable">
-            <thead><tr><th>Nome File</th><th>Categoria</th><th>Data</th><th></th></tr></thead>
+            <thead><tr><th>Nome File</th><th>Dimensione</th><th>Data</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -196,6 +206,8 @@ function appView(){
 
       <section class="hidden" data-page="chat">
         <h1>💬 Chat AI</h1>
+        ${!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
         <div class="card">
           <h3>Fai una domanda ai tuoi documenti</h3>
           <div style="display:flex;gap:12px;margin-top:16px">
@@ -203,12 +215,15 @@ function appView(){
             <select id="category" style="width:180px"><option value="">(Free: tutti)</option></select>
             <button class="btn" id="askBtn">Chiedi</button>
           </div>
+          <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/${maxChat}</div>
           <div id="chatLog" style="margin-top:24px"></div>
         </div>
       </section>
 
       <section class="hidden" data-page="calendar">
         <h1>📅 Calendario</h1>
+        ${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
         <div class="card">
           <h3>Aggiungi Evento</h3>
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:16px 0">
@@ -224,6 +239,26 @@ function appView(){
         </div>
       </section>
     </main>
+  </div>`;
+}
+
+function upgradeModal(){
+  return `
+  <div class="modal" id="upgradeModal">
+    <div class="modal-content">
+      <h2 style="margin-bottom:16px">🚀 Upgrade a Pro</h2>
+      <p style="margin-bottom:24px;color:var(--muted)">Inserisci il codice promozionale per attivare il piano Pro</p>
+      <div class="form-group">
+        <label>Codice Promozionale</label>
+        <input type="text" id="promoCode" placeholder="Inserisci codice"/>
+      </div>
+      <div id="upgradeError" class="error hidden"></div>
+      <div id="upgradeSuccess" class="success hidden"></div>
+      <div class="btn-group">
+        <button class="btn secondary" id="closeModal">Annulla</button>
+        <button class="btn" id="activateBtn">Attiva Pro</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -245,6 +280,7 @@ function route(r){
   if(page) page.classList.remove('hidden');
   if(r==='dashboard') loadDocs();
   if(r==='calendar') loadEvents();
+  if(r==='chat') updateChatCounter();
 }
 
 function bind(){
@@ -287,6 +323,12 @@ function bind(){
       render(); 
     };
     
+    // Bind upgrade buttons
+    ['upgradeBtn', 'upgradeBtn2', 'upgradeBtn3'].forEach(id => {
+      const btn = document.getElementById(id);
+      if(btn) btn.onclick = showUpgradeModal;
+    });
+    
     document.querySelectorAll('.nav a').forEach(a=>{
       a.onclick=(e)=>{e.preventDefault(); route(a.dataset.route);};
     });
@@ -309,7 +351,66 @@ function bind(){
     if(addEv) addEv.onclick=createEvent;
     
     loadDocs();
+    loadStats();
   }
+}
+
+function showUpgradeModal(){
+  document.body.insertAdjacentHTML('beforeend', upgradeModal());
+  document.getElementById('closeModal').onclick = ()=> document.getElementById('upgradeModal').remove();
+  document.getElementById('activateBtn').onclick = activatePro;
+}
+
+async function activatePro(){
+  const code = document.getElementById('promoCode').value.trim();
+  const err = document.getElementById('upgradeError');
+  const success = document.getElementById('upgradeSuccess');
+  
+  err.classList.add('hidden');
+  success.classList.add('hidden');
+  
+  if(!code){
+    err.textContent = 'Inserisci un codice';
+    err.classList.remove('hidden');
+    return;
+  }
+  
+  const fd = new FormData();
+  fd.append('code', code);
+  
+  const r = await api('api/upgrade.php', fd);
+  
+  if(r.success){
+    success.textContent = '✓ Piano Pro attivato! Ricarico...';
+    success.classList.remove('hidden');
+    setTimeout(()=>{
+      S.user.role = 'pro';
+      document.getElementById('upgradeModal').remove();
+      render();
+    }, 1500);
+  } else {
+    err.textContent = r.message || 'Codice non valido';
+    err.classList.remove('hidden');
+  }
+}
+
+async function loadStats(){
+  const r = await api('api/stats.php');
+  if(r.success){
+    S.stats = r.data;
+    const qCount = document.getElementById('qCount');
+    const qCountChat = document.getElementById('qCountChat');
+    const storageUsed = document.getElementById('storageUsed');
+    
+    if(qCount) qCount.textContent = S.stats.chatToday || 0;
+    if(qCountChat) qCountChat.textContent = S.stats.chatToday || 0;
+    if(storageUsed) storageUsed.textContent = (S.stats.totalSize / (1024*1024)).toFixed(1);
+  }
+}
+
+function updateChatCounter(){
+  const qCountChat = document.getElementById('qCountChat');
+  if(qCountChat) qCountChat.textContent = S.stats.chatToday || 0;
 }
 
 async function doLogin(){
@@ -332,7 +433,7 @@ async function doLogin(){
   const r = await api('api/auth.php?a=login', fd);
   
   if(r.success){
-    S.user = {email, role:'free'};
+    S.user = {email, role: r.role || 'free'};
     S.view = 'app';
     render();
   } else {
@@ -415,13 +516,15 @@ async function loadDocs(){
     tb.innerHTML = r.data.map(d=>`
       <tr>
         <td>${d.file_name}</td>
-        <td>${d.label||'-'}</td>
+        <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
         <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
         <td><button class='btn del' data-id='${d.id}'>Elimina</button></td>
       </tr>
     `).join('');
     tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
   }
+  
+  loadStats();
 }
 
 async function uploadFile(){
@@ -466,6 +569,11 @@ async function ask(){
     item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">${badge} ${r.source==='docs'?'Risposta dai documenti':'Risposta AI'}</div><div>${r.answer}</div>`;
     log.insertBefore(item, log.firstChild);
     q.value = '';
+    
+    S.stats.chatToday++;
+    updateChatCounter();
+    const qCount = document.getElementById('qCount');
+    if(qCount) qCount.textContent = S.stats.chatToday;
   } else {
     alert(r.message || 'Errore');
   }

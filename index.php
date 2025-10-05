@@ -148,10 +148,12 @@ function forgotView(){
 }
 
 function appView(){
-  const isPro = S.user.role === 'pro';
+  const isPro = S.user && S.user.role === 'pro';
   const maxDocs = isPro ? 200 : 5;
   const maxChat = isPro ? 200 : 20;
   const maxSize = isPro ? 150 : 50;
+  
+  console.log('Rendering app with isPro:', isPro, 'role:', S.user?.role); // DEBUG
   
   return `
   <div class="app">

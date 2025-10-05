@@ -348,13 +348,101 @@ function bind(){
     const uploadBtn = document.getElementById('uploadBtn');
     const askBtn = document.getElementById('askBtn');
     const addEv = document.getElementById('addEv');
+    const addCategoryBtn = document.getElementById('addCategoryBtn');
     
     if(uploadBtn) uploadBtn.onclick=uploadFile;
     if(askBtn) askBtn.onclick=ask;
     if(addEv) addEv.onclick=createEvent;
+    if(addCategoryBtn) addCategoryBtn.onclick=createCategory;
     
     loadDocs();
     loadStats();
+    if(S.user.role === 'pro') {
+      loadCategories();
+    }
+  }
+}
+
+async function loadCategories(){
+  const r = await api('api/categories.php?a=list');
+  if(!r.success) return;
+  
+  S.categories = r.data;
+  
+  // Aggiorna select upload
+  const uploadCategory = document.getElementById('uploadCategory');
+  if(uploadCategory) {
+    uploadCategory.innerHTML = '<option value="">-- Seleziona una categoria --</option>' +
+      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  
+  // Aggiorna select chat
+  const category = document.getElementById('category');
+  if(category) {
+    category.innerHTML = '<option value="">-- Seleziona una categoria --</option>' +
+      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  
+  // Mostra lista categorie nella card upload
+  const categoriesList = document.getElementById('categoriesList');
+  if(categoriesList) {
+    if(S.categories.length === 0) {
+      categoriesList.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:8px">Nessuna categoria. Creane una qui sotto!</p>';
+    } else {
+      categoriesList.innerHTML = S.categories.map(c=>`
+        <span style="background:#0b1220;border:1px solid #374151;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;font-size:13px">
+          🏷️ ${c.name}
+          <button onclick="deleteCategory(${c.id})" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px" title="Elimina categoria">✕</button>
+        </span>
+      `).join('');
+    }
+  }
+}
+
+async function createCategory(){
+  const input = document.getElementById('newCategoryName');
+  const btn = document.getElementById('addCategoryBtn');
+  const name = input.value.trim();
+  
+  if(!name){
+    alert('Inserisci un nome per la categoria');
+    input.focus();
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+  
+  const fd = new FormData();
+  fd.append('name', name);
+  
+  try {
+    const r = await api('api/categories.php?a=create', fd);
+    
+    if(r.success){
+      input.value = '';
+      loadCategories();
+    } else {
+      alert(r.message || 'Errore creazione categoria');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '+ Crea';
+  }
+}
+
+async function deleteCategory(id){
+  if(!confirm('Eliminare questa categoria? I documenti non verranno eliminati.')) return;
+  
+  const fd = new FormData();
+  fd.append('id', id);
+  
+  const r = await api('api/categories.php?a=delete', fd);
+  
+  if(r.success){
+    loadCategories();
+  } else {
+    alert(r.message || 'Errore eliminazione categoria');
   }
 }
 
@@ -534,8 +622,16 @@ async function uploadFile(){
   const file = document.getElementById('file');
   const uploadBtn = document.getElementById('uploadBtn');
   const drop = document.getElementById('drop');
+  const uploadCategory = document.getElementById('uploadCategory');
   const f = file.files[0];
   if(!f) return alert('Seleziona un file');
+  
+  // Pro deve selezionare categoria
+  if(S.user.role === 'pro' && uploadCategory && !uploadCategory.value){
+    alert('Seleziona una categoria prima di caricare il file');
+    uploadCategory.focus();
+    return;
+  }
   
   // Mostra loader
   uploadBtn.disabled = true;
@@ -549,6 +645,9 @@ async function uploadFile(){
   
   const fd = new FormData();
   fd.append('file', f);
+  if(uploadCategory && uploadCategory.value) {
+    fd.append('category', uploadCategory.value);
+  }
   
   try {
     const r = await api('api/documents.php?a=upload', fd);
@@ -556,6 +655,7 @@ async function uploadFile(){
     if(r.success){
       loadDocs();
       file.value = '';
+      if(uploadCategory) uploadCategory.value = '';
     } else {
       alert(r.message || 'Errore durante l\'upload');
     }
@@ -605,13 +705,20 @@ async function ask(){
     return;
   }
   
+  // Pro DEVE selezionare categoria
+  if(S.user.role === 'pro' && (!category.value || category.value === '')){
+    alert('Seleziona una categoria prima di fare la domanda');
+    category.focus();
+    return;
+  }
+  
   // Mostra loader
   askBtn.disabled = true;
-  askBtn.innerHTML = 'Cerco<span class="loader"></span>';
+  askBtn.innerHTML = 'Cerco... <span class="loader"></span>';
   
   const fd = new FormData();
   fd.append('q', q.value);
-  fd.append('category', category.value);
+  fd.append('category', category.value || '');
   
   try {
     const r = await api('api/chat.php', fd);

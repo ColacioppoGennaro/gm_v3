@@ -57,6 +57,10 @@ h1{margin-bottom:8px}
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:400px;width:90%}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
+.loader{display:inline-block;width:16px;height:16px;border:2px solid #374151;border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite;margin-left:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn:disabled{opacity:0.6;cursor:not-allowed}
+.uploading{pointer-events:none;opacity:0.7}
 </style>
 </head>
 <body>

@@ -23,7 +23,15 @@ try {
     }
 
     if ($action === 'list') {
-        $st = db()->prepare("SELECT d.id, d.file_name, d.size, d.mime, d.created_at, l.name as label FROM documents d JOIN labels l ON d.label_id=l.id WHERE d.user_id=? ORDER BY d.created_at DESC");
+        // Query con JOIN per includere la categoria
+        $st = db()->prepare("
+            SELECT d.id, d.file_name, d.size, d.mime, d.created_at, 
+                   l.name as category, d.docanalyzer_doc_id
+            FROM documents d 
+            JOIN labels l ON d.label_id = l.id 
+            WHERE d.user_id = ? 
+            ORDER BY d.created_at DESC
+        ");
         $st->bind_param("i", $user['id']); 
         $st->execute(); 
         $r = $st->get_result(); 
@@ -112,6 +120,88 @@ try {
         
         ob_end_clean();
         json_out(['success' => true, 'docid' => $docanalyzer_doc_id]);
+    }
+    elseif ($action === 'change_category') {
+        // Cambia categoria di un documento
+        $doc_id = intval($_POST['id'] ?? 0);
+        $new_category = trim($_POST['category'] ?? '');
+        
+        if (!$doc_id || !$new_category) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Dati mancanti'], 400);
+        }
+        
+        // Solo Pro può usare questa funzione (tranne per master)
+        if (!is_pro() && $new_category !== 'master') {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Funzione riservata a Pro'], 403);
+        }
+        
+        // 1. Ottieni documento con vecchia label
+        $st = db()->prepare("
+            SELECT d.docanalyzer_doc_id, d.label_id, l.name as old_category, l.docanalyzer_label_id as old_label_name
+            FROM documents d
+            JOIN labels l ON d.label_id = l.id
+            WHERE d.id = ? AND d.user_id = ?
+        ");
+        $st->bind_param("ii", $doc_id, $user['id']);
+        $st->execute();
+        $r = $st->get_result();
+        
+        if (!($doc = $r->fetch_assoc())) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Documento non trovato'], 404);
+        }
+        
+        // 2. Ottieni nuova label
+        $st = db()->prepare("SELECT id, name, docanalyzer_label_id FROM labels WHERE user_id = ? AND name = ?");
+        $st->bind_param("is", $user['id'], $new_category);
+        $st->execute();
+        $r = $st->get_result();
+        
+        if (!($new_label = $r->fetch_assoc())) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Categoria non trovata'], 404);
+        }
+        
+        // Se è la stessa categoria, ignora
+        if ($doc['old_category'] === $new_category) {
+            ob_end_clean();
+            json_out(['success' => true, 'message' => 'Già nella categoria corretta']);
+        }
+        
+        // 3. SPOSTA su DocAnalyzer
+        try {
+            $docAnalyzer = new DocAnalyzerClient();
+            $docid = $doc['docanalyzer_doc_id'];
+            
+            // UNTAG dalla vecchia label
+            error_log("UNTAG from old label: {$doc['old_label_name']}, docid: $docid");
+            $docAnalyzer->updateLabel($doc['old_label_name'], [
+                'docids' => ['untag' => [$docid]]
+            ]);
+            
+            // TAG sulla nuova label
+            error_log("TAG to new label: {$new_label['docanalyzer_label_id']}, docid: $docid");
+            $docAnalyzer->updateLabel($new_label['docanalyzer_label_id'], [
+                'docids' => ['tag' => [$docid]]
+            ]);
+            
+            error_log("DocAnalyzer: Documento $docid spostato da {$doc['old_category']} a {$new_category}");
+            
+        } catch (Exception $e) {
+            error_log("Errore spostamento DocAnalyzer: " . $e->getMessage());
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Errore spostamento su DocAnalyzer: ' . $e->getMessage()], 500);
+        }
+        
+        // 4. Update DB locale
+        $st = db()->prepare("UPDATE documents SET label_id = ? WHERE id = ? AND user_id = ?");
+        $st->bind_param("iii", $new_label['id'], $doc_id, $user['id']);
+        $st->execute();
+        
+        ob_end_clean();
+        json_out(['success' => true, 'message' => 'Documento spostato correttamente']);
     }
     elseif ($action === 'delete') {
         $id = intval($_POST['id'] ?? 0); 

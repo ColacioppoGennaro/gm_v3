@@ -188,12 +188,34 @@ class DocAnalyzerClient {
     
     /**
      * Interroga i documenti di una o più label
+     * @param string $question La domanda
+     * @param array $labelNames Array di nomi label (es. ["user_123", "user_123_fatture"])
      */
-    public function query($question, $labelIds = []) {
+    public function query($question, $labelNames = []) {
+        // Converti i nomi in LID
+        $labelIds = [];
+        if (!empty($labelNames)) {
+            $allLabels = $this->listLabels();
+            foreach ($labelNames as $name) {
+                foreach ($allLabels as $label) {
+                    if (($label['name'] ?? '') === $name) {
+                        $labelIds[] = $label['lid'];
+                        break;
+                    }
+                }
+            }
+        }
+        
         $data = [
-            'question' => $question,
-            'labelids' => $labelIds
+            'question' => $question
         ];
+        
+        // Aggiungi labelids solo se presenti
+        if (!empty($labelIds)) {
+            $data['labelids'] = $labelIds;
+        }
+        
+        error_log("DocAnalyzer Query: question=" . substr($question, 0, 50) . ", labels=" . json_encode($labelNames) . ", lids=" . json_encode($labelIds));
         
         $response = $this->request('POST', '/api/v1/query', $data);
         return $response['data'] ?? null;

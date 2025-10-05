@@ -1,0 +1,36 @@
+name: Deploy to Netsons
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install LFTP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+      - name: Sync files via FTP
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_PATH: ${{ secrets.FTP_PATH }}
+        run: |
+          lftp -e "
+            set ftp:ssl-allow no;
+            mirror -R --delete --verbose . $FTP_PATH \
+              -x '.git*' -x '.github*' -x '_var/logs*' -x 'node_modules*' -x 'dist*';
+            bye
+          " -u $FTP_USER,$FTP_PASS $FTP_HOST
+      - name: Run patcher
+        if: env.PATCH_URL != ''
+        env:
+          PATCH_URL: ${{ secrets.PATCH_URL }}
+        run: |
+          curl -s $PATCH_URL || true

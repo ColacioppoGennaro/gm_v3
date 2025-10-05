@@ -1,0 +1,1 @@
+Qui puoi generare il bundle React+Vite e pubblicare in /dist.

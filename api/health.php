@@ -1,0 +1,1 @@
+<?php require_once __DIR__.'/../_core/helpers.php'; require_once __DIR__.'/../_core/sentinel.php'; ob_start(); sentinel_check(); $hdr=headers_list(); json_out(['success'=>true,'health'=>$hdr]);

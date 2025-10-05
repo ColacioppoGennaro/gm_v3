@@ -1,6 +1,6 @@
 
 <?php
-require_once __DIR__.'/../_core/bootstrap.php';
+require_once __DIR__ . '/_api_boot.php';
 $action=$_GET['a']??$_POST['a']??'';
 if($action==='login'){
   ratelimit('login:'.($_SERVER['REMOTE_ADDR']??'na'),10,60);

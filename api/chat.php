@@ -84,20 +84,26 @@ try {
 
     // === QUERY DOCANALYZER ===
     $answer = null;
-    $source = 'llm'; // Default fallback
+    $source = 'llm';
     
     try {
         $docAnalyzer = new DocAnalyzerClient();
-        $docResult = $docAnalyzer->query($q, $labelIds);
         
-        // Verifica se DocAnalyzer ha trovato una risposta utile
+        // Usa la PRIMA label (master per free, o quella scelta per pro)
+        $labelToQuery = $labelIds[0]; // Questo è il NOME della label
+        
+        error_log("Tentativo query DocAnalyzer: label=$labelToQuery, question=" . substr($q, 0, 100));
+        
+        $docResult = $docAnalyzer->queryLabel($q, $labelToQuery);
+        
+        // Verifica se DocAnalyzer ha trovato una risposta
         if ($docResult && isset($docResult['answer']) && !empty(trim($docResult['answer']))) {
             $answer = $docResult['answer'];
             $source = 'docs';
             
-            error_log("DocAnalyzer Query Success: " . substr($answer, 0, 100));
+            error_log("DocAnalyzer SUCCESS: " . substr($answer, 0, 100));
         } else {
-            error_log("DocAnalyzer: Nessuna risposta nei documenti");
+            error_log("DocAnalyzer: Nessuna risposta trovata nei documenti");
         }
     } catch (Exception $e) {
         error_log("DocAnalyzer Query Error: " . $e->getMessage());

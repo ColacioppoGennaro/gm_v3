@@ -1,0 +1,9 @@
+DirectoryIndex index.php
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# Block direct access to internal directories
+RewriteRule ^(_core|_migrations|_var)/ - [F,L]
+</IfModule>

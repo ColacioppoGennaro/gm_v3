@@ -86,17 +86,18 @@ try {
         try {
             $docAnalyzer = new DocAnalyzerClient();
             
-            // Upload e tag su DocAnalyzer
+            // Il docanalyzer_label_id nel DB è il NOME della label su DocAnalyzer
+            // Dobbiamo usarlo come nome per trovare/creare la label
             $result = $docAnalyzer->uploadAndTag(
                 $f['tmp_name'],
                 $f['name'],
-                $docanalyzer_label_id // Usa il label_id di DocAnalyzer
+                $docanalyzer_label_id // Questo è il nome della label (es. "user_123" o "user_123_fatture")
             );
             
             $docanalyzer_doc_id = $result['docid'];
             
             // Log per debug
-            error_log("DocAnalyzer Upload Success: " . json_encode($result));
+            error_log("DocAnalyzer Upload Success: docid={$docanalyzer_doc_id}, label={$docanalyzer_label_id}, strategy={$result['strategy']}");
             
         } catch (Exception $e) {
             error_log("DocAnalyzer Error: " . $e->getMessage());

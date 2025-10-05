@@ -148,7 +148,7 @@ function appView(){
   const isPro = S.user.role === 'pro';
   const maxDocs = isPro ? 200 : 5;
   const maxChat = isPro ? 200 : 20;
-  const maxSize = isPro ? 150 : 10;
+  const maxSize = isPro ? 150 : 50;
   
   return `
   <div class="app">

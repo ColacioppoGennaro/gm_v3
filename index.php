@@ -54,14 +54,21 @@ table{width:100%;border-collapse:collapse;margin-top:16px}
 th,td{border-bottom:1px solid #1f2937;padding:12px 8px;text-align:left}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
 h1{margin-bottom:8px}
-.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:400px;width:90%}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:600px;width:100%;max-height:90vh;overflow-y:auto}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
+.badge-category{background:#1f2937;color:var(--accent);padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;display:inline-block}
 .loader{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 .category-tag{background:#0b1220;border:1px solid #374151;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;font-size:13px;margin:4px}
 .category-tag button{background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px}
 .category-tag button:hover{color:#ff6b6b}
+.organize-item{background:#1f2937;padding:12px;border-radius:8px;margin:8px 0;display:flex;align-items:center;gap:12px}
+.organize-item .filename{flex:1;font-size:13px}
+.organize-item select{width:200px;font-size:13px;padding:8px}
+.filter-bar{background:#1f2937;padding:12px 16px;border-radius:10px;margin:16px 0;display:flex;gap:12px;align-items:center}
+.filter-bar label{font-size:13px;color:var(--muted)}
+.filter-bar select{width:auto;min-width:200px;padding:8px 12px;font-size:13px}
 </style>
 </head>
 <body>
@@ -73,7 +80,8 @@ const S = {
   events: [],
   categories: [],
   view: 'login',
-  stats: {chatToday: 0, totalSize: 0}
+  stats: {chatToday: 0, totalSize: 0},
+  filterCategory: ''
 };
 
 const api = (p, fd=null) => fetch(p, {method: fd?'POST':'GET', body: fd}).then(r=>r.json());
@@ -156,8 +164,6 @@ function appView(){
   const maxChat = isPro ? 200 : 20;
   const maxSize = isPro ? 150 : 50;
   
-  console.log('Rendering app with isPro:', isPro, 'role:', S.user?.role); // DEBUG
-  
   return `
   <div class="app">
     <aside>
@@ -224,8 +230,27 @@ function appView(){
 
         <div class="card">
           <h3>📚 I Tuoi Documenti</h3>
+          
+          ${isPro ? `
+          <div class="filter-bar">
+            <label>Filtra per categoria:</label>
+            <select id="filterCategory">
+              <option value="">Tutte le categorie</option>
+            </select>
+            <button class="btn secondary" id="organizeDocsBtn">🔧 Organizza Documenti</button>
+          </div>
+          ` : ''}
+          
           <table id="docsTable">
-            <thead><tr><th>Nome File</th><th>Dimensione</th><th>Data</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Nome File</th>
+                ${isPro ? '<th>Categoria</th>' : ''}
+                <th>Dimensione</th>
+                <th>Data</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody></tbody>
           </table>
         </div>
@@ -284,6 +309,50 @@ function upgradeModal(){
       <div class="btn-group">
         <button class="btn secondary" id="closeModal">Annulla</button>
         <button class="btn" id="activateBtn">Attiva Pro</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function organizeDocsModal(){
+  const masterDocs = S.docs.filter(d => d.category === 'master');
+  
+  if (masterDocs.length === 0) {
+    return `
+    <div class="modal" id="organizeModal">
+      <div class="modal-content">
+        <h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>
+        <p style="color:var(--ok);margin-bottom:16px">✓ Tutti i documenti sono già organizzati in categorie!</p>
+        <button class="btn" onclick="document.getElementById('organizeModal').remove()">Chiudi</button>
+      </div>
+    </div>`;
+  }
+  
+  return `
+  <div class="modal" id="organizeModal">
+    <div class="modal-content">
+      <h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>
+      <p style="color:var(--muted);margin-bottom:16px">Hai ${masterDocs.length} documento/i senza categoria. Assegna una categoria a ciascuno:</p>
+      
+      <div id="organizeList">
+        ${masterDocs.map(d => `
+          <div class="organize-item" data-docid="${d.id}">
+            <div class="filename">📄 ${d.file_name}</div>
+            <select class="organize-select" data-docid="${d.id}">
+              <option value="">-- Scegli categoria --</option>
+              ${S.categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div style="margin-top:24px;font-size:13px;color:var(--muted)">
+        💡 Suggerimento: Crea prima le categorie di cui hai bisogno nella dashboard, poi torna qui per assegnarle.
+      </div>
+      
+      <div class="btn-group" style="margin-top:24px">
+        <button class="btn secondary" onclick="document.getElementById('organizeModal').remove()">Chiudi</button>
+        <button class="btn" id="saveOrganizeBtn">Salva Organizzazione</button>
       </div>
     </div>
   </div>`;
@@ -379,11 +448,15 @@ function bind(){
     const askBtn = document.getElementById('askBtn');
     const addEv = document.getElementById('addEv');
     const addCategoryBtn = document.getElementById('addCategoryBtn');
+    const organizeDocsBtn = document.getElementById('organizeDocsBtn');
+    const filterCategory = document.getElementById('filterCategory');
     
     if(uploadBtn) uploadBtn.onclick=uploadFile;
     if(askBtn) askBtn.onclick=ask;
     if(addEv) addEv.onclick=createEvent;
     if(addCategoryBtn) addCategoryBtn.onclick=createCategory;
+    if(organizeDocsBtn) organizeDocsBtn.onclick=showOrganizeModal;
+    if(filterCategory) filterCategory.onchange=(e)=>{S.filterCategory=e.target.value; renderDocsTable();};
     
     loadDocs();
     loadStats();
@@ -410,6 +483,13 @@ async function loadCategories(){
   const category = document.getElementById('category');
   if(category) {
     category.innerHTML = '<option value="">-- Seleziona categoria --</option>' +
+      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  
+  // Aggiorna filtro categoria
+  const filterCategory = document.getElementById('filterCategory');
+  if(filterCategory) {
+    filterCategory.innerHTML = '<option value="">Tutte le categorie</option>' +
       S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
   }
   
@@ -471,6 +551,7 @@ async function deleteCategory(id){
   
   if(r.success){
     loadCategories();
+    loadDocs(); // Ricarica documenti
   } else {
     alert(r.message || 'Errore eliminazione categoria');
   }
@@ -483,6 +564,61 @@ function showUpgradeModal(){
   document.body.insertAdjacentHTML('beforeend', upgradeModal());
   document.getElementById('closeModal').onclick = ()=> document.getElementById('upgradeModal').remove();
   document.getElementById('activateBtn').onclick = activatePro;
+}
+
+function showOrganizeModal(){
+  document.body.insertAdjacentHTML('beforeend', organizeDocsModal());
+  const saveBtn = document.getElementById('saveOrganizeBtn');
+  if(saveBtn) saveBtn.onclick = saveOrganization;
+}
+
+async function saveOrganization(){
+  const selects = document.querySelectorAll('.organize-select');
+  const updates = [];
+  
+  selects.forEach(select => {
+    const docid = select.dataset.docid;
+    const category = select.value;
+    if(category) {
+      updates.push({docid: parseInt(docid), category});
+    }
+  });
+  
+  if(updates.length === 0){
+    alert('Seleziona almeno una categoria');
+    return;
+  }
+  
+  const saveBtn = document.getElementById('saveOrganizeBtn');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = 'Salvataggio... <span class="loader"></span>';
+  
+  let success = 0;
+  let errors = 0;
+  
+  for(const update of updates){
+    const fd = new FormData();
+    fd.append('id', update.docid);
+    fd.append('category', update.category);
+    
+    try {
+      const r = await api('api/documents.php?a=change_category', fd);
+      if(r.success) success++;
+      else errors++;
+    } catch(e) {
+      errors++;
+    }
+  }
+  
+  document.getElementById('organizeModal').remove();
+  
+  if(errors === 0){
+    alert(`✓ ${success} documento/i organizzato/i correttamente!`);
+  } else {
+    alert(`⚠ ${success} documento/i organizzato/i, ${errors} errore/i.`);
+  }
+  
+  loadDocs();
 }
 
 async function activatePro(){
@@ -511,6 +647,13 @@ async function activatePro(){
       S.user.role = 'pro';
       document.getElementById('upgradeModal').remove();
       render();
+      // Mostra modal organizzazione se ci sono documenti master
+      setTimeout(() => {
+        const masterDocs = S.docs.filter(d => d.category === 'master');
+        if(masterDocs.length > 0) {
+          showOrganizeModal();
+        }
+      }, 500);
     }, 1500);
   } else {
     err.textContent = r.message || 'Codice non valido';
@@ -558,7 +701,6 @@ async function doLogin(){
   
   if(r.success){
     S.user = {email, role: r.role || 'free'};
-    console.log('User logged in:', S.user); // Debug
     S.view = 'app';
     render();
   } else {
@@ -633,23 +775,38 @@ async function loadDocs(){
   const r = await api('api/documents.php?a=list');
   if(!r.success) return;
   
-  const docCount = document.getElementById('docCount');
-  const tb = document.querySelector('#docsTable tbody');
+  S.docs = r.data;
   
-  if(docCount) docCount.textContent = r.data.length;
-  if(tb){
-    tb.innerHTML = r.data.map(d=>`
-      <tr>
-        <td>${d.file_name}</td>
-        <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
-        <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
-        <td><button class='btn del' data-id='${d.id}'>Elimina</button></td>
-      </tr>
-    `).join('');
-    tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  const docCount = document.getElementById('docCount');
+  if(docCount) docCount.textContent = S.docs.length;
+  
+  renderDocsTable();
+  loadStats();
+}
+
+function renderDocsTable(){
+  const tb = document.querySelector('#docsTable tbody');
+  if(!tb) return;
+  
+  const isPro = S.user && S.user.role === 'pro';
+  
+  // Filtra documenti se c'è un filtro attivo
+  let filteredDocs = S.docs;
+  if(S.filterCategory) {
+    filteredDocs = S.docs.filter(d => d.category === S.filterCategory);
   }
   
-  loadStats();
+  tb.innerHTML = filteredDocs.map(d=>`
+    <tr>
+      <td>${d.file_name}</td>
+      ${isPro ? `<td><span class="badge-category">${d.category}</span></td>` : ''}
+      <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
+      <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
+      <td><button class='btn del' data-id='${d.id}'>Elimina</button></td>
+    </tr>
+  `).join('');
+  
+  tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
 }
 
 async function uploadFile(){
@@ -708,7 +865,6 @@ async function uploadFile(){
 async function delDoc(id){
   if(!confirm('Eliminare questo documento?')) return;
   
-  // Trova il bottone e mostra loader
   const btn = document.querySelector(`button[data-id="${id}"]`);
   if(btn){
     btn.disabled = true;

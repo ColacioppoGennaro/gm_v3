@@ -187,37 +187,29 @@ class DocAnalyzerClient {
     }
     
     /**
-     * Interroga i documenti di una o più label
+     * Interroga i documenti di una label usando l'endpoint /label/{lid}/chat
      * @param string $question La domanda
-     * @param array $labelNames Array di nomi label (es. ["user_123", "user_123_fatture"])
+     * @param string $labelName Nome della label da interrogare
      */
-    public function query($question, $labelNames = []) {
-        // Converti i nomi in LID
-        $labelIds = [];
-        if (!empty($labelNames)) {
-            $allLabels = $this->listLabels();
-            foreach ($labelNames as $name) {
-                foreach ($allLabels as $label) {
-                    if (($label['name'] ?? '') === $name) {
-                        $labelIds[] = $label['lid'];
-                        break;
-                    }
-                }
-            }
+    public function queryLabel($question, $labelName) {
+        // Trova la label per nome
+        $label = $this->findLabelByName($labelName);
+        
+        if (!$label) {
+            throw new Exception("Label '$labelName' non trovata");
         }
+        
+        $lid = $label['lid'];
         
         $data = [
-            'question' => $question
+            'prompt' => $question,
+            'adherence' => 'balanced'
         ];
         
-        // Aggiungi labelids solo se presenti
-        if (!empty($labelIds)) {
-            $data['labelids'] = $labelIds;
-        }
+        error_log("DocAnalyzer Query Label: lid=$lid, label=$labelName, question=" . substr($question, 0, 50));
         
-        error_log("DocAnalyzer Query: question=" . substr($question, 0, 50) . ", labels=" . json_encode($labelNames) . ", lids=" . json_encode($labelIds));
+        $response = $this->request('POST', "/api/v1/label/{$lid}/chat", $data);
         
-        $response = $this->request('POST', '/api/v1/query', $data);
         return $response['data'] ?? null;
     }
     

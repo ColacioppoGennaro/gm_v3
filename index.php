@@ -432,7 +432,7 @@ async function createCategory(){
 }
 
 async function deleteCategory(id){
-  if(!confirm('Eliminare questa categoria? I documenti non verranno eliminati.')) return;
+  if(!confirm('Eliminare questa categoria?\n\nATTENZIONE: Non puoi eliminare categorie che contengono documenti.')) return;
   
   const fd = new FormData();
   fd.append('id', id);
@@ -525,6 +525,7 @@ async function doLogin(){
   
   if(r.success){
     S.user = {email, role: r.role || 'free'};
+    console.log('User logged in:', S.user); // Debug
     S.view = 'app';
     render();
   } else {

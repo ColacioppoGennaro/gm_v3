@@ -57,10 +57,8 @@ h1{margin-bottom:8px}
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:400px;width:90%}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
-.loader{display:inline-block;width:16px;height:16px;border:2px solid #374151;border-top-color:var(--accent);border-radius:50%;animation:spin 0.6s linear infinite;margin-left:8px}
+.loader{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
-.btn:disabled{opacity:0.6;cursor:not-allowed}
-.uploading{pointer-events:none;opacity:0.7}
 </style>
 </head>
 <body>
@@ -533,53 +531,109 @@ async function loadDocs(){
 
 async function uploadFile(){
   const file = document.getElementById('file');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const drop = document.getElementById('drop');
   const f = file.files[0];
   if(!f) return alert('Seleziona un file');
   
+  // Mostra loader
+  uploadBtn.disabled = true;
+  const originalText = uploadBtn.innerHTML;
+  uploadBtn.innerHTML = 'Caricamento... <span class="loader"></span>';
+  
+  if(drop) {
+    drop.style.opacity = '0.5';
+    drop.style.pointerEvents = 'none';
+  }
+  
   const fd = new FormData();
   fd.append('file', f);
-  const r = await api('api/documents.php?a=upload', fd);
   
-  if(r.success){
-    loadDocs();
-    file.value = '';
-  } else {
-    alert(r.message || 'Errore durante l\'upload');
+  try {
+    const r = await api('api/documents.php?a=upload', fd);
+    
+    if(r.success){
+      loadDocs();
+      file.value = '';
+    } else {
+      alert(r.message || 'Errore durante l\'upload');
+    }
+  } catch(e) {
+    alert('Errore di connessione durante l\'upload');
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.innerHTML = originalText;
+    if(drop) {
+      drop.style.opacity = '1';
+      drop.style.pointerEvents = 'auto';
+    }
   }
 }
 
 async function delDoc(id){
   if(!confirm('Eliminare questo documento?')) return;
+  
+  // Trova il bottone e mostra loader
+  const btn = document.querySelector(`button[data-id="${id}"]`);
+  if(btn){
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loader"></span>';
+  }
+  
   const fd = new FormData();
   fd.append('id', id);
   const r = await api('api/documents.php?a=delete', fd);
-  if(r.success) loadDocs();
+  
+  if(r.success) {
+    loadDocs();
+  } else {
+    if(btn){
+      btn.disabled = false;
+      btn.innerHTML = 'Elimina';
+    }
+  }
 }
 
 async function ask(){
   const q = document.getElementById('q');
   const category = document.getElementById('category');
+  const askBtn = document.getElementById('askBtn');
+  
+  if(!q.value.trim()){
+    alert('Inserisci una domanda');
+    return;
+  }
+  
+  // Mostra loader
+  askBtn.disabled = true;
+  askBtn.innerHTML = 'Cerco<span class="loader"></span>';
+  
   const fd = new FormData();
   fd.append('q', q.value);
   fd.append('category', category.value);
   
-  const r = await api('api/chat.php', fd);
-  const log = document.getElementById('chatLog');
-  
-  if(r.success){
-    const badge = r.source==='docs'?'📄':'🤖';
-    const item = document.createElement('div');
-    item.style.cssText = 'background:#1f2937;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)';
-    item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">${badge} ${r.source==='docs'?'Risposta dai documenti':'Risposta AI'}</div><div>${r.answer}</div>`;
-    log.insertBefore(item, log.firstChild);
-    q.value = '';
+  try {
+    const r = await api('api/chat.php', fd);
+    const log = document.getElementById('chatLog');
     
-    S.stats.chatToday++;
-    updateChatCounter();
-    const qCount = document.getElementById('qCount');
-    if(qCount) qCount.textContent = S.stats.chatToday;
-  } else {
-    alert(r.message || 'Errore');
+    if(r.success){
+      const badge = r.source==='docs'?'📄':'🤖';
+      const item = document.createElement('div');
+      item.style.cssText = 'background:#1f2937;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)';
+      item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">${badge} ${r.source==='docs'?'Risposta dai documenti':'Risposta AI'}</div><div>${r.answer}</div>`;
+      log.insertBefore(item, log.firstChild);
+      q.value = '';
+      
+      S.stats.chatToday++;
+      updateChatCounter();
+      const qCount = document.getElementById('qCount');
+      if(qCount) qCount.textContent = S.stats.chatToday;
+    } else {
+      alert(r.message || 'Errore');
+    }
+  } finally {
+    askBtn.disabled = false;
+    askBtn.innerHTML = 'Chiedi';
   }
 }
 

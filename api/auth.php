@@ -19,6 +19,7 @@ try {
         $pass=$_POST['password']??'';
         
         if(!$email||!$pass) {
+            ob_end_clean();
             json_out(['success'=>false,'message'=>'Campi mancanti'],400);
         }
         
@@ -32,9 +33,11 @@ try {
                 $_SESSION['user_id']=$row['id']; 
                 $_SESSION['role']=$row['role']; 
                 $_SESSION['email']=$email; 
-                json_out(['success'=>true]); 
+                ob_end_clean();
+                json_out(['success'=>true, 'role'=>$row['role']]); 
             } 
         }
+        ob_end_clean();
         json_out(['success'=>false,'message'=>'Credenziali errate'],401);
     }
     elseif($action==='register'){
@@ -42,6 +45,7 @@ try {
         $pass=$_POST['password']??'';
         
         if(!filter_var($email,FILTER_VALIDATE_EMAIL)||strlen($pass)<6) {
+            ob_end_clean();
             json_out(['success'=>false,'message'=>'Dati non validi'],400);
         }
         
@@ -52,6 +56,7 @@ try {
         try{ 
             $stmt->execute(); 
         } catch(Throwable $e){ 
+            ob_end_clean();
             json_out(['success'=>false,'message'=>'Email già esistente'],409); 
         }
         
@@ -62,6 +67,7 @@ try {
         $stmt2->bind_param("iss",$uid,$master,$label_id); 
         $stmt2->execute();
         
+        ob_end_clean();
         json_out(['success'=>true]);
     }
     elseif($action==='logout'){ 

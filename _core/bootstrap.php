@@ -1,4 +1,3 @@
-
 <?php
 // DEBUG temporaneo (poi toglilo)
 error_reporting(E_ALL);
@@ -28,4 +27,3 @@ if (!function_exists('gm_load_env')) {
 }
 // carica il nostro .env
 gm_load_env(__DIR__.'/../.env');
-

@@ -66,9 +66,11 @@ try {
     }
     elseif($action==='logout'){ 
         session_destroy(); 
+        ob_end_clean();
         json_out(['success'=>true]); 
     }
     else {
+        ob_end_clean();
         json_out(['success'=>false,'message'=>'Azione non valida'],404);
     }
     

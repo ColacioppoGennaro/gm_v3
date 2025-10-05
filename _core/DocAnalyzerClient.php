@@ -98,6 +98,26 @@ class DocAnalyzerClient {
     }
     
     /**
+     * Aggiorna una label (nome, colore, documenti)
+     * @param string $labelName Nome della label (verrà cercato il lid)
+     * @param array $updates ['name' => '...', 'color' => '...', 'docids' => ['tag' => [...], 'untag' => [...]]]
+     */
+    public function updateLabel($labelName, $updates) {
+        // Trova label per nome
+        $label = $this->findLabelByName($labelName);
+        if (!$label) {
+            throw new Exception("Label '$labelName' non trovata");
+        }
+        
+        $lid = $label['lid'];
+        
+        error_log("DocAnalyzer updateLabel: lid=$lid, updates=" . json_encode($updates));
+        
+        $response = $this->request('PUT', "/api/v1/label/{$lid}", $updates);
+        return $response['data'] ?? null;
+    }
+    
+    /**
      * Upload documento SINCRONO (strategia che funziona)
      */
     public function uploadDocumentSync($filePath, $fileName) {

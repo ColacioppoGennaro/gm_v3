@@ -38,27 +38,48 @@ try {
     $labelIds = [];
     
     if (is_pro()) {
+        // Pro: label master (user) + categoria specifica
         if (!$category) {
             ob_end_clean();
             json_out(['success' => false, 'message' => 'Seleziona una categoria'], 400);
         }
-        $st = db()->prepare("SELECT docanalyzer_label_id FROM labels WHERE user_id=? AND name=?"); 
-        $st->bind_param("is", $user['id'], $category); 
-        $st->execute(); 
-        $rr = $st->get_result(); 
-        if (!($row = $rr->fetch_assoc())) {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'Categoria non valida'], 400);
-        }
-        $labelIds = [$row['docanalyzer_label_id']];
-    } else {
-        // Free: usa solo la label master
+        
+        // 1. Label master dell'utente (sempre inclusa)
         $st = db()->prepare("SELECT docanalyzer_label_id FROM labels WHERE user_id=? AND name='master'"); 
         $st->bind_param("i", $user['id']); 
         $st->execute(); 
         $rr = $st->get_result(); 
-        $row = $rr->fetch_assoc(); 
-        $labelIds = [$row['docanalyzer_label_id']];
+        if ($row = $rr->fetch_assoc()) {
+            $labelIds[] = $row['docanalyzer_label_id'];
+        }
+        
+        // 2. Label categoria scelta
+        $st = db()->prepare("SELECT docanalyzer_label_id FROM labels WHERE user_id=? AND name=?"); 
+        $st->bind_param("is", $user['id'], $category); 
+        $st->execute(); 
+        $rr = $st->get_result(); 
+        if ($row = $rr->fetch_assoc()) {
+            $labelIds[] = $row['docanalyzer_label_id'];
+        }
+        
+        if (empty($labelIds)) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Categoria non valida'], 400);
+        }
+    } else {
+        // Free: usa SOLO la label master (user)
+        $st = db()->prepare("SELECT docanalyzer_label_id FROM labels WHERE user_id=? AND name='master'"); 
+        $st->bind_param("i", $user['id']); 
+        $st->execute(); 
+        $rr = $st->get_result(); 
+        if ($row = $rr->fetch_assoc()) {
+            $labelIds = [$row['docanalyzer_label_id']];
+        }
+        
+        if (empty($labelIds)) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Label master non trovata'], 500);
+        }
     }
 
     // === QUERY DOCANALYZER ===

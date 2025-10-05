@@ -90,27 +90,29 @@ try {
             }
         }
         
+        error_log("=== UPLOAD START ===");
+        error_log("File: {$f['name']}, Category: $label_name, DocAnalyzer Label: $docanalyzer_label_id");
+        
         // === INTEGRAZIONE DOCANALYZER ===
         try {
             $docAnalyzer = new DocAnalyzerClient();
             
             // Il docanalyzer_label_id nel DB è il NOME della label su DocAnalyzer
-            // Dobbiamo usarlo come nome per trovare/creare la label
             $result = $docAnalyzer->uploadAndTag(
                 $f['tmp_name'],
                 $f['name'],
-                $docanalyzer_label_id // Questo è il nome della label (es. "user_123" o "user_123_fatture")
+                $docanalyzer_label_id
             );
             
             $docanalyzer_doc_id = $result['docid'];
             
-            // Log per debug
-            error_log("DocAnalyzer Upload Success: docid={$docanalyzer_doc_id}, label={$docanalyzer_label_id}, strategy={$result['strategy']}");
+            error_log("Upload SUCCESS: docid=$docanalyzer_doc_id, strategy={$result['strategy']}");
             
         } catch (Exception $e) {
-            error_log("DocAnalyzer Error: " . $e->getMessage());
+            error_log("DocAnalyzer Upload Error: " . $e->getMessage());
+            error_log("Stack: " . $e->getTraceAsString());
             ob_end_clean();
-            json_out(['success' => false, 'message' => 'Errore caricamento su DocAnalyzer: ' . $e->getMessage()], 500);
+            json_out(['success' => false, 'message' => 'Errore DocAnalyzer: ' . $e->getMessage()], 500);
         }
         
         // Salva nel DB locale
@@ -170,29 +172,49 @@ try {
             json_out(['success' => true, 'message' => 'Già nella categoria corretta']);
         }
         
-        // 3. SPOSTA su DocAnalyzer
+        // 3. SPOSTA su DocAnalyzer (con gestione errori robusta)
         try {
             $docAnalyzer = new DocAnalyzerClient();
             $docid = $doc['docanalyzer_doc_id'];
             
-            // UNTAG dalla vecchia label
-            error_log("UNTAG from old label: {$doc['old_label_name']}, docid: $docid");
-            $docAnalyzer->updateLabel($doc['old_label_name'], [
-                'docids' => ['untag' => [$docid]]
-            ]);
+            error_log("=== CHANGE CATEGORY START ===");
+            error_log("Doc ID: $docid");
+            error_log("Old label: {$doc['old_label_name']} (category: {$doc['old_category']})");
+            error_log("New label: {$new_label['docanalyzer_label_id']} (category: {$new_category})");
             
-            // TAG sulla nuova label
-            error_log("TAG to new label: {$new_label['docanalyzer_label_id']}, docid: $docid");
-            $docAnalyzer->updateLabel($new_label['docanalyzer_label_id'], [
-                'docids' => ['tag' => [$docid]]
-            ]);
+            // Verifica che entrambe le label esistano su DocAnalyzer
+            $oldLabelExists = $docAnalyzer->findLabelByName($doc['old_label_name']);
+            $newLabelExists = $docAnalyzer->findLabelByName($new_label['docanalyzer_label_id']);
             
-            error_log("DocAnalyzer: Documento $docid spostato da {$doc['old_category']} a {$new_category}");
+            if (!$oldLabelExists) {
+                error_log("WARNING: Old label '{$doc['old_label_name']}' not found on DocAnalyzer - skipping UNTAG");
+            } else {
+                // UNTAG dalla vecchia label
+                error_log("UNTAG from: {$doc['old_label_name']}");
+                $docAnalyzer->updateLabel($doc['old_label_name'], [
+                    'docids' => ['untag' => [$docid]]
+                ]);
+            }
+            
+            if (!$newLabelExists) {
+                error_log("WARNING: New label '{$new_label['docanalyzer_label_id']}' not found on DocAnalyzer - creating it");
+                // Crea la label se non esiste
+                $docAnalyzer->createLabel($new_label['docanalyzer_label_id'], [$docid]);
+            } else {
+                // TAG sulla nuova label
+                error_log("TAG to: {$new_label['docanalyzer_label_id']}");
+                $docAnalyzer->updateLabel($new_label['docanalyzer_label_id'], [
+                    'docids' => ['tag' => [$docid]]
+                ]);
+            }
+            
+            error_log("=== CHANGE CATEGORY SUCCESS ===");
             
         } catch (Exception $e) {
-            error_log("Errore spostamento DocAnalyzer: " . $e->getMessage());
+            error_log("ERROR changing category: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             ob_end_clean();
-            json_out(['success' => false, 'message' => 'Errore spostamento su DocAnalyzer: ' . $e->getMessage()], 500);
+            json_out(['success' => false, 'message' => 'Errore DocAnalyzer: ' . $e->getMessage()], 500);
         }
         
         // 4. Update DB locale
@@ -248,11 +270,14 @@ try {
 } catch (Throwable $e) {
     ob_end_clean();
     error_log("API Error in documents.php: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false, 
-        'message' => 'Errore server: ' . $e->getMessage()
+        'message' => 'Errore server: ' . $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
     ]);
     exit;
 }

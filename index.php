@@ -1,5 +1,9 @@
+<?php
+// IMPORTANTE: Avvia la sessione prima di tutto
+session_start();
 
-<?php require_once __DIR__.'/_core/helpers.php'; ?>
+require_once __DIR__.'/_core/helpers.php';
+?>
 <!doctype html><html lang="it"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>gm_v3</title>
@@ -104,46 +108,66 @@ function mount(html){ document.getElementById('root').innerHTML=html; bind(); }
 function route(r){
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active', a.dataset.route===r));
   document.querySelectorAll('[data-page]').forEach(p=>p.classList.add('hidden'));
-  document.querySelector(`[data-page="${r}"]`).classList.remove('hidden');
+  const page = document.querySelector(`[data-page="${r}"]`);
+  if(page) page.classList.remove('hidden');
   if(r==='dashboard') loadDocs(); if(r==='calendar') loadEvents();
 }
 
 async function bind(){
   if(!S.user){
-    document.getElementById('loginBtn').onclick=async()=>{
+    const loginBtn = document.getElementById('loginBtn');
+    const regBtn = document.getElementById('regBtn');
+    if(loginBtn) loginBtn.onclick=async()=>{
+      const email = document.getElementById('email');
+      const password = document.getElementById('password');
       const fd=new FormData(); fd.append('email',email.value); fd.append('password',password.value);
       const r=await api('api/auth.php?a=login',fd); if(r.success){ S.user={email:email.value,role:'free'}; mount(ui()); } else alert(r.message||'Errore');
     };
-    document.getElementById('regBtn').onclick=async()=>{
+    if(regBtn) regBtn.onclick=async()=>{
+      const email = document.getElementById('email');
+      const password = document.getElementById('password');
       const fd=new FormData(); fd.append('email',email.value); fd.append('password',password.value);
       const r=await api('api/auth.php?a=register',fd); if(r.success){ alert('Registrato! Ora accedi.'); } else alert(r.message||'Errore'); };
     return;
   }
-  document.getElementById('logoutBtn').onclick=async()=>{ await api('api/auth.php?a=logout'); S.user=null; mount(ui()); };
+  const logoutBtn = document.getElementById('logoutBtn');
+  if(logoutBtn) logoutBtn.onclick=async()=>{ await api('api/auth.php?a=logout'); S.user=null; mount(ui()); };
   document.querySelectorAll('.nav a').forEach(a=>a.onclick=(e)=>{e.preventDefault(); route(a.dataset.route);});
-  document.getElementById('drop').onclick=()=>document.getElementById('file').click();
-  document.getElementById('uploadBtn').onclick=uploadFile;
-  document.getElementById('askBtn').onclick=ask;
-  document.getElementById('addEv').onclick=createEvent;
+  const drop = document.getElementById('drop');
+  const file = document.getElementById('file');
+  if(drop && file) drop.onclick=()=>file.click();
+  const uploadBtn = document.getElementById('uploadBtn');
+  const askBtn = document.getElementById('askBtn');
+  const addEv = document.getElementById('addEv');
+  if(uploadBtn) uploadBtn.onclick=uploadFile;
+  if(askBtn) askBtn.onclick=ask;
+  if(addEv) addEv.onclick=createEvent;
   loadDocs();
 }
 
 async function loadDocs(){
   const r=await api('api/documents.php?a=list'); if(!r.success) return;
-  const tb=document.querySelector('#docsTable tbody'); document.getElementById('docCount').textContent=r.data.length;
-  tb.innerHTML=r.data.map(d=>`<tr><td>${d.file_name}</td><td>${d.label||'-'}</td><td>${new Date(d.created_at).toLocaleString()}</td><td><button class='btn del' data-id='${d.id}'>Elimina</button></td></tr>`).join('');
-  tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  const docCount = document.getElementById('docCount');
+  const tb=document.querySelector('#docsTable tbody'); 
+  if(docCount) docCount.textContent=r.data.length;
+  if(tb) {
+    tb.innerHTML=r.data.map(d=>`<tr><td>${d.file_name}</td><td>${d.label||'-'}</td><td>${new Date(d.created_at).toLocaleString()}</td><td><button class='btn del' data-id='${d.id}'>Elimina</button></td></tr>`).join('');
+    tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  }
 }
 
 async function uploadFile(){
-  const f=document.getElementById('file').files[0]; if(!f) return alert('Seleziona un file');
+  const file = document.getElementById('file');
+  const f=file.files[0]; if(!f) return alert('Seleziona un file');
   const fd=new FormData(); fd.append('file',f); const r=await api('api/documents.php?a=upload',fd);
   if(r.success) loadDocs(); else alert(r.message||'Errore');
 }
 async function delDoc(id){ const fd=new FormData(); fd.append('id',id); const r=await api('api/documents.php?a=delete',fd); if(r.success) loadDocs(); }
 
 async function ask(){
-  const fd=new FormData(); fd.append('q', document.getElementById('q').value); fd.append('category', document.getElementById('category').value);
+  const q = document.getElementById('q');
+  const category = document.getElementById('category');
+  const fd=new FormData(); fd.append('q', q.value); fd.append('category', category.value);
   const r=await api('api/chat.php',fd); const log=document.getElementById('chatLog');
   if(r.success){ const badge=r.source==='docs'?'📄':'🤖'; log.innerHTML=`<div>${badge} ${r.answer}</div>`+log.innerHTML; } else alert(r.message||'Errore');
 }
@@ -151,10 +175,17 @@ async function ask(){
 async function loadEvents(){
   const r=await api('api/calendar.php?a=list'); if(!r.success) return;
   const tb=document.querySelector('#evTable tbody');
-  tb.innerHTML=r.data.map(e=>`<tr><td>${new Date(e.start).toLocaleString()}</td><td>${e.title}</td><td><button class='btn del' data-id='${e.id}'>Elimina</button></td></tr>`).join('');
-  tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delEvent(b.dataset.id));
+  if(tb) {
+    tb.innerHTML=r.data.map(e=>`<tr><td>${new Date(e.start).toLocaleString()}</td><td>${e.title}</td><td><button class='btn del' data-id='${e.id}'>Elimina</button></td></tr>`).join('');
+    tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delEvent(b.dataset.id));
+  }
 }
-async function createEvent(){ const fd=new FormData(); fd.append('title',evTitle.value); fd.append('starts_at',evStart.value); fd.append('ends_at',evEnd.value); const r=await api('api/calendar.php?a=create',fd); if(r.success) loadEvents(); }
+async function createEvent(){ 
+  const evTitle = document.getElementById('evTitle');
+  const evStart = document.getElementById('evStart');
+  const evEnd = document.getElementById('evEnd');
+  const fd=new FormData(); fd.append('title',evTitle.value); fd.append('starts_at',evStart.value); fd.append('ends_at',evEnd.value); const r=await api('api/calendar.php?a=create',fd); if(r.success) loadEvents(); 
+}
 async function delEvent(id){ const fd=new FormData(); fd.append('id',id); const r=await api('api/calendar.php?a=delete',fd); if(r.success) loadEvents(); }
 
 mount(ui());

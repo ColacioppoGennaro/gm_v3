@@ -50,7 +50,7 @@ try {
             json_out(['success' => false, 'message' => 'Errore upload'], 400);
         }
         
-        $max_size = (is_pro() ? 150 : 10) * 1024 * 1024; 
+        $max_size = (is_pro() ? 150 : 50) * 1024 * 1024; 
         if ($f['size'] > $max_size) {
             ob_end_clean();
             json_out(['success' => false, 'message' => 'File troppo grande'], 400);

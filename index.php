@@ -31,6 +31,7 @@ main{flex:1;padding:24px 32px;overflow-y:auto}
 .btn.secondary{background:#374151}
 .btn.warn{background:var(--warn)}
 .btn.del{background:var(--danger);padding:8px 14px;font-size:13px}
+.btn.small{padding:6px 12px;font-size:12px}
 .banner{background:#1f2937;border:1px solid #374151;border-left:4px solid var(--warn);padding:16px;border-radius:10px;color:#fbbf24;margin:20px 0;cursor:pointer;transition:all .2s}
 .banner:hover{background:#252f3f;transform:translateX(4px)}
 .ads{height:90px;background:linear-gradient(135deg,#1f2937,#0b1220);border:1px dashed #374151;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:13px;margin:20px 0}
@@ -55,7 +56,7 @@ th,td{border-bottom:1px solid #1f2937;padding:12px 8px;text-align:left}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
 h1{margin-bottom:8px}
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:600px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:700px;width:100%;max-height:90vh;overflow-y:auto}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
 .badge-category{background:#1f2937;color:var(--accent);padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;display:inline-block}
 .loader{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
@@ -64,11 +65,16 @@ h1{margin-bottom:8px}
 .category-tag button{background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px}
 .category-tag button:hover{color:#ff6b6b}
 .organize-item{background:#1f2937;padding:12px;border-radius:8px;margin:8px 0;display:flex;align-items:center;gap:12px}
-.organize-item .filename{flex:1;font-size:13px}
+.organize-item .filename{flex:1;font-size:13px;color:var(--fg)}
 .organize-item select{width:200px;font-size:13px;padding:8px}
+.organize-item input{width:200px;font-size:13px;padding:8px}
 .filter-bar{background:#1f2937;padding:12px 16px;border-radius:10px;margin:16px 0;display:flex;gap:12px;align-items:center}
 .filter-bar label{font-size:13px;color:var(--muted)}
 .filter-bar select{width:auto;min-width:200px;padding:8px 12px;font-size:13px}
+.category-select-cell{min-width:150px}
+.category-select-cell select{width:100%;padding:6px 10px;font-size:13px}
+.new-category-box{background:#0b1220;border:2px dashed #7c3aed;padding:16px;border-radius:10px;margin:16px 0}
+.new-category-box h4{color:var(--accent);margin-bottom:12px;font-size:14px}
 </style>
 </head>
 <body>
@@ -332,7 +338,16 @@ function organizeDocsModal(){
   <div class="modal" id="organizeModal">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>
-      <p style="color:var(--muted);margin-bottom:16px">Hai ${masterDocs.length} documento/i senza categoria. Assegna una categoria a ciascuno:</p>
+      <p style="color:var(--muted);margin-bottom:16px">Hai ${masterDocs.length} documento/i senza categoria specifica. Assegna una categoria a ciascuno:</p>
+      
+      <div class="new-category-box">
+        <h4>➕ Crea Nuova Categoria</h4>
+        <div style="display:flex;gap:8px">
+          <input id="modalNewCategoryName" placeholder="Nome categoria (es. Lavoro, Fatture...)" style="flex:1"/>
+          <button class="btn small" id="modalAddCategoryBtn">Crea</button>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">Categorie esistenti: ${S.categories.length > 0 ? S.categories.map(c => c.name).join(', ') : 'nessuna'}</div>
+      </div>
       
       <div id="organizeList">
         ${masterDocs.map(d => `
@@ -344,10 +359,6 @@ function organizeDocsModal(){
             </select>
           </div>
         `).join('')}
-      </div>
-      
-      <div style="margin-top:24px;font-size:13px;color:var(--muted)">
-        💡 Suggerimento: Crea prima le categorie di cui hai bisogno nella dashboard, poi torna qui per assegnarle.
       </div>
       
       <div class="btn-group" style="margin-top:24px">
@@ -531,13 +542,49 @@ async function createCategory(){
     
     if(r.success){
       input.value = '';
-      loadCategories();
+      await loadCategories();
     } else {
       alert(r.message || 'Errore creazione categoria');
     }
   } finally {
     btn.disabled = false;
     btn.innerHTML = '+ Crea';
+  }
+}
+
+async function createCategoryInModal(){
+  const input = document.getElementById('modalNewCategoryName');
+  const btn = document.getElementById('modalAddCategoryBtn');
+  const name = input.value.trim();
+  
+  if(!name){
+    alert('Inserisci un nome per la categoria');
+    input.focus();
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+  
+  const fd = new FormData();
+  fd.append('name', name);
+  
+  try {
+    const r = await api('api/categories.php?a=create', fd);
+    
+    if(r.success){
+      input.value = '';
+      await loadCategories();
+      
+      // Ricarica il modal con le nuove categorie
+      document.getElementById('organizeModal').remove();
+      showOrganizeModal();
+    } else {
+      alert(r.message || 'Errore creazione categoria');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Crea';
   }
 }
 
@@ -551,7 +598,7 @@ async function deleteCategory(id){
   
   if(r.success){
     loadCategories();
-    loadDocs(); // Ricarica documenti
+    loadDocs();
   } else {
     alert(r.message || 'Errore eliminazione categoria');
   }
@@ -569,7 +616,10 @@ function showUpgradeModal(){
 function showOrganizeModal(){
   document.body.insertAdjacentHTML('beforeend', organizeDocsModal());
   const saveBtn = document.getElementById('saveOrganizeBtn');
+  const modalAddBtn = document.getElementById('modalAddCategoryBtn');
+  
   if(saveBtn) saveBtn.onclick = saveOrganization;
+  if(modalAddBtn) modalAddBtn.onclick = createCategoryInModal;
 }
 
 async function saveOrganization(){
@@ -585,7 +635,7 @@ async function saveOrganization(){
   });
   
   if(updates.length === 0){
-    alert('Seleziona almeno una categoria');
+    alert('Seleziona almeno una categoria per i documenti');
     return;
   }
   
@@ -799,14 +849,68 @@ function renderDocsTable(){
   tb.innerHTML = filteredDocs.map(d=>`
     <tr>
       <td>${d.file_name}</td>
-      ${isPro ? `<td><span class="badge-category">${d.category}</span></td>` : ''}
+      ${isPro ? `
+        <td class="category-select-cell">
+          <select class="doc-category-select" data-docid="${d.id}" data-current="${d.category}">
+            ${S.categories.map(c => `<option value="${c.name}" ${c.name === d.category ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </td>
+      ` : ''}
       <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
       <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
       <td><button class='btn del' data-id='${d.id}'>Elimina</button></td>
     </tr>
   `).join('');
   
+  // Bind delete buttons
   tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  
+  // Bind category selects (solo Pro)
+  if(isPro) {
+    tb.querySelectorAll('.doc-category-select').forEach(select => {
+      select.onchange = async (e) => {
+        const docid = e.target.dataset.docid;
+        const oldCategory = e.target.dataset.current;
+        const newCategory = e.target.value;
+        
+        if(oldCategory === newCategory) return;
+        
+        if(!confirm(`Spostare il documento nella categoria "${newCategory}"?\n\nIl documento verrà spostato anche su DocAnalyzer.`)) {
+          e.target.value = oldCategory;
+          return;
+        }
+        
+        // Mostra loader
+        e.target.disabled = true;
+        const originalHTML = e.target.innerHTML;
+        e.target.innerHTML = '<option>Spostamento...</option>';
+        
+        const fd = new FormData();
+        fd.append('id', docid);
+        fd.append('category', newCategory);
+        
+        try {
+          const r = await api('api/documents.php?a=change_category', fd);
+          
+          if(r.success) {
+            // Aggiorna dataset
+            e.target.dataset.current = newCategory;
+            // Ricarica documenti per essere sicuri
+            await loadDocs();
+          } else {
+            alert(r.message || 'Errore spostamento');
+            e.target.value = oldCategory;
+          }
+        } catch(err) {
+          alert('Errore di connessione');
+          e.target.value = oldCategory;
+        } finally {
+          e.target.disabled = false;
+          e.target.innerHTML = originalHTML;
+        }
+      };
+    });
+  }
 }
 
 async function uploadFile(){

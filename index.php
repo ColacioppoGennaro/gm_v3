@@ -59,6 +59,9 @@ h1{margin-bottom:8px}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
 .loader{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+.category-tag{background:#0b1220;border:1px solid #374151;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;font-size:13px;margin:4px}
+.category-tag button{background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px}
+.category-tag button:hover{color:#ff6b6b}
 </style>
 </head>
 <body>
@@ -187,6 +190,25 @@ function appView(){
 
         <div class="card">
           <h3>📤 Carica Documento</h3>
+          
+          ${isPro ? `
+          <div style="background:#1f2937;padding:16px;border-radius:10px;margin-bottom:16px">
+            <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--accent)">🏷️ Le tue categorie</h4>
+            <div id="categoriesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;min-height:32px;align-items:center"></div>
+            <div style="display:flex;gap:8px">
+              <input id="newCategoryName" placeholder="Nome nuova categoria (es. Fatture)" style="flex:1"/>
+              <button class="btn" id="addCategoryBtn">+ Crea</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Categoria documento *</label>
+            <select id="uploadCategory" style="width:100%">
+              <option value="">-- Seleziona una categoria --</option>
+            </select>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">Devi scegliere una categoria prima di caricare</div>
+          </div>
+          ` : ''}
+          
           <div class="drop" id="drop">
             <div style="text-align:center">
               <div style="font-size:48px;margin-bottom:8px">📁</div>
@@ -217,7 +239,7 @@ function appView(){
           <h3>Fai una domanda ai tuoi documenti</h3>
           <div style="display:flex;gap:12px;margin-top:16px">
             <input id="q" placeholder="Es: Quando scade l'IMU?" style="flex:1"/>
-            <select id="category" style="width:180px"><option value="">(Free: tutti)</option></select>
+            ${isPro ? `<select id="category" style="width:200px"><option value="">-- Seleziona categoria --</option></select>` : '<select id="category" style="width:180px"><option value="">(Free: tutti)</option></select>'}
             <button class="btn" id="askBtn">Chiedi</button>
           </div>
           <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/${maxChat}</div>
@@ -283,9 +305,15 @@ function route(r){
   document.querySelectorAll('[data-page]').forEach(p=>p.classList.add('hidden'));
   const page = document.querySelector(`[data-page="${r}"]`);
   if(page) page.classList.remove('hidden');
-  if(r==='dashboard') loadDocs();
+  if(r==='dashboard') {
+    loadDocs();
+    if(S.user && S.user.role === 'pro') loadCategories();
+  }
   if(r==='calendar') loadEvents();
-  if(r==='chat') updateChatCounter();
+  if(r==='chat') {
+    updateChatCounter();
+    if(S.user && S.user.role === 'pro') loadCategories();
+  }
 }
 
 function bind(){
@@ -381,7 +409,7 @@ async function loadCategories(){
   // Aggiorna select chat
   const category = document.getElementById('category');
   if(category) {
-    category.innerHTML = '<option value="">-- Seleziona una categoria --</option>' +
+    category.innerHTML = '<option value="">-- Seleziona categoria --</option>' +
       S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
   }
   
@@ -392,9 +420,9 @@ async function loadCategories(){
       categoriesList.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:8px">Nessuna categoria. Creane una qui sotto!</p>';
     } else {
       categoriesList.innerHTML = S.categories.map(c=>`
-        <span style="background:#0b1220;border:1px solid #374151;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;font-size:13px">
+        <span class="category-tag">
           🏷️ ${c.name}
-          <button onclick="deleteCategory(${c.id})" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px" title="Elimina categoria">✕</button>
+          <button onclick="deleteCategory(${c.id})" title="Elimina categoria">✕</button>
         </span>
       `).join('');
     }
@@ -447,6 +475,9 @@ async function deleteCategory(id){
     alert(r.message || 'Errore eliminazione categoria');
   }
 }
+
+// Rendi deleteCategory globale per onclick inline
+window.deleteCategory = deleteCategory;
 
 function showUpgradeModal(){
   document.body.insertAdjacentHTML('beforeend', upgradeModal());

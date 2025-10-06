@@ -1,4 +1,73 @@
 <?php
+/**
+ * index.php
+ * 
+ * Frontend SPA (Single Page Application) per gm_v3 - Assistente AI per Documenti Personali
+ * 
+ * FUNZIONALITÀ PRINCIPALI:
+ * --------------------------------------------------
+ * 1. AUTENTICAZIONE
+ *    - Login/Register con validazione
+ *    - Logout e gestione sessioni
+ *    - Rate limiting per sicurezza
+ * 
+ * 2. DASHBOARD
+ *    - Statistiche utilizzo (documenti, chat, storage)
+ *    - Limiti Free vs Pro
+ *    - Banner upgrade a Pro
+ * 
+ * 3. GESTIONE DOCUMENTI
+ *    - Upload file (drag&drop)
+ *    - Lista documenti con filtro categoria (Pro)
+ *    - Download documenti
+ *    - Eliminazione documenti
+ *    - OCR su documenti (1 per Free, illimitato Pro)
+ *    - Badge OCR consigliato per PDF senza testo/immagini
+ *    - Cambio categoria documenti (Pro)
+ * 
+ * 4. CHAT AI IBRIDA
+ *    - DocAnalyzer: interroga documenti caricati
+ *    - Google Gemini: AI generica fallback
+ *    - Parametri: aderenza, riferimenti pagina
+ *    - Text-to-Speech per risposte (voce italiana, velocità)
+ *    - Copia risposta, usa come contesto
+ *    - Differenziazione Free/Pro (categorie)
+ * 
+ * 5. CALENDARIO
+ *    - Creazione eventi con data/ora
+ *    - Visualizzazione eventi
+ *    - Eliminazione eventi
+ * 
+ * 6. ACCOUNT
+ *    - Visualizza piano e utilizzo
+ *    - Upgrade a Pro (codice promozionale)
+ *    - Downgrade a Free (con controlli)
+ *    - Eliminazione account completa
+ * 
+ * 7. CATEGORIE (SOLO PRO)
+ *    - Creazione categorie personalizzate
+ *    - Eliminazione categorie vuote
+ *    - Organizzazione documenti in categorie
+ *    - Modal organizzazione batch
+ * 
+ * STACK TECNOLOGICO:
+ * --------------------------------------------------
+ * - Frontend: Vanilla JavaScript (no framework)
+ * - Styling: CSS inline (no build)
+ * - API: REST JSON via Fetch
+ * - Storage: MySQL + file system locale
+ * - AI: DocAnalyzer.ai + Google Gemini
+ * - TTS: Web Speech API (browser nativo)
+ * 
+ * ARCHITETTURA:
+ * --------------------------------------------------
+ * - SPA con routing client-side
+ * - State management in oggetto globale S
+ * - View functions per rendering HTML
+ * - Event binding dopo render
+ * - Comunicazione API via helper api()
+ */
+
 session_start();
 require_once __DIR__.'/_core/helpers.php';
 ?>
@@ -1017,15 +1086,24 @@ function renderDocsTable(){
     
     html += '<td>' + (d.size/(1024*1024)).toFixed(2) + ' MB</td>' +
       '<td>' + new Date(d.created_at).toLocaleString('it-IT') + '</td>' +
-      '<td>' +
-      '<a href="api/documents.php?a=download&id=' + d.id + '" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥 Scarica</a>' +
-      '<button class="btn del" data-id="' + d.id + '">Elimina</button>' +
+      '<td style="white-space:nowrap">' +
+      '<a href="api/documents.php?a=download&id=' + d.id + '" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥</a>';
+    
+    // Bottone OCR
+    if (d.ocr_recommended) {
+      html += '<button class="btn small" data-id="' + d.id + '" data-action="ocr" style="background:#f59e0b;margin-right:8px" title="OCR Consigliato">🔍 OCR</button>';
+    } else {
+      html += '<button class="btn small secondary" data-id="' + d.id + '" data-action="ocr" style="margin-right:8px" title="OCR disponibile">🔍</button>';
+    }
+    
+    html += '<button class="btn del" data-id="' + d.id + '" data-action="delete">🗑️</button>' +
       '</td></tr>';
   });
   
   tb.innerHTML = html;
   
-  tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  tb.querySelectorAll('button[data-action="delete"]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
+  tb.querySelectorAll('button[data-action="ocr"]').forEach(b=>b.onclick=()=>doOCR(b.dataset.id));
   
   if(isPro) {
     tb.querySelectorAll('.doc-category-select').forEach(select => {
@@ -1125,7 +1203,7 @@ async function uploadFile(){
 async function delDoc(id){
   if(!confirm('Eliminare questo documento?')) return;
   
-  const btn = document.querySelector('button[data-id="' + id + '"]');
+  const btn = document.querySelector('button[data-id="' + id + '"][data-action="delete"]');
   if(btn){
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span>';
@@ -1140,7 +1218,56 @@ async function delDoc(id){
   } else {
     if(btn){
       btn.disabled = false;
-      btn.innerHTML = 'Elimina';
+      btn.innerHTML = '🗑️';
+    }
+  }
+}
+
+async function doOCR(id){
+  const isPro = S.user && S.user.role === 'pro';
+  
+  let confirmMsg = 'Avviare OCR su questo documento?\n\n';
+  
+  if (!isPro) {
+    confirmMsg += '⚠️ SEI FREE: Hai diritto a 1 SOLO OCR.\nDopo questo non potrai più usare OCR su altri documenti.\n\nPassa a Pro per OCR illimitato.\n\n';
+  }
+  
+  confirmMsg += '💰 Costo: 1 credito DocAnalyzer per pagina del documento.';
+  
+  if(!confirm(confirmMsg)) return;
+  
+  const btn = document.querySelector('button[data-id="' + id + '"][data-action="ocr"]');
+  if(btn){
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loader"></span>';
+  }
+  
+  const fd = new FormData();
+  fd.append('id', id);
+  
+  try {
+    const r = await api('api/documents.php?a=ocr', fd);
+    
+    if(r.success) {
+      alert('✓ ' + r.message);
+      if(btn) {
+        btn.style.background = '#10b981';
+        btn.innerHTML = '✓';
+        btn.title = 'OCR Avviato';
+        setTimeout(() => btn.disabled = true, 500);
+      }
+    } else {
+      alert('❌ ' + r.message);
+      if(btn) {
+        btn.disabled = false;
+        btn.innerHTML = '🔍';
+      }
+    }
+  } catch(e) {
+    alert('Errore connessione: ' + e);
+    if(btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔍';
     }
   }
 }

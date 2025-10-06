@@ -22,7 +22,7 @@ aside{width:220px;background:#0b1220;border-right:1px solid #1f2937;padding:20px
 .nav a.active{background:var(--accent);color:#fff}
 main{flex:1;padding:24px 32px;overflow-y:auto}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin:20px 0}
-.card{background:var(--panel);border:1px solid #1f2937;border-radius:14px;padding:20px}
+.card{background:var(--panel);border:1px solid #1f2937;border-radius:14px;padding:20px;margin-bottom:20px}
 .card h3{margin-bottom:16px;color:var(--accent)}
 .drop{border:2px dashed #374151;border-radius:12px;min-height:180px;display:flex;align-items:center;justify-content:center;margin:16px 0;color:var(--muted);cursor:pointer;transition:all .3s}
 .drop:hover{border-color:var(--accent);background:rgba(124,58,237,.05)}
@@ -33,10 +33,11 @@ main{flex:1;padding:24px 32px;overflow-y:auto}
 .btn.del{background:var(--danger);padding:8px 14px;font-size:13px}
 .btn.small{padding:6px 12px;font-size:12px}
 .btn.icon{padding:8px 12px;font-size:14px}
+.btn.success{background:#10b981}
 .banner{background:#1f2937;border:1px solid #374151;border-left:4px solid var(--warn);padding:16px;border-radius:10px;color:#fbbf24;margin:20px 0;cursor:pointer;transition:all .2s}
 .banner:hover{background:#252f3f;transform:translateX(4px)}
 .ads{height:90px;background:linear-gradient(135deg,#1f2937,#0b1220);border:1px dashed #374151;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:13px;margin:20px 0}
-.hidden{display:none}
+.hidden{display:none!important}
 .auth-container{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px}
 .auth-box{background:#0b1220;padding:40px;border-radius:16px;border:1px solid #1f2937;box-shadow:0 20px 60px rgba(0,0,0,.5);max-width:440px;width:100%}
 .auth-box h1{font-size:28px;margin-bottom:8px;background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -60,16 +61,13 @@ h1{margin-bottom:8px}
 .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
 .modal-content{background:#0b1220;padding:32px;border-radius:16px;border:1px solid #1f2937;max-width:700px;width:100%;max-height:90vh;overflow-y:auto}
 .badge-pro{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;display:inline-block;margin-left:8px}
-.badge-category{background:#1f2937;color:var(--accent);padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;display:inline-block}
 .loader{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 .category-tag{background:#0b1220;border:1px solid #374151;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;font-size:13px;margin:4px}
 .category-tag button{background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:14px}
-.category-tag button:hover{color:#ff6b6b}
 .organize-item{background:#1f2937;padding:12px;border-radius:8px;margin:8px 0;display:flex;align-items:center;gap:12px}
 .organize-item .filename{flex:1;font-size:13px;color:var(--fg)}
 .organize-item select{width:200px;font-size:13px;padding:8px}
-.organize-item input{width:200px;font-size:13px;padding:8px}
 .filter-bar{background:#1f2937;padding:12px 16px;border-radius:10px;margin:16px 0;display:flex;gap:12px;align-items:center}
 .filter-bar label{font-size:13px;color:var(--muted)}
 .filter-bar select{width:auto;min-width:200px;padding:8px 12px;font-size:13px}
@@ -77,15 +75,15 @@ h1{margin-bottom:8px}
 .category-select-cell select{width:100%;padding:6px 10px;font-size:13px}
 .new-category-box{background:#0b1220;border:2px dashed #7c3aed;padding:16px;border-radius:10px;margin:16px 0}
 .new-category-box h4{color:var(--accent);margin-bottom:12px;font-size:14px}
-.chat-message{padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)}
-.chat-message.docs{background:#1f2937}
+.chat-message{padding:16px;border-radius:10px;margin-bottom:16px;border-left:4px solid var(--accent)}
+.chat-message.docs{background:#1f2937;border-left-color:#7c3aed}
 .chat-message.ai{background:#0b1220;border-left-color:#10b981}
 .chat-controls{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
-.chat-controls select{width:auto;padding:6px 10px;font-size:12px}
+.chat-controls select{width:auto;padding:6px 10px;font-size:12px;max-width:200px}
 .context-box{background:#1e293b;border:2px solid #7c3aed;border-radius:10px;padding:16px;margin-bottom:16px;position:relative}
 .context-box textarea{min-height:100px;background:#0b1220;border-color:#374151}
 .context-box .remove-context{position:absolute;top:8px;right:8px;background:var(--danger);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
-.settings-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;background:#1f2937;padding:12px;border-radius:8px}
+.settings-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;background:#1f2937;padding:12px;border-radius:8px;flex-wrap:wrap}
 .settings-row label{font-size:13px;color:var(--muted);white-space:nowrap}
 </style>
 </head>
@@ -106,8 +104,122 @@ const S = {
 
 const api = (p, fd=null) => fetch(p, {method: fd?'POST':'GET', body: fd}).then(r=>r.json());
 
+// === TTS FUNCTIONS ===
+function getItalianVoices() {
+  const voices = speechSynthesis.getVoices();
+  const italian = voices.filter(v => v.lang.startsWith('it'));
+  return italian.length > 0 ? italian : voices;
+}
+
+function speakText(msgId) {
+  const msg = document.querySelector(\`[data-msgid="\${msgId}"]\`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  const voiceSelect = msg.querySelector('.voice-select');
+  const speedSelect = msg.querySelector('.speed-select');
+  const playBtn = msg.querySelector('.play-btn');
+  const stopBtn = msg.querySelector('.stop-btn');
+  
+  if (S.ttsState[msgId] && S.ttsState[msgId].speaking) {
+    speechSynthesis.cancel();
+    S.ttsState[msgId].speaking = false;
+    playBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+    return;
+  }
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voices = speechSynthesis.getVoices();
+  utterance.voice = voices[voiceSelect.value] || voices[0];
+  utterance.rate = parseFloat(speedSelect.value);
+  
+  utterance.onend = () => {
+    S.ttsState[msgId].speaking = false;
+    playBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+  };
+  
+  S.ttsState[msgId] = { speaking: true };
+  playBtn.classList.add('hidden');
+  stopBtn.classList.remove('hidden');
+  
+  speechSynthesis.speak(utterance);
+}
+
+function stopSpeaking(msgId) {
+  speechSynthesis.cancel();
+  const msg = document.querySelector(\`[data-msgid="\${msgId}"]\`);
+  if (msg) {
+    msg.querySelector('.play-btn').classList.remove('hidden');
+    msg.querySelector('.stop-btn').classList.add('hidden');
+  }
+  if (S.ttsState[msgId]) {
+    S.ttsState[msgId].speaking = false;
+  }
+}
+
+function copyToClipboard(msgId) {
+  const msg = document.querySelector(\`[data-msgid="\${msgId}"]\`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = msg.querySelector('.copy-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓';
+    setTimeout(() => btn.innerHTML = originalText, 1500);
+  });
+}
+
+function useAsContext(msgId) {
+  const msg = document.querySelector(\`[data-msgid="\${msgId}"]\`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  S.chatContext = text;
+  
+  const contextBox = document.getElementById('contextBox');
+  if (!contextBox) return;
+  
+  contextBox.className = 'context-box';
+  contextBox.innerHTML = \`
+    <button class="remove-context" onclick="removeContext()">✕ Rimuovi contesto</button>
+    <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--accent);font-weight:600">📋 Contesto dalla risposta documenti:</label>
+    <textarea id="contextText" readonly>\${text}</textarea>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted)">
+      💡 Aggiungi una domanda di follow-up nell'input qui sotto e chiedi a Gemini
+    </div>
+  \`;
+  
+  document.querySelector('#qAI').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.querySelector('#qAI').focus(), 500);
+}
+
+function removeContext() {
+  S.chatContext = null;
+  const contextBox = document.getElementById('contextBox');
+  if (contextBox) {
+    contextBox.className = 'hidden';
+    contextBox.innerHTML = '';
+  }
+}
+
+window.speakText = speakText;
+window.stopSpeaking = stopSpeaking;
+window.copyToClipboard = copyToClipboard;
+window.useAsContext = useAsContext;
+window.removeContext = removeContext;
+
+// Load voices
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = () => {
+    getItalianVoices();
+  };
+}
+
 function loginView(){
-  return `
+  return \`
   <div class="auth-container">
     <div class="auth-box">
       <h1>✨ Bentornato</h1>
@@ -127,11 +239,11 @@ function loginView(){
       <button class="link-btn" id="goRegister">Non hai un account? Registrati</button>
       <button class="link-btn" id="goForgot" style="display:block;margin-top:8px">Password dimenticata?</button>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function registerView(){
-  return `
+  return \`
   <div class="auth-container">
     <div class="auth-box">
       <h1>🚀 Crea Account</h1>
@@ -155,11 +267,11 @@ function registerView(){
         <button class="btn" id="registerBtn">Registrati</button>
       </div>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function forgotView(){
-  return `
+  return \`
   <div class="auth-container">
     <div class="auth-box">
       <h1>🔑 Password Dimenticata</h1>
@@ -175,7 +287,7 @@ function forgotView(){
         <button class="btn" id="forgotBtn">Invia Link</button>
       </div>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function appView(){
@@ -184,10 +296,10 @@ function appView(){
   const maxChat = isPro ? 200 : 20;
   const maxSize = isPro ? 150 : 50;
   
-  return `
+  return \`
   <div class="app">
     <aside>
-      <div class="logo">✨ <b>gm_v3</b> ${isPro ? '<span class="badge-pro">PRO</span>' : ''}</div>
+      <div class="logo">✨ <b>gm_v3</b> \${isPro ? '<span class="badge-pro">PRO</span>' : ''}</div>
       <div class="nav">
         <a href="#" data-route="dashboard" class="active">📊 Dashboard</a>
         <a href="#" data-route="chat">💬 Chat AI</a>
@@ -198,26 +310,26 @@ function appView(){
     <main>
       <section data-page="dashboard">
         <h1>Dashboard</h1>
-        ${!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        \${!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         <div class="cards">
           <div class="card">
             <div style="color:var(--muted);font-size:12px">Documenti Archiviati</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="docCount">0</span> / ${maxDocs}</div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="docCount">0</span> / \${maxDocs}</div>
           </div>
           <div class="card">
             <div style="color:var(--muted);font-size:12px">Domande AI Oggi</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="qCount">0</span> / ${maxChat}</div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="qCount">0</span> / \${maxChat}</div>
           </div>
           <div class="card">
             <div style="color:var(--muted);font-size:12px">Storage Usato</div>
-            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="storageUsed">0</span> MB / ${maxSize} MB</div>
+            <div style="font-size:28px;font-weight:700;margin-top:8px"><span id="storageUsed">0</span> MB / \${maxSize} MB</div>
           </div>
         </div>
 
         <div class="card">
           <h3>📤 Carica Documento</h3>
           
-          ${isPro ? `
+          \${isPro ? \`
           <div style="background:#1f2937;padding:16px;border-radius:10px;margin-bottom:16px">
             <h4 style="margin:0 0 12px 0;font-size:14px;color:var(--accent)">🏷️ Le tue categorie</h4>
             <div id="categoriesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;min-height:32px;align-items:center"></div>
@@ -233,25 +345,25 @@ function appView(){
             </select>
             <div style="font-size:12px;color:var(--muted);margin-top:4px">Devi scegliere una categoria prima di caricare</div>
           </div>
-          ` : ''}
+          \` : ''}
           
           <div class="drop" id="drop">
             <div style="text-align:center">
               <div style="font-size:48px;margin-bottom:8px">📁</div>
               <div>Trascina qui un file o clicca per selezionare</div>
-              <div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max ${maxSize}MB)</div>
+              <div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max \${maxSize}MB)</div>
             </div>
           </div>
           <input type="file" id="file" class="hidden"/>
           <button class="btn" id="uploadBtn" style="width:100%">Carica File</button>
         </div>
 
-        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
+        \${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
 
         <div class="card">
           <h3>📚 I Tuoi Documenti</h3>
           
-          ${isPro ? `
+          \${isPro ? \`
           <div class="filter-bar">
             <label>Filtra per categoria:</label>
             <select id="filterCategory">
@@ -259,13 +371,13 @@ function appView(){
             </select>
             <button class="btn secondary" id="organizeDocsBtn">🔧 Organizza Documenti</button>
           </div>
-          ` : ''}
+          \` : ''}
           
           <table id="docsTable">
             <thead>
               <tr>
                 <th>Nome File</th>
-                ${isPro ? '<th>Categoria</th>' : ''}
+                \${isPro ? '<th>Categoria</th>' : ''}
                 <th>Dimensione</th>
                 <th>Data</th>
                 <th></th>
@@ -277,9 +389,8 @@ function appView(){
       </section>
 
       <section class="hidden" data-page="chat">
-        <h1>Chat AI</h1>
-        ${!isPro ? '<div class="banner" id="upgradeBtn2">Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
-        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
+        <h1>💬 Chat AI</h1>
+        \${!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         
         <div class="card">
           <h3>📄 Chiedi ai tuoi documenti</h3>
@@ -294,41 +405,44 @@ function appView(){
               <option value="free">Libera interpretazione</option>
             </select>
             
-            <label style="margin-left:16px">
-              <input type="checkbox" id="showRefs" checked style="width:auto;margin-right:4px"/>
+            <label style="margin-left:16px;display:flex;align-items:center;gap:4px">
+              <input type="checkbox" id="showRefs" checked style="width:auto;margin:0"/>
               <span style="font-size:13px">Mostra riferimenti pagine</span>
             </label>
           </div>
           
           <div style="display:flex;gap:12px;margin-top:16px">
             <input id="qDocs" placeholder="Es: Quando scade l'IMU?" style="flex:1"/>
-            ${isPro ? `<select id="categoryDocs" style="width:200px"><option value="">-- Seleziona categoria --</option></select>` : '<select id="categoryDocs" style="width:180px"><option value="">(Free: tutti)</option></select>'}
+            \${isPro ? \`<select id="categoryDocs" style="width:200px"><option value="">-- Seleziona categoria --</option></select>\` : '<select id="categoryDocs" style="width:180px"><option value="">(Free: tutti)</option></select>'}
             <button class="btn" id="askDocsBtn">🔍 Chiedi ai documenti</button>
           </div>
-          <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/${maxChat}</div>
+          <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/\${maxChat}</div>
         </div>
+
+        \${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
 
         <div class="card">
           <h3>🤖 Chat AI Generica (Google Gemini)</h3>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Chiedi qualsiasi cosa all'AI generica, anche senza documenti</p>
           
           <div id="contextBox" class="hidden"></div>
           
           <div style="display:flex;gap:12px">
-            <input id="qAI" placeholder="Es: Spiegami come funziona..." style="flex:1"/>
-            <button class="btn" id="askAIBtn" style="background:#10b981">🤖 Chiedi a Gemini</button>
+            <input id="qAI" placeholder="Es: Spiegami come funziona la fotosintesi..." style="flex:1"/>
+            <button class="btn success" id="askAIBtn">🤖 Chiedi a Gemini</button>
           </div>
         </div>
 
         <div class="card">
           <h3>💬 Conversazione</h3>
-          <div id="chatLog"></div>
+          <div id="chatLog" style="min-height:200px"></div>
         </div>
       </section>
 
       <section class="hidden" data-page="calendar">
         <h1>📅 Calendario</h1>
-        ${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
-        ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
+        \${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        \${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
         <div class="card">
           <h3>Aggiungi Evento</h3>
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:16px 0">
@@ -350,21 +464,21 @@ function appView(){
         <div class="cards">
           <div class="card">
             <h3>Piano Attuale</h3>
-            <div style="font-size:32px;font-weight:700;margin:16px 0;color:var(--accent)">${isPro ? 'PRO' : 'FREE'}</div>
+            <div style="font-size:32px;font-weight:700;margin:16px 0;color:var(--accent)">\${isPro ? 'PRO' : 'FREE'}</div>
             <div style="color:var(--muted);font-size:13px">Email: <b id="accountEmail">...</b></div>
             <div style="color:var(--muted);font-size:13px;margin-top:4px">Membro da: <b id="accountSince">...</b></div>
           </div>
           
           <div class="card">
             <h3>Utilizzo</h3>
-            <div style="font-size:13px;margin:8px 0">Documenti: <b id="usageDocs">0</b> / ${isPro ? '200' : '5'}</div>
-            <div style="font-size:13px;margin:8px 0">Storage: <b id="usageStorage">0</b> MB / ${isPro ? '150' : '50'} MB</div>
-            <div style="font-size:13px;margin:8px 0">Chat oggi: <b id="usageChat">0</b> / ${isPro ? '200' : '20'}</div>
-            ${isPro ? '<div style="font-size:13px;margin:8px 0">Categorie: <b id="usageCategories">0</b></div>' : ''}
+            <div style="font-size:13px;margin:8px 0">Documenti: <b id="usageDocs">0</b> / \${isPro ? '200' : '5'}</div>
+            <div style="font-size:13px;margin:8px 0">Storage: <b id="usageStorage">0</b> MB / \${isPro ? '150' : '50'} MB</div>
+            <div style="font-size:13px;margin:8px 0">Chat oggi: <b id="usageChat">0</b> / \${isPro ? '200' : '20'}</div>
+            \${isPro ? '<div style="font-size:13px;margin:8px 0">Categorie: <b id="usageCategories">0</b></div>' : ''}
           </div>
         </div>
 
-        ${!isPro ? `
+        \${!isPro ? \`
         <div class="card">
           <h3>⚡ Upgrade a Pro</h3>
           <p style="color:var(--muted);margin-bottom:16px">Sblocca funzionalità avanzate e limiti aumentati</p>
@@ -376,14 +490,14 @@ function appView(){
           <div id="upgradePageSuccess" class="success hidden"></div>
           <button class="btn" id="activateProPage">Attiva Pro</button>
         </div>
-        ` : `
+        \` : \`
         <div class="card">
           <h3>⬇️ Downgrade a Free</h3>
           <p style="color:var(--muted);margin-bottom:16px">Torna al piano gratuito. <b>ATTENZIONE:</b> Devi avere massimo 5 documenti.</p>
           <div id="downgradeError" class="error hidden"></div>
           <button class="btn warn" id="downgradeBtn">Downgrade a Free</button>
         </div>
-        `}
+        \`}
 
         <div class="card">
           <h3>⚙️ Impostazioni</h3>
@@ -392,11 +506,11 @@ function appView(){
         </div>
       </section>
     </main>
-  </div>`;
+  </div>\`;
 }
 
 function upgradeModal(){
-  return `
+  return \`
   <div class="modal" id="upgradeModal">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">🚀 Upgrade a Pro</h2>
@@ -412,28 +526,28 @@ function upgradeModal(){
         <button class="btn" id="activateBtn">Attiva Pro</button>
       </div>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function organizeDocsModal(){
   const masterDocs = S.docs.filter(d => d.category === 'master');
   
   if (masterDocs.length === 0) {
-    return `
+    return \`
     <div class="modal" id="organizeModal">
       <div class="modal-content">
         <h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>
         <p style="color:var(--ok);margin-bottom:16px">✓ Tutti i documenti sono già organizzati in categorie!</p>
         <button class="btn" onclick="document.getElementById('organizeModal').remove()">Chiudi</button>
       </div>
-    </div>`;
+    </div>\`;
   }
   
-  return `
+  return \`
   <div class="modal" id="organizeModal">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>
-      <p style="color:var(--muted);margin-bottom:16px">Hai ${masterDocs.length} documento/i senza categoria specifica. Assegna una categoria a ciascuno:</p>
+      <p style="color:var(--muted);margin-bottom:16px">Hai \${masterDocs.length} documento/i senza categoria specifica. Assegna una categoria a ciascuno:</p>
       
       <div class="new-category-box">
         <h4>➕ Crea Nuova Categoria</h4>
@@ -441,19 +555,19 @@ function organizeDocsModal(){
           <input id="modalNewCategoryName" placeholder="Nome categoria (es. Lavoro, Fatture...)" style="flex:1"/>
           <button class="btn small" id="modalAddCategoryBtn">Crea</button>
         </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--muted)">Categorie esistenti: ${S.categories.length > 0 ? S.categories.map(c => c.name).join(', ') : 'nessuna'}</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">Categorie esistenti: \${S.categories.length > 0 ? S.categories.map(c => c.name).join(', ') : 'nessuna'}</div>
       </div>
       
       <div id="organizeList">
-        ${masterDocs.map(d => `
-          <div class="organize-item" data-docid="${d.id}">
-            <div class="filename">📄 ${d.file_name}</div>
-            <select class="organize-select" data-docid="${d.id}">
+        \${masterDocs.map(d => \`
+          <div class="organize-item" data-docid="\${d.id}">
+            <div class="filename">📄 \${d.file_name}</div>
+            <select class="organize-select" data-docid="\${d.id}">
               <option value="">-- Scegli categoria --</option>
-              ${S.categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+              \${S.categories.map(c => \`<option value="\${c.name}">\${c.name}</option>\`).join('')}
             </select>
           </div>
-        `).join('')}
+        \`).join('')}
       </div>
       
       <div class="btn-group" style="margin-top:24px">
@@ -461,7 +575,7 @@ function organizeDocsModal(){
         <button class="btn" id="saveOrganizeBtn">Salva Organizzazione</button>
       </div>
     </div>
-  </div>`;
+  </div>\`;
 }
 
 function render(){
@@ -478,7 +592,7 @@ function render(){
 function route(r){
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active', a.dataset.route===r));
   document.querySelectorAll('[data-page]').forEach(p=>p.classList.add('hidden'));
-  const page = document.querySelector(`[data-page="${r}"]`);
+  const page = document.querySelector(\`[data-page="\${r}"]\`);
   if(page) page.classList.remove('hidden');
   if(r==='dashboard') {
     loadDocs();
@@ -584,115 +698,6 @@ function bind(){
   }
 }
 
-// === TTS FUNCTIONS ===
-function getItalianVoices() {
-  const voices = speechSynthesis.getVoices();
-  const italian = voices.filter(v => v.lang.startsWith('it'));
-  return italian.length > 0 ? italian : voices;
-}
-
-function speakText(msgId) {
-  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
-  if (!msg) return;
-  
-  const text = msg.querySelector('.message-text').textContent;
-  const voiceSelect = msg.querySelector('.voice-select');
-  const speedSelect = msg.querySelector('.speed-select');
-  const playBtn = msg.querySelector('.play-btn');
-  const stopBtn = msg.querySelector('.stop-btn');
-  
-  if (S.ttsState[msgId] && S.ttsState[msgId].speaking) {
-    speechSynthesis.cancel();
-    S.ttsState[msgId].speaking = false;
-    playBtn.classList.remove('hidden');
-    stopBtn.classList.add('hidden');
-    return;
-  }
-  
-  const utterance = new SpeechSynthesisUtterance(text);
-  const voices = speechSynthesis.getVoices();
-  utterance.voice = voices[voiceSelect.value] || voices[0];
-  utterance.rate = parseFloat(speedSelect.value);
-  
-  utterance.onend = () => {
-    S.ttsState[msgId].speaking = false;
-    playBtn.classList.remove('hidden');
-    stopBtn.classList.add('hidden');
-  };
-  
-  S.ttsState[msgId] = { speaking: true };
-  playBtn.classList.add('hidden');
-  stopBtn.classList.remove('hidden');
-  
-  speechSynthesis.speak(utterance);
-}
-
-function stopSpeaking(msgId) {
-  speechSynthesis.cancel();
-  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
-  if (msg) {
-    msg.querySelector('.play-btn').classList.remove('hidden');
-    msg.querySelector('.stop-btn').classList.add('hidden');
-  }
-  if (S.ttsState[msgId]) {
-    S.ttsState[msgId].speaking = false;
-  }
-}
-
-function copyToClipboard(msgId) {
-  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
-  if (!msg) return;
-  
-  const text = msg.querySelector('.message-text').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = msg.querySelector('.copy-btn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '✓';
-    setTimeout(() => btn.innerHTML = originalText, 1500);
-  });
-}
-
-function useAsContext(msgId) {
-  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
-  if (!msg) return;
-  
-  const text = msg.querySelector('.message-text').textContent;
-  S.chatContext = text;
-  
-  const contextBox = document.getElementById('contextBox');
-  contextBox.className = 'context-box';
-  contextBox.innerHTML = `
-    <button class="remove-context" onclick="removeContext()">✕ Rimuovi contesto</button>
-    <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--accent)">📋 Contesto dalla risposta documenti:</label>
-    <textarea id="contextText" readonly>${text}</textarea>
-    <div style="margin-top:8px;font-size:12px;color:var(--muted)">
-      Puoi aggiungere una domanda di follow-up nell'input qui sotto
-    </div>
-  `;
-  
-  // Scroll to Gemini section
-  document.querySelector('#qAI').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  document.querySelector('#qAI').focus();
-}
-
-function removeContext() {
-  S.chatContext = null;
-  document.getElementById('contextBox').className = 'hidden';
-}
-
-window.speakText = speakText;
-window.stopSpeaking = stopSpeaking;
-window.copyToClipboard = copyToClipboard;
-window.useAsContext = useAsContext;
-window.removeContext = removeContext;
-
-// Load voices
-if (speechSynthesis.onvoiceschanged !== undefined) {
-  speechSynthesis.onvoiceschanged = () => {
-    getItalianVoices();
-  };
-}
-
 async function loadCategories(){
   const r = await api('api/categories.php?a=list');
   if(!r.success) return;
@@ -702,19 +707,19 @@ async function loadCategories(){
   const uploadCategory = document.getElementById('uploadCategory');
   if(uploadCategory) {
     uploadCategory.innerHTML = '<option value="">-- Seleziona una categoria --</option>' +
-      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+      S.categories.map(c=>\`<option value="\${c.name}">\${c.name}</option>\`).join('');
   }
   
   const categoryDocs = document.getElementById('categoryDocs');
   if(categoryDocs) {
     categoryDocs.innerHTML = '<option value="">-- Seleziona categoria --</option>' +
-      S.categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      S.categories.map(c => \`<option value="\${c.name}">\${c.name}</option>\`).join('');
   }
   
   const filterCategory = document.getElementById('filterCategory');
   if(filterCategory) {
     filterCategory.innerHTML = '<option value="">Tutte le categorie</option>' +
-      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+      S.categories.map(c=>\`<option value="\${c.name}">\${c.name}</option>\`).join('');
   }
   
   const categoriesList = document.getElementById('categoriesList');
@@ -722,12 +727,12 @@ async function loadCategories(){
     if(S.categories.length === 0) {
       categoriesList.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:8px">Nessuna categoria. Creane una qui sotto!</p>';
     } else {
-      categoriesList.innerHTML = S.categories.map(c=>`
+      categoriesList.innerHTML = S.categories.map(c=>\`
         <span class="category-tag">
-          🏷️ ${c.name}
-          <button onclick="deleteCategory(${c.id})" title="Elimina categoria">✕</button>
+          🏷️ \${c.name}
+          <button onclick="deleteCategory(\${c.id})" title="Elimina categoria">✕</button>
         </span>
-      `).join('');
+      \`).join('');
     }
   }
 }
@@ -799,7 +804,7 @@ async function createCategoryInModal(){
 }
 
 async function deleteCategory(id){
-  if(!confirm('Eliminare questa categoria?\n\nATTENZIONE: Non puoi eliminare categorie che contengono documenti.')) return;
+  if(!confirm('Eliminare questa categoria?\\n\\nATTENZIONE: Non puoi eliminare categorie che contengono documenti.')) return;
   
   const fd = new FormData();
   fd.append('id', id);
@@ -872,9 +877,9 @@ async function saveOrganization(){
   document.getElementById('organizeModal').remove();
   
   if(errors === 0){
-    alert(`✓ ${success} documento/i organizzato/i correttamente!`);
+    alert(\`✓ \${success} documento/i organizzato/i correttamente!\`);
   } else {
-    alert(`⚠ ${success} documento/i organizzato/i, ${errors} errore/i.`);
+    alert(\`⚠ \${success} documento/i organizzato/i, \${errors} errore/i.\`);
   }
   
   loadDocs();
@@ -1025,7 +1030,7 @@ async function doForgot(){
     return;
   }
   
-  success.textContent = '✓ Se l\'email esiste, riceverai un link per reimpostare la password.';
+  success.textContent = '✓ Se l\\'email esiste, riceverai un link per reimpostare la password.';
   success.classList.remove('hidden');
 }
 
@@ -1053,24 +1058,24 @@ function renderDocsTable(){
     filteredDocs = S.docs.filter(d => d.category === S.filterCategory);
   }
   
-  tb.innerHTML = filteredDocs.map(d=>`
+  tb.innerHTML = filteredDocs.map(d=>\`
     <tr>
-      <td>${d.file_name}</td>
-      ${isPro ? `
+      <td>\${d.file_name}</td>
+      \${isPro ? \`
         <td class="category-select-cell">
-          <select class="doc-category-select" data-docid="${d.id}" data-current="${d.category}">
-            ${S.categories.map(c => `<option value="${c.name}" ${c.name === d.category ? 'selected' : ''}>${c.name}</option>`).join('')}
+          <select class="doc-category-select" data-docid="\${d.id}" data-current="\${d.category}">
+            \${S.categories.map(c => \`<option value="\${c.name}" \${c.name === d.category ? 'selected' : ''}>\${c.name}</option>\`).join('')}
           </select>
         </td>
-      ` : ''}
-      <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
-      <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
+      \` : ''}
+      <td>\${(d.size/(1024*1024)).toFixed(2)} MB</td>
+      <td>\${new Date(d.created_at).toLocaleString('it-IT')}</td>
       <td>
-        <a href="api/documents.php?a=download&id=${d.id}" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥 Scarica</a>
-        <button class='btn del' data-id='${d.id}'>Elimina</button>
+        <a href="api/documents.php?a=download&id=\${d.id}" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥 Scarica</a>
+        <button class='btn del' data-id='\${d.id}'>Elimina</button>
       </td>
     </tr>
-  `).join('');
+  \`).join('');
   
   tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
   
@@ -1083,7 +1088,7 @@ function renderDocsTable(){
         
         if(oldCategory === newCategory) return;
         
-        if(!confirm(`Spostare il documento nella categoria "${newCategory}"?\n\nIl documento verrà spostato anche su DocAnalyzer.`)) {
+        if(!confirm(\`Spostare il documento nella categoria "\${newCategory}"?\\n\\nIl documento verrà spostato anche su DocAnalyzer.\`)) {
           e.target.value = oldCategory;
           return;
         }
@@ -1155,10 +1160,10 @@ async function uploadFile(){
       file.value = '';
       if(uploadCategory) uploadCategory.value = '';
     } else {
-      alert(r.message || 'Errore durante l\'upload');
+      alert(r.message || 'Errore durante l\\'upload');
     }
   } catch(e) {
-    alert('Errore di connessione durante l\'upload');
+    alert('Errore di connessione durante l\\'upload');
   } finally {
     uploadBtn.disabled = false;
     uploadBtn.innerHTML = originalText;
@@ -1172,7 +1177,7 @@ async function uploadFile(){
 async function delDoc(id){
   if(!confirm('Eliminare questo documento?')) return;
   
-  const btn = document.querySelector(`button[data-id="${id}"]`);
+  const btn = document.querySelector(\`button[data-id="\${id}"]\`);
   if(btn){
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span>';
@@ -1201,6 +1206,7 @@ async function askDocs(){
   
   if(!q.value.trim()){
     alert('Inserisci una domanda');
+    q.focus();
     return;
   }
   
@@ -1211,7 +1217,7 @@ async function askDocs(){
   }
   
   askBtn.disabled = true;
-  askBtn.innerHTML = 'Cerco... <span class="loader"></span>';
+  askBtn.innerHTML = 'Cerco nei documenti... <span class="loader"></span>';
   
   const fd = new FormData();
   fd.append('q', q.value);
@@ -1224,37 +1230,7 @@ async function askDocs(){
     const r = await api('api/chat.php', fd);
     
     if(r.success && r.source !== 'none'){
-      const msgId = 'msg_' + Date.now();
-      const voices = getItalianVoices();
-      const voiceOptions = voices.map((v, i) => 
-        `<option value="${i}">${v.name} (${v.lang})</option>`
-      ).join('');
-      
-      const log = document.getElementById('chatLog');
-      const item = document.createElement('div');
-      item.className = 'chat-message docs';
-      item.dataset.msgid = msgId;
-      
-      item.innerHTML = `
-        <div style="font-weight:600;margin-bottom:8px">📄 Risposta dai documenti</div>
-        <div class="message-text" style="white-space:pre-wrap">${r.answer}</div>
-        <div class="chat-controls">
-          <button class="btn small" onclick="useAsContext('${msgId}')">📋 Usa risposta come contesto</button>
-          <button class="btn small icon copy-btn" onclick="copyToClipboard('${msgId}')" title="Copia negli appunti">📋</button>
-          <select class="voice-select" title="Seleziona voce">${voiceOptions}</select>
-          <select class="speed-select" title="Velocità">
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-          </select>
-          <button class="btn small icon play-btn" onclick="speakText('${msgId}')" title="Leggi">▶️</button>
-          <button class="btn small icon stop-btn hidden" onclick="stopSpeaking('${msgId}')" title="Stop">⏸️</button>
-        </div>
-      `;
-      
-      log.insertBefore(item, log.firstChild);
+      addMessageToLog(r.answer, 'docs', q.value);
       
       q.value = '';
       S.stats.chatToday++;
@@ -1262,7 +1238,7 @@ async function askDocs(){
       const qCount = document.getElementById('qCount');
       if(qCount) qCount.textContent = S.stats.chatToday;
     } else if(r.can_ask_ai) {
-      alert('Non ho trovato informazioni nei tuoi documenti. Prova a chiedere a Gemini!');
+      alert('Non ho trovato informazioni nei tuoi documenti. Prova a chiedere a Gemini nella sezione qui sotto!');
     } else {
       alert(r.message || 'Errore');
     }
@@ -1278,17 +1254,18 @@ async function askAI(){
   
   if(!q.value.trim() && !S.chatContext){
     alert('Inserisci una domanda');
+    q.focus();
     return;
   }
   
   askBtn.disabled = true;
-  askBtn.innerHTML = 'Pensando... <span class="loader"></span>';
+  askBtn.innerHTML = 'Gemini sta pensando... <span class="loader"></span>';
   
   const fd = new FormData();
   
   let finalQuestion = q.value;
   if(S.chatContext) {
-    finalQuestion = `Contesto: ${S.chatContext}\n\nDomanda: ${q.value || 'Continua con questo contesto'}`;
+    finalQuestion = \`Contesto: \${S.chatContext}\\n\\nDomanda: \${q.value || 'Continua con questo contesto'}\`;
   }
   
   fd.append('q', finalQuestion);
@@ -1298,36 +1275,7 @@ async function askAI(){
     const r = await api('api/chat.php', fd);
     
     if(r.success){
-      const msgId = 'msg_' + Date.now();
-      const voices = getItalianVoices();
-      const voiceOptions = voices.map((v, i) => 
-        `<option value="${i}">${v.name} (${v.lang})</option>`
-      ).join('');
-      
-      const log = document.getElementById('chatLog');
-      const item = document.createElement('div');
-      item.className = 'chat-message ai';
-      item.dataset.msgid = msgId;
-      
-      item.innerHTML = `
-        <div style="font-weight:600;margin-bottom:8px">🤖 Risposta AI Generica (Google Gemini)</div>
-        <div class="message-text" style="white-space:pre-wrap">${r.answer}</div>
-        <div class="chat-controls">
-          <button class="btn small icon copy-btn" onclick="copyToClipboard('${msgId}')" title="Copia negli appunti">📋</button>
-          <select class="voice-select" title="Seleziona voce">${voiceOptions}</select>
-          <select class="speed-select" title="Velocità">
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-          </select>
-          <button class="btn small icon play-btn" onclick="speakText('${msgId}')" title="Leggi">▶️</button>
-          <button class="btn small icon stop-btn hidden" onclick="stopSpeaking('${msgId}')" title="Stop">⏸️</button>
-        </div>
-      `;
-      
-      log.insertBefore(item, log.firstChild);
+      addMessageToLog(r.answer, 'ai', q.value || 'Continua contesto');
       
       q.value = '';
       removeContext();
@@ -1344,19 +1292,56 @@ async function askAI(){
   }
 }
 
+function addMessageToLog(answer, type, question) {
+  const msgId = 'msg_' + Date.now();
+  const voices = getItalianVoices();
+  const voiceOptions = voices.map((v, i) => 
+    \`<option value="\${i}">\${v.name} (\${v.lang})</option>\`
+  ).join('');
+  
+  const log = document.getElementById('chatLog');
+  const item = document.createElement('div');
+  item.className = \`chat-message \${type}\`;
+  item.dataset.msgid = msgId;
+  
+  const title = type === 'docs' ? '📄 Risposta dai documenti' : '🤖 Risposta AI Generica (Google Gemini)';
+  const useContextBtn = type === 'docs' ? \`<button class="btn small" onclick="useAsContext('\${msgId}')">📋 Usa come contesto</button>\` : '';
+  
+  item.innerHTML = \`
+    <div style="font-weight:600;margin-bottom:8px">\${title}</div>
+    <div class="message-text" style="white-space:pre-wrap">\${answer}</div>
+    <div class="chat-controls">
+      \${useContextBtn}
+      <button class="btn small icon copy-btn" onclick="copyToClipboard('\${msgId}')" title="Copia">📋</button>
+      <select class="voice-select" title="Voce">\${voiceOptions}</select>
+      <select class="speed-select" title="Velocità">
+        <option value="0.75">0.75x</option>
+        <option value="1" selected>1x</option>
+        <option value="1.25">1.25x</option>
+        <option value="1.5">1.5x</option>
+        <option value="2">2x</option>
+      </select>
+      <button class="btn small icon play-btn" onclick="speakText('\${msgId}')" title="Leggi">▶️</button>
+      <button class="btn small icon stop-btn hidden" onclick="stopSpeaking('\${msgId}')" title="Stop">⏸️</button>
+    </div>
+  \`;
+  
+  log.insertBefore(item, log.firstChild);
+}
+
 async function loadEvents(){
   const r = await api('api/calendar.php?a=list');
   if(!r.success) return;
   
   const tb = document.querySelector('#evTable tbody');
   if(tb){
-    tb.innerHTML = r.data.map(e=>`
+    tb.innerHTML = r.data.map(e=>\`
       <tr>
-        <td>${new Date(e.start).toLocaleString('it-IT')}</td>
-        <td>${e.title}</td>
-        <td><button class='btn del' data-id='${e.id}'>Elimina</button></td>
+        <td>\${new Date(e.start).toLocaleString('it-IT')}</td>
+        <td>\${e.title}</td>
+        <td><button class='btn del' data-id='\${e.id}'>Elimina</button></td>
       </tr>
-    `).join('');
+    \`).join('');
     tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delEvent(b.dataset.id));
   }
 }
@@ -1460,7 +1445,7 @@ async function activateProFromPage(){
 }
 
 async function doDowngrade(){
-  if(!confirm('Sei sicuro di voler passare al piano Free?\n\nDevi avere massimo 5 documenti. Tutti i documenti saranno spostati nella categoria principale.')) return;
+  if(!confirm('Sei sicuro di voler passare al piano Free?\\n\\nDevi avere massimo 5 documenti. Tutti i documenti saranno spostati nella categoria principale.')) return;
   
   const btn = document.getElementById('downgradeBtn');
   const err = document.getElementById('downgradeError');
@@ -1484,9 +1469,9 @@ async function doDowngrade(){
 }
 
 async function doDeleteAccount(){
-  if(!confirm('⚠️ ATTENZIONE ⚠️\n\nVuoi eliminare il tuo account?\n\nQuesta azione eliminerà:\n- Tutti i tuoi documenti\n- Tutte le chat\n- Tutti gli eventi\n- Il tuo account\n\nQuesta azione è IRREVERSIBILE.')) return;
+  if(!confirm('⚠️ ATTENZIONE ⚠️\\n\\nVuoi eliminare il tuo account?\\n\\nQuesta azione eliminerà:\\n- Tutti i tuoi documenti\\n- Tutte le chat\\n- Tutti gli eventi\\n- Il tuo account\\n\\nQuesta azione è IRREVERSIBILE.')) return;
   
-  if(!confirm('Confermi l\'eliminazione dell\'account?\n\nNon potrai più recuperare i tuoi dati.')) return;
+  if(!confirm('Confermi l\\'eliminazione dell\\'account?\\n\\nNon potrai più recuperare i tuoi dati.')) return;
   
   const btn = document.getElementById('deleteAccountBtn');
   btn.disabled = true;

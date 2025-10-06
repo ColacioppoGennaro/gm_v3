@@ -536,6 +536,7 @@ function bind(){
     
     const uploadBtn = document.getElementById('uploadBtn');
     const askBtn = document.getElementById('askBtn');
+    const askAIBtn = document.getElementById('askAIBtn');
     const addEv = document.getElementById('addEv');
     const addCategoryBtn = document.getElementById('addCategoryBtn');
     const organizeDocsBtn = document.getElementById('organizeDocsBtn');
@@ -543,6 +544,7 @@ function bind(){
     
     if(uploadBtn) uploadBtn.onclick=uploadFile;
     if(askBtn) askBtn.onclick=ask;
+    if(askAIBtn) askAIBtn.onclick=askAIDirect;
     if(addEv) addEv.onclick=createEvent;
     if(addCategoryBtn) addCategoryBtn.onclick=createCategory;
     if(organizeDocsBtn) organizeDocsBtn.onclick=showOrganizeModal;

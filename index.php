@@ -32,6 +32,7 @@ main{flex:1;padding:24px 32px;overflow-y:auto}
 .btn.warn{background:var(--warn)}
 .btn.del{background:var(--danger);padding:8px 14px;font-size:13px}
 .btn.small{padding:6px 12px;font-size:12px}
+.btn.icon{padding:8px 12px;font-size:14px}
 .banner{background:#1f2937;border:1px solid #374151;border-left:4px solid var(--warn);padding:16px;border-radius:10px;color:#fbbf24;margin:20px 0;cursor:pointer;transition:all .2s}
 .banner:hover{background:#252f3f;transform:translateX(4px)}
 .ads{height:90px;background:linear-gradient(135deg,#1f2937,#0b1220);border:1px dashed #374151;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:13px;margin:20px 0}
@@ -42,9 +43,10 @@ main{flex:1;padding:24px 32px;overflow-y:auto}
 .auth-box p{color:var(--muted);margin-bottom:32px;font-size:14px}
 .form-group{margin-bottom:20px}
 .form-group label{display:block;margin-bottom:8px;font-weight:500;font-size:13px;color:var(--muted)}
-input,select{width:100%;padding:12px 16px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e5e7eb;font-size:14px;transition:border .2s}
-input:focus,select:focus{outline:none;border-color:var(--accent)}
-input::placeholder{color:#4b5563}
+input,select,textarea{width:100%;padding:12px 16px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e5e7eb;font-size:14px;transition:border .2s;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+input::placeholder,textarea::placeholder{color:#4b5563}
+textarea{resize:vertical;min-height:80px}
 .btn-group{display:flex;gap:12px;margin-top:24px}
 .btn-group .btn{flex:1}
 .link-btn{background:none;border:none;color:var(--accent);cursor:pointer;text-decoration:underline;font-size:13px;margin-top:16px;display:inline-block}
@@ -75,6 +77,16 @@ h1{margin-bottom:8px}
 .category-select-cell select{width:100%;padding:6px 10px;font-size:13px}
 .new-category-box{background:#0b1220;border:2px dashed #7c3aed;padding:16px;border-radius:10px;margin:16px 0}
 .new-category-box h4{color:var(--accent);margin-bottom:12px;font-size:14px}
+.chat-message{padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)}
+.chat-message.docs{background:#1f2937}
+.chat-message.ai{background:#0b1220;border-left-color:#10b981}
+.chat-controls{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.chat-controls select{width:auto;padding:6px 10px;font-size:12px}
+.context-box{background:#1e293b;border:2px solid #7c3aed;border-radius:10px;padding:16px;margin-bottom:16px;position:relative}
+.context-box textarea{min-height:100px;background:#0b1220;border-color:#374151}
+.context-box .remove-context{position:absolute;top:8px;right:8px;background:var(--danger);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
+.settings-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;background:#1f2937;padding:12px;border-radius:8px}
+.settings-row label{font-size:13px;color:var(--muted);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -87,7 +99,9 @@ const S = {
   categories: [],
   view: 'login',
   stats: {chatToday: 0, totalSize: 0},
-  filterCategory: ''
+  filterCategory: '',
+  chatContext: null,
+  ttsState: {}
 };
 
 const api = (p, fd=null) => fetch(p, {method: fd?'POST':'GET', body: fd}).then(r=>r.json());
@@ -266,34 +280,48 @@ function appView(){
         <h1>Chat AI</h1>
         ${!isPro ? '<div class="banner" id="upgradeBtn2">Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
+        
         <div class="card">
-          <h3>Fai una domanda ai tuoi documenti</h3>
+          <h3>📄 Chiedi ai tuoi documenti</h3>
           
-          <div style="background:#1f2937;padding:12px;border-radius:8px;margin-bottom:12px">
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <label style="font-size:13px;color:var(--muted)">Aderenza:</label>
-              <select id="adherence" style="width:auto;padding:6px 10px;font-size:13px">
-                <option value="strict">Strettamente documenti</option>
-                <option value="high">Alta aderenza</option>
-                <option value="balanced" selected>Bilanciata</option>
-                <option value="low">Bassa aderenza</option>
-                <option value="free">Libera interpretazione</option>
-              </select>
-              
-              <label style="margin-left:16px">
-                <input type="checkbox" id="showRefs" checked style="width:auto;margin-right:4px"/>
-                <span style="font-size:13px;color:var(--muted)">Mostra riferimenti pagine</span>
-              </label>
-            </div>
+          <div class="settings-row">
+            <label>Aderenza:</label>
+            <select id="adherence" style="width:auto;padding:6px 10px">
+              <option value="strict">Strettamente documenti</option>
+              <option value="high">Alta aderenza</option>
+              <option value="balanced" selected>Bilanciata</option>
+              <option value="low">Bassa aderenza</option>
+              <option value="free">Libera interpretazione</option>
+            </select>
+            
+            <label style="margin-left:16px">
+              <input type="checkbox" id="showRefs" checked style="width:auto;margin-right:4px"/>
+              <span style="font-size:13px">Mostra riferimenti pagine</span>
+            </label>
           </div>
           
           <div style="display:flex;gap:12px;margin-top:16px">
-            <input id="q" placeholder="Es: Quando scade l'IMU?" style="flex:1"/>
-            ${isPro ? `<select id="category" style="width:200px"><option value="">-- Seleziona categoria --</option></select>` : '<select id="category" style="width:180px"><option value="">(Free: tutti)</option></select>'}
-            <button class="btn" id="askBtn">Chiedi ai documenti</button>
+            <input id="qDocs" placeholder="Es: Quando scade l'IMU?" style="flex:1"/>
+            ${isPro ? `<select id="categoryDocs" style="width:200px"><option value="">-- Seleziona categoria --</option></select>` : '<select id="categoryDocs" style="width:180px"><option value="">(Free: tutti)</option></select>'}
+            <button class="btn" id="askDocsBtn">🔍 Chiedi ai documenti</button>
           </div>
           <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/${maxChat}</div>
-          <div id="chatLog" style="margin-top:24px"></div>
+        </div>
+
+        <div class="card">
+          <h3>🤖 Chat AI Generica (Google Gemini)</h3>
+          
+          <div id="contextBox" class="hidden"></div>
+          
+          <div style="display:flex;gap:12px">
+            <input id="qAI" placeholder="Es: Spiegami come funziona..." style="flex:1"/>
+            <button class="btn" id="askAIBtn" style="background:#10b981">🤖 Chiedi a Gemini</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>💬 Conversazione</h3>
+          <div id="chatLog"></div>
         </div>
       </section>
 
@@ -506,13 +534,11 @@ function bind(){
       render(); 
     };
     
-    // Bind upgrade buttons
     ['upgradeBtn', 'upgradeBtn2', 'upgradeBtn3'].forEach(id => {
       const btn = document.getElementById(id);
       if(btn) btn.onclick = showUpgradeModal;
     });
     
-    // Bind account page buttons
     const activateProPage = document.getElementById('activateProPage');
     const downgradeBtn = document.getElementById('downgradeBtn');
     const deleteAccountBtn = document.getElementById('deleteAccountBtn');
@@ -535,7 +561,7 @@ function bind(){
     }
     
     const uploadBtn = document.getElementById('uploadBtn');
-    const askBtn = document.getElementById('askBtn');
+    const askDocsBtn = document.getElementById('askDocsBtn');
     const askAIBtn = document.getElementById('askAIBtn');
     const addEv = document.getElementById('addEv');
     const addCategoryBtn = document.getElementById('addCategoryBtn');
@@ -543,8 +569,8 @@ function bind(){
     const filterCategory = document.getElementById('filterCategory');
     
     if(uploadBtn) uploadBtn.onclick=uploadFile;
-    if(askBtn) askBtn.onclick=ask;
-    if(askAIBtn) askAIBtn.onclick=askAIDirect;
+    if(askDocsBtn) askDocsBtn.onclick=askDocs;
+    if(askAIBtn) askAIBtn.onclick=askAI;
     if(addEv) addEv.onclick=createEvent;
     if(addCategoryBtn) addCategoryBtn.onclick=createCategory;
     if(organizeDocsBtn) organizeDocsBtn.onclick=showOrganizeModal;
@@ -558,34 +584,139 @@ function bind(){
   }
 }
 
+// === TTS FUNCTIONS ===
+function getItalianVoices() {
+  const voices = speechSynthesis.getVoices();
+  const italian = voices.filter(v => v.lang.startsWith('it'));
+  return italian.length > 0 ? italian : voices;
+}
+
+function speakText(msgId) {
+  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  const voiceSelect = msg.querySelector('.voice-select');
+  const speedSelect = msg.querySelector('.speed-select');
+  const playBtn = msg.querySelector('.play-btn');
+  const stopBtn = msg.querySelector('.stop-btn');
+  
+  if (S.ttsState[msgId] && S.ttsState[msgId].speaking) {
+    speechSynthesis.cancel();
+    S.ttsState[msgId].speaking = false;
+    playBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+    return;
+  }
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voices = speechSynthesis.getVoices();
+  utterance.voice = voices[voiceSelect.value] || voices[0];
+  utterance.rate = parseFloat(speedSelect.value);
+  
+  utterance.onend = () => {
+    S.ttsState[msgId].speaking = false;
+    playBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+  };
+  
+  S.ttsState[msgId] = { speaking: true };
+  playBtn.classList.add('hidden');
+  stopBtn.classList.remove('hidden');
+  
+  speechSynthesis.speak(utterance);
+}
+
+function stopSpeaking(msgId) {
+  speechSynthesis.cancel();
+  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
+  if (msg) {
+    msg.querySelector('.play-btn').classList.remove('hidden');
+    msg.querySelector('.stop-btn').classList.add('hidden');
+  }
+  if (S.ttsState[msgId]) {
+    S.ttsState[msgId].speaking = false;
+  }
+}
+
+function copyToClipboard(msgId) {
+  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = msg.querySelector('.copy-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓';
+    setTimeout(() => btn.innerHTML = originalText, 1500);
+  });
+}
+
+function useAsContext(msgId) {
+  const msg = document.querySelector(`[data-msgid="${msgId}"]`);
+  if (!msg) return;
+  
+  const text = msg.querySelector('.message-text').textContent;
+  S.chatContext = text;
+  
+  const contextBox = document.getElementById('contextBox');
+  contextBox.className = 'context-box';
+  contextBox.innerHTML = `
+    <button class="remove-context" onclick="removeContext()">✕ Rimuovi contesto</button>
+    <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--accent)">📋 Contesto dalla risposta documenti:</label>
+    <textarea id="contextText" readonly>${text}</textarea>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted)">
+      Puoi aggiungere una domanda di follow-up nell'input qui sotto
+    </div>
+  `;
+  
+  // Scroll to Gemini section
+  document.querySelector('#qAI').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.querySelector('#qAI').focus();
+}
+
+function removeContext() {
+  S.chatContext = null;
+  document.getElementById('contextBox').className = 'hidden';
+}
+
+window.speakText = speakText;
+window.stopSpeaking = stopSpeaking;
+window.copyToClipboard = copyToClipboard;
+window.useAsContext = useAsContext;
+window.removeContext = removeContext;
+
+// Load voices
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = () => {
+    getItalianVoices();
+  };
+}
+
 async function loadCategories(){
   const r = await api('api/categories.php?a=list');
   if(!r.success) return;
   
   S.categories = r.data;
   
-  // Aggiorna select upload
   const uploadCategory = document.getElementById('uploadCategory');
   if(uploadCategory) {
     uploadCategory.innerHTML = '<option value="">-- Seleziona una categoria --</option>' +
       S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
   }
   
-  // Aggiorna select chat
-  const category = document.getElementById('category');
-  if(category) {
-    category.innerHTML = '<option value="">-- Seleziona categoria --</option>' +
-      S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  const categoryDocs = document.getElementById('categoryDocs');
+  if(categoryDocs) {
+    categoryDocs.innerHTML = '<option value="">-- Seleziona categoria --</option>' +
+      S.categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
   }
   
-  // Aggiorna filtro categoria
   const filterCategory = document.getElementById('filterCategory');
   if(filterCategory) {
     filterCategory.innerHTML = '<option value="">Tutte le categorie</option>' +
       S.categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
   }
   
-  // Mostra lista categorie nella card upload
   const categoriesList = document.getElementById('categoriesList');
   if(categoriesList) {
     if(S.categories.length === 0) {
@@ -656,8 +787,6 @@ async function createCategoryInModal(){
     if(r.success){
       input.value = '';
       await loadCategories();
-      
-      // Ricarica il modal con le nuove categorie
       document.getElementById('organizeModal').remove();
       showOrganizeModal();
     } else {
@@ -685,7 +814,6 @@ async function deleteCategory(id){
   }
 }
 
-// Rendi deleteCategory globale per onclick inline
 window.deleteCategory = deleteCategory;
 
 function showUpgradeModal(){
@@ -778,7 +906,6 @@ async function activatePro(){
       S.user.role = 'pro';
       document.getElementById('upgradeModal').remove();
       render();
-      // Mostra modal organizzazione se ci sono documenti master
       setTimeout(() => {
         const masterDocs = S.docs.filter(d => d.category === 'master');
         if(masterDocs.length > 0) {
@@ -921,7 +1048,6 @@ function renderDocsTable(){
   
   const isPro = S.user && S.user.role === 'pro';
   
-  // Filtra documenti se c'è un filtro attivo
   let filteredDocs = S.docs;
   if(S.filterCategory) {
     filteredDocs = S.docs.filter(d => d.category === S.filterCategory);
@@ -946,10 +1072,8 @@ function renderDocsTable(){
     </tr>
   `).join('');
   
-  // Bind delete buttons
   tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
   
-  // Bind category selects (solo Pro)
   if(isPro) {
     tb.querySelectorAll('.doc-category-select').forEach(select => {
       select.onchange = async (e) => {
@@ -964,7 +1088,6 @@ function renderDocsTable(){
           return;
         }
         
-        // Mostra loader
         e.target.disabled = true;
         const originalHTML = e.target.innerHTML;
         e.target.innerHTML = '<option>Spostamento...</option>';
@@ -977,9 +1100,7 @@ function renderDocsTable(){
           const r = await api('api/documents.php?a=change_category', fd);
           
           if(r.success) {
-            // Aggiorna dataset
             e.target.dataset.current = newCategory;
-            // Ricarica documenti per essere sicuri
             await loadDocs();
           } else {
             alert(r.message || 'Errore spostamento');
@@ -1005,14 +1126,12 @@ async function uploadFile(){
   const f = file.files[0];
   if(!f) return alert('Seleziona un file');
   
-  // Pro deve selezionare categoria
   if(S.user.role === 'pro' && uploadCategory && !uploadCategory.value){
     alert('Seleziona una categoria prima di caricare il file');
     uploadCategory.focus();
     return;
   }
   
-  // Mostra loader
   uploadBtn.disabled = true;
   const originalText = uploadBtn.innerHTML;
   uploadBtn.innerHTML = 'Caricamento... <span class="loader"></span>';
@@ -1073,10 +1192,10 @@ async function delDoc(id){
   }
 }
 
-async function ask(){
-  const q = document.getElementById('q');
-  const category = document.getElementById('category');
-  const askBtn = document.getElementById('askBtn');
+async function askDocs(){
+  const q = document.getElementById('qDocs');
+  const category = document.getElementById('categoryDocs');
+  const askBtn = document.getElementById('askDocsBtn');
   const adherence = document.getElementById('adherence');
   const showRefs = document.getElementById('showRefs');
   
@@ -1085,14 +1204,12 @@ async function ask(){
     return;
   }
   
-  // Pro DEVE selezionare categoria
   if(S.user.role === 'pro' && (!category.value || category.value === '')){
     alert('Seleziona una categoria prima di fare la domanda');
     category.focus();
     return;
   }
   
-  // Mostra loader
   askBtn.disabled = true;
   askBtn.innerHTML = 'Cerco... <span class="loader"></span>';
   
@@ -1105,83 +1222,115 @@ async function ask(){
   
   try {
     const r = await api('api/chat.php', fd);
-    const log = document.getElementById('chatLog');
     
-    if(r.success){
-      let badge = '';
-      let sourceLabel = '';
-      let bgColor = '#1f2937';
+    if(r.success && r.source !== 'none'){
+      const msgId = 'msg_' + Date.now();
+      const voices = getItalianVoices();
+      const voiceOptions = voices.map((v, i) => 
+        `<option value="${i}">${v.name} (${v.lang})</option>`
+      ).join('');
       
-      if(r.source === 'docs'){
-        badge = 'Risposta dai documenti';
-        sourceLabel = 'DocAnalyzer';
-        bgColor = '#1f2937';
-      } else if(r.source === 'ai'){
-        badge = 'Risposta AI Generica';
-        sourceLabel = 'Google Gemini';
-        bgColor = '#0b1220';
-      } else if(r.source === 'none'){
-        badge = 'Nessuna risposta trovata';
-        bgColor = '#1e293b';
-      }
-      
+      const log = document.getElementById('chatLog');
       const item = document.createElement('div');
-      item.style.cssText = `background:${bgColor};padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)`;
+      item.className = 'chat-message docs';
+      item.dataset.msgid = msgId;
       
-      let html = `<div style="font-weight:600;margin-bottom:8px">${badge}</div>`;
-      html += `<div style="white-space:pre-wrap">${r.answer}</div>`;
+      item.innerHTML = `
+        <div style="font-weight:600;margin-bottom:8px">📄 Risposta dai documenti</div>
+        <div class="message-text" style="white-space:pre-wrap">${r.answer}</div>
+        <div class="chat-controls">
+          <button class="btn small" onclick="useAsContext('${msgId}')">📋 Usa risposta come contesto</button>
+          <button class="btn small icon copy-btn" onclick="copyToClipboard('${msgId}')" title="Copia negli appunti">📋</button>
+          <select class="voice-select" title="Seleziona voce">${voiceOptions}</select>
+          <select class="speed-select" title="Velocità">
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+          <button class="btn small icon play-btn" onclick="speakText('${msgId}')" title="Leggi">▶️</button>
+          <button class="btn small icon stop-btn hidden" onclick="stopSpeaking('${msgId}')" title="Stop">⏸️</button>
+        </div>
+      `;
       
-      // Se DocAnalyzer non ha trovato risposta, aggiungi bottone per chiedere a Gemini
-      if(r.can_ask_ai){
-        html += `<button class="btn" onclick="askAI('${q.value.replace(/'/g, "\\'")}', '${category.value}')" style="margin-top:12px">Chiedi a AI generica (Google Gemini)</button>`;
-      }
-      
-      item.innerHTML = html;
       log.insertBefore(item, log.firstChild);
       
-      if(r.source !== 'none'){
-        q.value = '';
-        S.stats.chatToday++;
-        updateChatCounter();
-        const qCount = document.getElementById('qCount');
-        if(qCount) qCount.textContent = S.stats.chatToday;
-      }
+      q.value = '';
+      S.stats.chatToday++;
+      updateChatCounter();
+      const qCount = document.getElementById('qCount');
+      if(qCount) qCount.textContent = S.stats.chatToday;
+    } else if(r.can_ask_ai) {
+      alert('Non ho trovato informazioni nei tuoi documenti. Prova a chiedere a Gemini!');
     } else {
       alert(r.message || 'Errore');
     }
   } finally {
     askBtn.disabled = false;
-    askBtn.innerHTML = 'Chiedi ai documenti';
+    askBtn.innerHTML = '🔍 Chiedi ai documenti';
   }
 }
 
-async function askAI(question, category){
-  const log = document.getElementById('chatLog');
+async function askAI(){
+  const q = document.getElementById('qAI');
+  const askBtn = document.getElementById('askAIBtn');
   
-  // Aggiungi loader
-  const loader = document.createElement('div');
-  loader.id = 'aiLoader';
-  loader.style.cssText = 'background:#0b1220;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid #10b981';
-  loader.innerHTML = '<div style="font-weight:600;margin-bottom:8px">Chiedendo a Google Gemini...</div><span class="loader"></span>';
-  log.insertBefore(loader, log.firstChild);
+  if(!q.value.trim() && !S.chatContext){
+    alert('Inserisci una domanda');
+    return;
+  }
+  
+  askBtn.disabled = true;
+  askBtn.innerHTML = 'Pensando... <span class="loader"></span>';
   
   const fd = new FormData();
-  fd.append('q', question);
-  fd.append('category', category);
+  
+  let finalQuestion = q.value;
+  if(S.chatContext) {
+    finalQuestion = `Contesto: ${S.chatContext}\n\nDomanda: ${q.value || 'Continua con questo contesto'}`;
+  }
+  
+  fd.append('q', finalQuestion);
   fd.append('mode', 'ai');
   
   try {
     const r = await api('api/chat.php', fd);
     
-    // Rimuovi loader
-    document.getElementById('aiLoader')?.remove();
-    
     if(r.success){
+      const msgId = 'msg_' + Date.now();
+      const voices = getItalianVoices();
+      const voiceOptions = voices.map((v, i) => 
+        `<option value="${i}">${v.name} (${v.lang})</option>`
+      ).join('');
+      
+      const log = document.getElementById('chatLog');
       const item = document.createElement('div');
-      item.style.cssText = 'background:#0b1220;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid #10b981';
-      item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">Risposta AI Generica (Google Gemini)</div><div style="white-space:pre-wrap">${r.answer}</div>`;
+      item.className = 'chat-message ai';
+      item.dataset.msgid = msgId;
+      
+      item.innerHTML = `
+        <div style="font-weight:600;margin-bottom:8px">🤖 Risposta AI Generica (Google Gemini)</div>
+        <div class="message-text" style="white-space:pre-wrap">${r.answer}</div>
+        <div class="chat-controls">
+          <button class="btn small icon copy-btn" onclick="copyToClipboard('${msgId}')" title="Copia negli appunti">📋</button>
+          <select class="voice-select" title="Seleziona voce">${voiceOptions}</select>
+          <select class="speed-select" title="Velocità">
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+          <button class="btn small icon play-btn" onclick="speakText('${msgId}')" title="Leggi">▶️</button>
+          <button class="btn small icon stop-btn hidden" onclick="stopSpeaking('${msgId}')" title="Stop">⏸️</button>
+        </div>
+      `;
+      
       log.insertBefore(item, log.firstChild);
       
+      q.value = '';
+      removeContext();
       S.stats.chatToday++;
       updateChatCounter();
       const qCount = document.getElementById('qCount');
@@ -1189,14 +1338,11 @@ async function askAI(question, category){
     } else {
       alert(r.message || 'Errore AI');
     }
-  } catch(e) {
-    document.getElementById('aiLoader')?.remove();
-    alert('Errore connessione AI');
+  } finally {
+    askBtn.disabled = false;
+    askBtn.innerHTML = '🤖 Chiedi a Gemini';
   }
 }
-
-// Rendi askAI globale
-window.askAI = askAI;
 
 async function loadEvents(){
   const r = await api('api/calendar.php?a=list');
@@ -1298,7 +1444,6 @@ async function activateProFromPage(){
     setTimeout(()=>{
       S.user.role = 'pro';
       render();
-      // Mostra modal organizzazione se ci sono documenti master
       setTimeout(() => {
         const masterDocs = S.docs.filter(d => d.category === 'master');
         if(masterDocs.length > 0) {
@@ -1339,10 +1484,8 @@ async function doDowngrade(){
 }
 
 async function doDeleteAccount(){
-  // Prima conferma
   if(!confirm('⚠️ ATTENZIONE ⚠️\n\nVuoi eliminare il tuo account?\n\nQuesta azione eliminerà:\n- Tutti i tuoi documenti\n- Tutte le chat\n- Tutti gli eventi\n- Il tuo account\n\nQuesta azione è IRREVERSIBILE.')) return;
   
-  // Seconda conferma
   if(!confirm('Confermi l\'eliminazione dell\'account?\n\nNon potrai più recuperare i tuoi dati.')) return;
   
   const btn = document.getElementById('deleteAccountBtn');

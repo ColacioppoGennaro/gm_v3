@@ -90,10 +90,11 @@ try {
         $st->bind_param("iss", $user['id'], $name, $docanalyzer_label_id);
         $st->execute();
         
-        error_log("Label created in DB: id=" . db()->insert_id());
+        $newId = db()->insert_id;
+        error_log("Label created in DB: id=$newId");
         
         ob_end_clean();
-        json_out(['success' => true, 'id' => db()->insert_id()]);
+        json_out(['success' => true, 'id' => $newId]);
     }
     elseif ($action === 'delete') {
         $id = intval($_POST['id'] ?? 0);

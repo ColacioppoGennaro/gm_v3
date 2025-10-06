@@ -858,7 +858,10 @@ function renderDocsTable(){
       ` : ''}
       <td>${(d.size/(1024*1024)).toFixed(2)} MB</td>
       <td>${new Date(d.created_at).toLocaleString('it-IT')}</td>
-      <td><button class='btn del' data-id='${d.id}'>Elimina</button></td>
+      <td>
+        <a href="api/documents.php?a=download&id=${d.id}" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥 Scarica</a>
+        <button class='btn del' data-id='${d.id}'>Elimina</button>
+      </td>
     </tr>
   `).join('');
   

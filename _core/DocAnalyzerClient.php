@@ -15,9 +15,9 @@ class DocAnalyzerClient {
     }
     
     /**
-     * HTTP request helper
+     * HTTP request helper (PUBBLICO per permettere chiamate custom)
      */
-    private function request($method, $path, $data = null, $isFile = false) {
+    public function request($method, $path, $data = null, $isFile = false) {
         $url = $this->apiBase . $path;
         $ch = curl_init($url);
         
@@ -27,15 +27,13 @@ class DocAnalyzerClient {
         
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Timeout lungo per upload
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);
         
         if ($data) {
             if ($isFile) {
-                // Upload file multipart
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
             } else {
-                // JSON data
                 $headers[] = 'Content-Type: application/json';
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             }
@@ -55,7 +53,16 @@ class DocAnalyzerClient {
         $result = json_decode($response, true);
         
         if ($httpCode >= 400) {
-            $errMsg = $result['error'] ?? "HTTP $httpCode: $response";
+            // MIGLIORE GESTIONE ERRORI
+            if (isset($result['error'])) {
+                $errMsg = is_array($result['error']) ? json_encode($result['error']) : $result['error'];
+            } else {
+                $errMsg = "HTTP $httpCode: " . substr($response, 0, 200);
+            }
+            
+            error_log("DocAnalyzer API Error: $errMsg");
+            error_log("Full response: $response");
+            
             throw new Exception("DocAnalyzer API Error: $errMsg");
         }
         
@@ -93,6 +100,8 @@ class DocAnalyzerClient {
             'docids' => $docids
         ];
         
+        error_log("DocAnalyzer createLabel: name=$name, docids=" . json_encode($docids));
+        
         $response = $this->request('POST', '/api/v1/label', $data);
         return $response['data'] ?? null;
     }
@@ -105,27 +114,27 @@ class DocAnalyzerClient {
     public function updateLabel($labelName, $updates) {
         // Trova label per nome
         $label = $this->findLabelByName($labelName);
+        
         if (!$label) {
-            throw new Exception("Label '$labelName' non trovata");
+            throw new Exception("Label '$labelName' non trovata su DocAnalyzer");
         }
         
         $lid = $label['lid'];
         
-        error_log("DocAnalyzer updateLabel: lid=$lid, updates=" . json_encode($updates));
+        error_log("DocAnalyzer updateLabel: lid=$lid, labelName=$labelName, updates=" . json_encode($updates));
         
         $response = $this->request('PUT', "/api/v1/label/{$lid}", $updates);
         return $response['data'] ?? null;
     }
     
     /**
-     * Upload documento SINCRONO (strategia che funziona)
+     * Upload documento SINCRONO
      */
     public function uploadDocumentSync($filePath, $fileName) {
         if (!file_exists($filePath)) {
             throw new Exception("File non trovato: $filePath");
         }
         
-        // Crea CURLFile per upload multipart
         $cfile = new CURLFile($filePath, mime_content_type($filePath), $fileName);
         
         $data = [
@@ -139,11 +148,11 @@ class DocAnalyzerClient {
             throw new Exception('Upload riuscito ma nessun DocID ricevuto');
         }
         
-        return $docids[0]; // Ritorna il primo docid
+        return $docids[0];
     }
     
     /**
-     * Upload documento direttamente su una label esistente (strategia B)
+     * Upload documento su una label esistente
      */
     public function uploadToLabelSync($labelId, $filePath, $fileName) {
         if (!file_exists($filePath)) {
@@ -167,15 +176,14 @@ class DocAnalyzerClient {
     }
     
     /**
-     * FLUSSO COMPLETO: Upload e Tag (come nel tuo esempio funzionante)
-     * Questo è il metodo principale da usare
+     * FLUSSO COMPLETO: Upload e Tag
      */
     public function uploadAndTag($filePath, $fileName, $labelName) {
         // 1. Cerca se la label esiste
         $existingLabel = $this->findLabelByName($labelName);
         
         if ($existingLabel) {
-            // STRATEGIA B: Label esiste, upload diretto
+            // Label esiste, upload diretto
             $labelId = $existingLabel['lid'];
             $docid = $this->uploadToLabelSync($labelId, $filePath, $fileName);
             
@@ -186,11 +194,9 @@ class DocAnalyzerClient {
                 'strategy' => 'existing_label'
             ];
         } else {
-            // STRATEGIA A: Label non esiste
-            // 1. Upload documento separato
+            // Label non esiste - upload separato poi crea label
             $docid = $this->uploadDocumentSync($filePath, $fileName);
             
-            // 2. Crea label e associa docid
             $newLabel = $this->createLabel($labelName, [$docid]);
             
             if (!$newLabel || !isset($newLabel['lid'])) {
@@ -207,12 +213,9 @@ class DocAnalyzerClient {
     }
     
     /**
-     * Interroga i documenti di una label usando l'endpoint /label/{lid}/chat
-     * @param string $question La domanda
-     * @param string $labelName Nome della label da interrogare
+     * Interroga i documenti di una label
      */
     public function queryLabel($question, $labelName) {
-        // Trova la label per nome
         $label = $this->findLabelByName($labelName);
         
         if (!$label) {
@@ -226,7 +229,7 @@ class DocAnalyzerClient {
             'adherence' => 'balanced'
         ];
         
-        error_log("DocAnalyzer Query Label: lid=$lid, label=$labelName, question=" . substr($question, 0, 50));
+        error_log("DocAnalyzer Query: lid=$lid, label=$labelName, question=" . substr($question, 0, 50));
         
         $response = $this->request('POST', "/api/v1/label/{$lid}/chat", $data);
         

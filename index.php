@@ -263,15 +263,34 @@ function appView(){
       </section>
 
       <section class="hidden" data-page="chat">
-        <h1>💬 Chat AI</h1>
-        ${!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        <h1>Chat AI</h1>
+        ${!isPro ? '<div class="banner" id="upgradeBtn2">Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         ${!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : ''}
         <div class="card">
           <h3>Fai una domanda ai tuoi documenti</h3>
+          
+          <div style="background:#1f2937;padding:12px;border-radius:8px;margin-bottom:12px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:13px;color:var(--muted)">Aderenza:</label>
+              <select id="adherence" style="width:auto;padding:6px 10px;font-size:13px">
+                <option value="strict">Strettamente documenti</option>
+                <option value="high">Alta aderenza</option>
+                <option value="balanced" selected>Bilanciata</option>
+                <option value="low">Bassa aderenza</option>
+                <option value="free">Libera interpretazione</option>
+              </select>
+              
+              <label style="margin-left:16px">
+                <input type="checkbox" id="showRefs" checked style="width:auto;margin-right:4px"/>
+                <span style="font-size:13px;color:var(--muted)">Mostra riferimenti pagine</span>
+              </label>
+            </div>
+          </div>
+          
           <div style="display:flex;gap:12px;margin-top:16px">
             <input id="q" placeholder="Es: Quando scade l'IMU?" style="flex:1"/>
             ${isPro ? `<select id="category" style="width:200px"><option value="">-- Seleziona categoria --</option></select>` : '<select id="category" style="width:180px"><option value="">(Free: tutti)</option></select>'}
-            <button class="btn" id="askBtn">Chiedi</button>
+            <button class="btn" id="askBtn">Chiedi ai documenti</button>
           </div>
           <div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/${maxChat}</div>
           <div id="chatLog" style="margin-top:24px"></div>
@@ -1056,6 +1075,8 @@ async function ask(){
   const q = document.getElementById('q');
   const category = document.getElementById('category');
   const askBtn = document.getElementById('askBtn');
+  const adherence = document.getElementById('adherence');
+  const showRefs = document.getElementById('showRefs');
   
   if(!q.value.trim()){
     alert('Inserisci una domanda');
@@ -1076,31 +1097,104 @@ async function ask(){
   const fd = new FormData();
   fd.append('q', q.value);
   fd.append('category', category.value || '');
+  fd.append('mode', 'docs');
+  fd.append('adherence', adherence.value);
+  fd.append('show_refs', showRefs.checked ? '1' : '0');
   
   try {
     const r = await api('api/chat.php', fd);
     const log = document.getElementById('chatLog');
     
     if(r.success){
-      const badge = r.source==='docs'?'📄':'🤖';
+      let badge = '';
+      let sourceLabel = '';
+      let bgColor = '#1f2937';
+      
+      if(r.source === 'docs'){
+        badge = 'Risposta dai documenti';
+        sourceLabel = 'DocAnalyzer';
+        bgColor = '#1f2937';
+      } else if(r.source === 'ai'){
+        badge = 'Risposta AI Generica';
+        sourceLabel = 'Google Gemini';
+        bgColor = '#0b1220';
+      } else if(r.source === 'none'){
+        badge = 'Nessuna risposta trovata';
+        bgColor = '#1e293b';
+      }
+      
       const item = document.createElement('div');
-      item.style.cssText = 'background:#1f2937;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)';
-      item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">${badge} ${r.source==='docs'?'Risposta dai documenti':'Risposta AI'}</div><div>${r.answer}</div>`;
+      item.style.cssText = `background:${bgColor};padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)`;
+      
+      let html = `<div style="font-weight:600;margin-bottom:8px">${badge}</div>`;
+      html += `<div style="white-space:pre-wrap">${r.answer}</div>`;
+      
+      // Se DocAnalyzer non ha trovato risposta, aggiungi bottone per chiedere a Gemini
+      if(r.can_ask_ai){
+        html += `<button class="btn" onclick="askAI('${q.value.replace(/'/g, "\\'")}', '${category.value}')" style="margin-top:12px">Chiedi a AI generica (Google Gemini)</button>`;
+      }
+      
+      item.innerHTML = html;
       log.insertBefore(item, log.firstChild);
-      q.value = '';
+      
+      if(r.source !== 'none'){
+        q.value = '';
+        S.stats.chatToday++;
+        updateChatCounter();
+        const qCount = document.getElementById('qCount');
+        if(qCount) qCount.textContent = S.stats.chatToday;
+      }
+    } else {
+      alert(r.message || 'Errore');
+    }
+  } finally {
+    askBtn.disabled = false;
+    askBtn.innerHTML = 'Chiedi ai documenti';
+  }
+}
+
+async function askAI(question, category){
+  const log = document.getElementById('chatLog');
+  
+  // Aggiungi loader
+  const loader = document.createElement('div');
+  loader.id = 'aiLoader';
+  loader.style.cssText = 'background:#0b1220;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid #10b981';
+  loader.innerHTML = '<div style="font-weight:600;margin-bottom:8px">Chiedendo a Google Gemini...</div><span class="loader"></span>';
+  log.insertBefore(loader, log.firstChild);
+  
+  const fd = new FormData();
+  fd.append('q', question);
+  fd.append('category', category);
+  fd.append('mode', 'ai');
+  
+  try {
+    const r = await api('api/chat.php', fd);
+    
+    // Rimuovi loader
+    document.getElementById('aiLoader')?.remove();
+    
+    if(r.success){
+      const item = document.createElement('div');
+      item.style.cssText = 'background:#0b1220;padding:16px;border-radius:10px;margin-bottom:12px;border-left:4px solid #10b981';
+      item.innerHTML = `<div style="font-weight:600;margin-bottom:8px">Risposta AI Generica (Google Gemini)</div><div style="white-space:pre-wrap">${r.answer}</div>`;
+      log.insertBefore(item, log.firstChild);
       
       S.stats.chatToday++;
       updateChatCounter();
       const qCount = document.getElementById('qCount');
       if(qCount) qCount.textContent = S.stats.chatToday;
     } else {
-      alert(r.message || 'Errore');
+      alert(r.message || 'Errore AI');
     }
-  } finally {
-    askBtn.disabled = false;
-    askBtn.innerHTML = 'Chiedi';
+  } catch(e) {
+    document.getElementById('aiLoader')?.remove();
+    alert('Errore connessione AI');
   }
 }
+
+// Rendi askAI globale
+window.askAI = askAI;
 
 async function loadEvents(){
   const r = await api('api/calendar.php?a=list');

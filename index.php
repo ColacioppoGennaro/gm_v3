@@ -1015,25 +1015,10 @@ function renderDocsTable(){
       html += '</select></td>';
     }
     
-    // Badge e bottone OCR
-    let ocrBadge = '';
-    let ocrBtn = '';
-    
-    if(d.ocr_status === 'pending') {
-      ocrBadge = '<span style="color:#f59e0b;font-size:11px;margin-left:8px">🔄 OCR in corso...</span>';
-      ocrBtn = '<button class="btn small secondary" disabled style="margin-right:8px;opacity:0.5">⏳ OCR</button>';
-    } else if(d.ocr_status === 'completed') {
-      ocrBadge = '<span style="color:#10b981;font-size:11px;margin-left:8px">✓ OCR fatto</span>';
-      ocrBtn = '';
-    } else {
-      ocrBtn = '<button class="btn small secondary" data-ocr="' + d.id + '" onclick="ocrDoc(' + d.id + ', \'' + d.file_name.replace(/'/g, "\\'") + '\')" style="margin-right:8px">🔍 OCR</button>';
-    }
-    
-    html += '<td>' + (d.size/(1024*1024)).toFixed(2) + ' MB' + ocrBadge + '</td>' +
+    html += '<td>' + (d.size/(1024*1024)).toFixed(2) + ' MB</td>' +
       '<td>' + new Date(d.created_at).toLocaleString('it-IT') + '</td>' +
       '<td>' +
       '<a href="api/documents.php?a=download&id=' + d.id + '" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥 Scarica</a>' +
-      ocrBtn +
       '<button class="btn del" data-id="' + d.id + '">Elimina</button>' +
       '</td></tr>';
   });
@@ -1159,42 +1144,6 @@ async function delDoc(id){
     }
   }
 }
-
-async function ocrDoc(id, fileName){
-  if(!confirm('Attivare OCR su "' + fileName + '"?\n\n⚠️ COSTO: 1 credito DocAnalyzer per pagina\n\nL\'OCR migliora la lettura di documenti scansionati o con testo in immagini.\n\nIl processo richiede alcuni minuti.')) return;
-  
-  const btn = document.querySelector('button[data-ocr="' + id + '"]');
-  if(btn){
-    btn.disabled = true;
-    btn.innerHTML = '⏳ <span class="loader"></span>';
-  }
-  
-  const fd = new FormData();
-  fd.append('id', id);
-  
-  try {
-    const r = await api('api/documents.php?a=ocr', fd);
-    
-    if(r.success) {
-      alert('✓ OCR avviato!\n\n' + r.message + '\n\nRicarica la pagina tra qualche minuto per vedere il completamento.');
-      loadDocs();
-    } else {
-      alert('Errore OCR: ' + (r.message || 'Sconosciuto'));
-      if(btn) {
-        btn.disabled = false;
-        btn.innerHTML = '🔍 OCR';
-      }
-    }
-  } catch(e) {
-    alert('Errore di connessione durante OCR');
-    if(btn) {
-      btn.disabled = false;
-      btn.innerHTML = '🔍 OCR';
-    }
-  }
-}
-
-window.ocrDoc = ocrDoc;
 
 async function askDocs(){
   const q = document.getElementById('qDocs');

@@ -5,8 +5,11 @@
  */
 class GeminiClient {
     private $apiKey;
-    private $apiBase = 'https://generativelanguage.googleapis.com/v1beta';
-    private $model = 'gemini-pro';
+    // 1. CORREZIONE: Aggiornato l'URL dell'API alla versione stabile v1
+    private $apiBase = 'https://generativelanguage.googleapis.com/v1';
+    
+    // 2. AGGIORNAMENTO: Utilizzo di un modello più moderno, veloce ed efficiente
+    private $model = 'gemini-1.5-flash-latest';
     
     public function __construct($apiKey = null) {
         $this->apiKey = $apiKey ?: env_get('GEMINI_API_KEY');
@@ -19,6 +22,7 @@ class GeminiClient {
      * Chiedi a Gemini
      */
     public function ask($question, $context = null) {
+        // La costruzione dell'URL ora è corretta perché $apiBase e $model sono giusti
         $url = "{$this->apiBase}/models/{$this->model}:generateContent?key={$this->apiKey}";
         
         // Costruisci prompt con contesto se disponibile

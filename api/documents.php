@@ -3,31 +3,22 @@
 
 /**
  * Decide se consigliare l'OCR per un file caricato.
- * Regole:
- * - solo PDF e immagini
- * - immagini: sempre sì (non hanno text layer)
- * - PDF: sì se NON ha un text layer rilevante
  */
 function shouldRecommendOCR($filePath, $mime) {
     if (!is_string($filePath) || $filePath === '' || !file_exists($filePath)) {
-        return false; // file non valido -> non suggerisco nulla
+        return false;
     }
 
-    // Normalizza MIME
     $mime = strtolower(trim((string)$mime));
-
-    // Solo PDF e immagini
     $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!in_array($mime, $allowed, true)) {
         return false;
     }
 
-    // Immagini: sempre consigliato
     if (str_starts_with($mime, 'image/')) {
-        return true;
+        return true; // immagini sempre OCR
     }
 
-    // PDF: consiglia OCR solo se NON ha text layer
     if ($mime === 'application/pdf') {
         return !pdfHasTextLayer($filePath);
     }
@@ -37,15 +28,12 @@ function shouldRecommendOCR($filePath, $mime) {
 
 /**
  * Rileva se un PDF contiene un layer testuale "sufficiente".
- * Usa smalot/pdfparser (composer require smalot/pdfparser).
- * In caso di errore/parsing fallito, ritorna false (meglio consigliare OCR).
  */
 function pdfHasTextLayer($filePath) {
     if (!file_exists($filePath) || !is_readable($filePath)) {
         return false;
     }
 
-    // Autoload: prova vari percorsi comuni al progetto
     $autoloadCandidates = [
         dirname(__DIR__, 2) . '/vendor/autoload.php',
         dirname(__DIR__, 1) . '/vendor/autoload.php',
@@ -63,7 +51,7 @@ function pdfHasTextLayer($filePath) {
 
     try {
         if (!$autoloadLoaded) {
-            error_log("pdfHasTextLayer: autoload non trovato, impossibile usare smalot/pdfparser.");
+            error_log("pdfHasTextLayer: autoload non trovato.");
             return false;
         }
 
@@ -72,12 +60,10 @@ function pdfHasTextLayer($filePath) {
 
         $text = $pdf->getText();
         if (!is_string($text)) $text = '';
-
         $text = trim($text);
         $len = function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
 
-        // Soglia conservativa: >200 caratteri = presumiamo text layer presente
-        return $len > 200;
+        return $len > 200; // soglia conservativa
     } catch (\Throwable $e) {
         error_log("PDF text check failed: " . $e->getMessage());
         return false;
@@ -93,8 +79,6 @@ if (($action ?? null) === 'list') {
         json_out(['success' => false, 'message' => 'Accesso negato'], 401);
     }
 
-    // NB: se la colonna si chiama "docanalyzer_docid" o "docanalyzer_doc_id" 
-    //    adegua qui sotto in base al tuo schema.
     $sql = "
         SELECT 
             d.id,
@@ -135,4 +119,65 @@ if (($action ?? null) === 'list') {
         @ob_end_clean();
     }
     json_out(['success' => true, 'data' => $docs]);
+}
+
+// --- OCR AVVIO ------------------------------------------------
+elseif (($action ?? null) === 'ocr') {
+    require_login();
+    $u = user();
+
+    $id = intval($_POST['id'] ?? 0);
+    if (!$id) {
+        ob_end_clean();
+        json_out(['success' => false, 'message' => 'ID mancante'], 400);
+    }
+
+    // Limite Free: 1 OCR
+    if (!is_pro()) {
+        $ocrCount = db()->query("
+            SELECT COUNT(*) as cnt FROM ocr_logs 
+            WHERE user_id={$u['id']}
+        ")->fetch_assoc();
+
+        if (intval($ocrCount['cnt']) >= 1) {
+            ob_end_clean();
+            json_out([
+                'success' => false,
+                'message' => 'Limite OCR Free raggiunto (1). Passa a Pro per OCR illimitato.'
+            ], 403);
+        }
+    }
+
+    // Ottieni documento
+    $st = db()->prepare("SELECT docanalyzer_docid, file_name FROM documents WHERE id=? AND user_id=?");
+    $st->bind_param("ii", $id, $u['id']);
+    $st->execute();
+    $r = $st->get_result();
+
+    if (!($doc = $r->fetch_assoc())) {
+        ob_end_clean();
+        json_out(['success' => false, 'message' => 'Documento non trovato'], 404);
+    }
+
+    try {
+        $docAnalyzer = new DocAnalyzerClient();
+        $result = $docAnalyzer->ocrDocument($doc['docanalyzer_docid']);
+
+        // Log OCR
+        $st = db()->prepare("INSERT INTO ocr_logs(user_id, document_id, created_at) VALUES(?,?,NOW())");
+        $st->bind_param("ii", $u['id'], $id);
+        $st->execute();
+
+        ob_end_clean();
+        json_out([
+            'success' => true,
+            'message' => 'OCR avviato. Costo: 1 credito per pagina.',
+            'workflow_id' => $result['queue'][0] ?? null
+        ]);
+
+    } catch (Exception $e) {
+        error_log("OCR Error: " . $e->getMessage());
+        ob_end_clean();
+        json_out(['success' => false, 'message' => 'Errore OCR: ' . $e->getMessage()], 500);
+    }
 }

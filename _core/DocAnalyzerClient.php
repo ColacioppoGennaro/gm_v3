@@ -1,7 +1,7 @@
 <?php
 /**
  * DocAnalyzer.ai API Client
- * Gestisce upload documenti e tagging con label
+ * Gestisce upload documenti, tagging con label e OCR
  */
 class DocAnalyzerClient {
     private $apiKey;
@@ -232,6 +232,28 @@ class DocAnalyzerClient {
         error_log("DocAnalyzer Query: lid=$lid, label=$labelName, question=" . substr($question, 0, 50));
         
         $response = $this->request('POST', "/api/v1/label/{$lid}/chat", $data);
+        
+        return $response['data'] ?? null;
+    }
+    
+    /**
+     * Ottiene dettagli di un documento
+     */
+    public function getDocumentDetails($docid) {
+        error_log("DocAnalyzer getDocumentDetails: docid=$docid");
+        
+        $response = $this->request('GET', "/api/v1/doc/{$docid}");
+        
+        return $response['data'] ?? null;
+    }
+    
+    /**
+     * Esegue OCR su un documento (1 credito per pagina)
+     */
+    public function ocrDocument($docid) {
+        error_log("DocAnalyzer OCR: docid=$docid");
+        
+        $response = $this->request('POST', "/api/v1/doc/{$docid}/ocr");
         
         return $response['data'] ?? null;
     }

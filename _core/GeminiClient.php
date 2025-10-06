@@ -6,7 +6,7 @@
 class GeminiClient {
     private $apiKey;
     private $apiBase = 'https://generativelanguage.googleapis.com/v1beta';
-    private $model = 'gemini-1.5-flash';
+    private $model = 'gemini-pro';
     
     public function __construct($apiKey = null) {
         $this->apiKey = $apiKey ?: env_get('GEMINI_API_KEY');

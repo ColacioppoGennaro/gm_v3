@@ -1,83 +1,91 @@
 <?php
-// Legge .env una sola volta, con gestione BOM/virgolette e commenti
-function env_get($key, $default = null) {
-    static $E = null;
-    if ($E === null) {
-        $E = [];
-        $paths = [
-            dirname(__DIR__, 2) . "/config/gm_v3/.env",
-            __DIR__ . "/../.env",
-        ];
-        foreach ($paths as $p) {
-            if (!is_readable($p)) continue;
-            $raw = file_get_contents($p);
-            // rimuovi BOM se presente
-            if (substr($raw, 0, 3) === "\xEF\xBB\xBF") $raw = substr($raw, 3);
-            foreach (preg_split("/\r\n|\n|\r/", $raw) as $line) {
-                $line = trim($line);
-                if ($line === '' || $line[0] === '#' || $line[0] === ';') continue;
-                $parts = explode('=', $line, 2);
-                if (count($parts) !== 2) continue;
-                $k = trim($parts[0]);
-                $v = trim($parts[1]);
-                // togli eventuali virgolette avvolgenti
-                if ((str_starts_with($v, '"') && str_ends_with($v, '"')) ||
-                    (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
-                    $v = substr($v, 1, -1);
-                }
-                $E[$k] = $v;
-            }
-            break; // usa il primo .env trovato
+// --- OCR recommendation helpers ------------------------------------------------
+
+/**
+ * Decide se consigliare l'OCR per un file caricato.
+ * Regole:
+ * - solo PDF e immagini
+ * - immagini: sempre sì (non hanno text layer)
+ * - PDF: sì se NON ha un text layer rilevante
+ */
+function shouldRecommendOCR($filePath, $mime) {
+    if (!is_string($filePath) || $filePath === '' || !file_exists($filePath)) {
+        return false; // file non valido -> non suggerisco nulla
+    }
+
+    // Normalizza MIME
+    $mime = strtolower(trim((string)$mime));
+
+    // Solo PDF e immagini
+    $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!in_array($mime, $allowed, true)) {
+        return false;
+    }
+
+    // Immagini: sempre consigliato
+    if (str_starts_with($mime, 'image/')) {
+        return true;
+    }
+
+    // PDF: consiglia OCR solo se NON ha text layer
+    if ($mime === 'application/pdf') {
+        return !pdfHasTextLayer($filePath);
+    }
+
+    return false;
+}
+
+/**
+ * Rileva se un PDF contiene un layer testuale "sufficiente".
+ * Usa smalot/pdfparser (composer require smalot/pdfparser).
+ * In caso di errore/parsing fallito, ritorna false (meglio consigliare OCR).
+ */
+function pdfHasTextLayer($filePath) {
+    if (!file_exists($filePath) || !is_readable($filePath)) {
+        return false;
+    }
+
+    // Autoload: prova vari percorsi comuni al progetto
+    $autoloadCandidates = [
+        // tipico se questo file è in .../_src/actions/ e vendor sta alla root del progetto
+        dirname(__DIR__, 2) . '/vendor/autoload.php',
+        dirname(__DIR__, 1) . '/vendor/autoload.php',
+        __DIR__ . '/vendor/autoload.php',
+    ];
+
+    $autoloadLoaded = false;
+    foreach ($autoloadCandidates as $auto) {
+        if (is_readable($auto)) {
+            require_once $auto;
+            $autoloadLoaded = true;
+            break;
         }
     }
-    return array_key_exists($key, $E) ? $E[$key] : $default;
-}
 
-function db() {
-    static $c = null;
-    if ($c === null) {
-        $h = env_get('DB_HOST', 'localhost');
-        $u = env_get('DB_USER', '');
-        $p = env_get('DB_PASS', '');
-        $d = env_get('DB_NAME', '');
+    try {
+        if (!$autoloadLoaded) {
+            // Se non c'è autoload, non possiamo parsare: fallback prudente
+            error_log("pdfHasTextLayer: autoload non trovato, impossibile usare smalot/pdfparser.");
+            return false;
+        }
 
-        mysqli_report(MYSQLI_REPORT_OFF);
-        $c = @new mysqli($h, $u, $p, $d);
-        if ($c->connect_errno && $h === 'localhost') {
-            // fallback su TCP
-            $c = @new mysqli('127.0.0.1', $u, $p, $d);
-        }
-        if ($c->connect_errno) {
-            throw new Exception('DB error: ' . $c->connect_error);
-        }
-        $c->set_charset('utf8mb4');
+        // Parser PDF
+        $parser = new \Smalot\PdfParser\Parser();
+        $pdf = $parser->parseFile($filePath);
+
+        // Testo estratto
+        $text = $pdf->getText();
+        if (!is_string($text)) $text = '';
+
+        $text = trim($text);
+        $len = function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
+
+        // Soglia conservativa: >200 caratteri = presumiamo text layer presente
+        // (riduci a 100 se vuoi essere più "permissivo" e consigliare OCR più spesso)
+        return $len > 200;
+    } catch (\Throwable $e) {
+        // In caso di errore parsing: meglio consigliare OCR (false = "non ha testo")
+        error_log("PDF text check failed: " . $e->getMessage());
+        return false;
     }
-    return $c;
 }
-
-function json_out($a, $code = 200) {
-    http_response_code($code);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-function require_login() {
-    if (!isset($_SESSION['user_id'])) json_out(['success' => false, 'message' => 'Accesso negato'], 401);
-}
-function user() { return ['id' => $_SESSION['user_id'] ?? null, 'role' => $_SESSION['role'] ?? 'free', 'email' => $_SESSION['email'] ?? null]; }
-function is_pro() { return (user()['role'] ?? 'free') === 'pro'; }
-function is_admin() { return (user()['role'] ?? 'free') === 'admin'; }
-
-function ratelimit($key, $limit, $window = 60) {
-    $file = sys_get_temp_dir() . "/gmv3_rl_" . md5($key);
-    $data = ['count' => 0, 'until' => time() + $window];
-    if (file_exists($file)) $data = json_decode(file_get_contents($file), true) ?: $data;
-    if (time() > ($data['until'] ?? 0)) $data = ['count' => 0, 'until' => time() + $window];
-    $data['count']++;
-    file_put_contents($file, json_encode($data));
-    if ($data['count'] > $limit) json_out(['success' => false, 'message' => 'Troppi tentativi, riprova tra poco']);
-}
-function hash_password($p){ return password_hash($p, PASSWORD_BCRYPT); }
-function verify_password($p,$h){ return password_verify($p,$h); }
-

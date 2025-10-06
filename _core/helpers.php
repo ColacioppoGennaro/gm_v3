@@ -1,91 +1,157 @@
 <?php
-// --- OCR recommendation helpers ------------------------------------------------
-
 /**
- * Decide se consigliare l'OCR per un file caricato.
- * Regole:
- * - solo PDF e immagini
- * - immagini: sempre sì (non hanno text layer)
- * - PDF: sì se NON ha un text layer rilevante
+ * _core/helpers.php
+ * 
+ * Funzioni helper globali per gm_v3:
+ * - env_get(): Carica e legge variabili .env
+ * - db(): Connessione database MySQL
+ * - json_out(): Output JSON standard
+ * - require_login(), user(), is_pro(), is_admin(): Gestione autenticazione
+ * - ratelimit(): Rate limiting semplice
+ * - hash_password(), verify_password(): Gestione password
+ * - shouldRecommendOCR(), pdfHasTextLayer(): Logica OCR per documenti
+ * - ensure_ocr_table(): Auto-creazione tabella ocr_logs
  */
-function shouldRecommendOCR($filePath, $mime) {
-    if (!is_string($filePath) || $filePath === '' || !file_exists($filePath)) {
-        return false; // file non valido -> non suggerisco nulla
+
+// Legge .env una sola volta, con gestione BOM/virgolette e commenti
+function env_get($key, $default = null) {
+    static $E = null;
+    if ($E === null) {
+        $E = [];
+        $paths = [
+            dirname(__DIR__, 2) . "/config/gm_v3/.env",
+            __DIR__ . "/../.env",
+        ];
+        foreach ($paths as $p) {
+            if (!is_readable($p)) continue;
+            $raw = file_get_contents($p);
+            // rimuovi BOM se presente
+            if (substr($raw, 0, 3) === "\xEF\xBB\xBF") $raw = substr($raw, 3);
+            foreach (preg_split("/\r\n|\n|\r/", $raw) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#' || $line[0] === ';') continue;
+                $parts = explode('=', $line, 2);
+                if (count($parts) !== 2) continue;
+                $k = trim($parts[0]);
+                $v = trim($parts[1]);
+                // togli eventuali virgolette avvolgenti
+                if ((str_starts_with($v, '"') && str_ends_with($v, '"')) ||
+                    (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+                    $v = substr($v, 1, -1);
+                }
+                $E[$k] = $v;
+            }
+            break; // usa il primo .env trovato
+        }
     }
+    return array_key_exists($key, $E) ? $E[$key] : $default;
+}
 
-    // Normalizza MIME
-    $mime = strtolower(trim((string)$mime));
+function db() {
+    static $c = null;
+    if ($c === null) {
+        $h = env_get('DB_HOST', 'localhost');
+        $u = env_get('DB_USER', '');
+        $p = env_get('DB_PASS', '');
+        $d = env_get('DB_NAME', '');
 
-    // Solo PDF e immagini
-    $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!in_array($mime, $allowed, true)) {
+        mysqli_report(MYSQLI_REPORT_OFF);
+        $c = @new mysqli($h, $u, $p, $d);
+        if ($c->connect_errno && $h === 'localhost') {
+            // fallback su TCP
+            $c = @new mysqli('127.0.0.1', $u, $p, $d);
+        }
+        if ($c->connect_errno) {
+            throw new Exception('DB error: ' . $c->connect_error);
+        }
+        $c->set_charset('utf8mb4');
+    }
+    return $c;
+}
+
+function json_out($a, $code = 200) {
+    http_response_code($code);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function require_login() {
+    if (!isset($_SESSION['user_id'])) json_out(['success' => false, 'message' => 'Accesso negato'], 401);
+}
+function user() { return ['id' => $_SESSION['user_id'] ?? null, 'role' => $_SESSION['role'] ?? 'free', 'email' => $_SESSION['email'] ?? null]; }
+function is_pro() { return (user()['role'] ?? 'free') === 'pro'; }
+function is_admin() { return (user()['role'] ?? 'free') === 'admin'; }
+
+function ratelimit($key, $limit, $window = 60) {
+    $file = sys_get_temp_dir() . "/gmv3_rl_" . md5($key);
+    $data = ['count' => 0, 'until' => time() + $window];
+    if (file_exists($file)) $data = json_decode(file_get_contents($file), true) ?: $data;
+    if (time() > ($data['until'] ?? 0)) $data = ['count' => 0, 'until' => time() + $window];
+    $data['count']++;
+    file_put_contents($file, json_encode($data));
+    if ($data['count'] > $limit) json_out(['success' => false, 'message' => 'Troppi tentativi, riprova tra poco']);
+}
+function hash_password($p){ return password_hash($p, PASSWORD_BCRYPT); }
+function verify_password($p,$h){ return password_verify($p,$h); }
+
+function shouldRecommendOCR($filePath, $mime) {
+    // Solo per PDF e immagini
+    if (!in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'])) {
         return false;
     }
-
-    // Immagini: sempre consigliato
-    if (str_starts_with($mime, 'image/')) {
+    
+    // Per immagini: sempre consigliato
+    if (strpos($mime, 'image/') === 0) {
         return true;
     }
-
-    // PDF: consiglia OCR solo se NON ha text layer
+    
+    // Per PDF: controlla text layer
     if ($mime === 'application/pdf') {
         return !pdfHasTextLayer($filePath);
     }
-
+    
     return false;
 }
 
-/**
- * Rileva se un PDF contiene un layer testuale "sufficiente".
- * Usa smalot/pdfparser (composer require smalot/pdfparser).
- * In caso di errore/parsing fallito, ritorna false (meglio consigliare OCR).
- */
 function pdfHasTextLayer($filePath) {
-    if (!file_exists($filePath) || !is_readable($filePath)) {
-        return false;
-    }
-
-    // Autoload: prova vari percorsi comuni al progetto
-    $autoloadCandidates = [
-        // tipico se questo file è in .../_src/actions/ e vendor sta alla root del progetto
-        dirname(__DIR__, 2) . '/vendor/autoload.php',
-        dirname(__DIR__, 1) . '/vendor/autoload.php',
-        __DIR__ . '/vendor/autoload.php',
-    ];
-
-    $autoloadLoaded = false;
-    foreach ($autoloadCandidates as $auto) {
-        if (is_readable($auto)) {
-            require_once $auto;
-            $autoloadLoaded = true;
-            break;
-        }
-    }
-
+    if (!file_exists($filePath)) return false;
+    
     try {
-        if (!$autoloadLoaded) {
-            // Se non c'è autoload, non possiamo parsare: fallback prudente
-            error_log("pdfHasTextLayer: autoload non trovato, impossibile usare smalot/pdfparser.");
-            return false;
+        // Leggi primi 50KB del PDF
+        $content = file_get_contents($filePath, false, null, 0, 51200);
+        
+        // Cerca stringhe ASCII lunghe (testo estratto)
+        $textMatches = preg_match_all('/[\x20-\x7E]{50,}/', $content, $matches);
+        
+        // Se trova >200 caratteri ASCII consecutivi → ha testo
+        if ($textMatches > 0) {
+            $totalChars = array_sum(array_map('strlen', $matches[0]));
+            return $totalChars > 200;
         }
-
-        // Parser PDF
-        $parser = new \Smalot\PdfParser\Parser();
-        $pdf = $parser->parseFile($filePath);
-
-        // Testo estratto
-        $text = $pdf->getText();
-        if (!is_string($text)) $text = '';
-
-        $text = trim($text);
-        $len = function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
-
-        // Soglia conservativa: >200 caratteri = presumiamo text layer presente
-        // (riduci a 100 se vuoi essere più "permissivo" e consigliare OCR più spesso)
-        return $len > 200;
-    } catch (\Throwable $e) {
-        // In caso di errore parsing: meglio consigliare OCR (false = "non ha testo")
-        error_log("PDF text check failed: " . $e->getMessage());
+        
         return false;
+    } catch (\Throwable $e) {
+        error_log("PDF text check failed: " . $e->getMessage());
+        return false; // default: consiglia OCR
     }
+}
+
+function ensure_ocr_table() {
+    static $checked = false;
+    if ($checked) return;
+    
+    db()->query("
+        CREATE TABLE IF NOT EXISTS ocr_logs(
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          document_id INT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_user(user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    
+    $checked = true;
 }

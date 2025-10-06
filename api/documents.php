@@ -23,10 +23,10 @@ try {
     }
 
     if ($action === 'list') {
-        // Query con JOIN per includere la categoria e stato OCR
+        // Query con JOIN per includere la categoria
         $st = db()->prepare("
             SELECT d.id, d.file_name, d.size, d.mime, d.created_at, 
-                   l.name as category, d.docanalyzer_doc_id, d.ocr_status
+                   l.name as category, d.docanalyzer_doc_id
             FROM documents d 
             JOIN labels l ON d.label_id = l.id 
             WHERE d.user_id = ? 
@@ -130,10 +130,9 @@ try {
             json_out(['success' => false, 'message' => 'Errore DocAnalyzer: ' . $e->getMessage()], 500);
         }
         
-        // Salva nel DB locale CON PATH e OCR status
-        $ocr_status = 'none';
-        $st = db()->prepare("INSERT INTO documents(user_id, label_id, file_name, mime, size, docanalyzer_doc_id, file_path, ocr_status) VALUES(?,?,?,?,?,?,?,?)"); 
-        $st->bind_param("iissiiss", $user['id'], $label_id, $f['name'], $f['type'], $f['size'], $docanalyzer_doc_id, $localPath, $ocr_status); 
+        // Salva nel DB locale CON PATH
+        $st = db()->prepare("INSERT INTO documents(user_id, label_id, file_name, mime, size, docanalyzer_doc_id, file_path) VALUES(?,?,?,?,?,?,?)"); 
+        $st->bind_param("iississ", $user['id'], $label_id, $f['name'], $f['type'], $f['size'], $docanalyzer_doc_id, $localPath); 
         $st->execute();
         
         ob_end_clean();
@@ -280,8 +279,8 @@ try {
             }
         }
         
-        // 6. UPDATE DB (reset OCR status perché è un nuovo documento)
-        $st = db()->prepare("UPDATE documents SET label_id = ?, docanalyzer_doc_id = ?, file_path = ?, ocr_status = 'none' WHERE id = ? AND user_id = ?");
+        // 6. UPDATE DB
+        $st = db()->prepare("UPDATE documents SET label_id = ?, docanalyzer_doc_id = ?, file_path = ? WHERE id = ? AND user_id = ?");
         $st->bind_param("issii", $new_label['id'], $new_docid, $newLocalPath, $doc_id, $user['id']);
         $st->execute();
         
@@ -289,90 +288,6 @@ try {
         
         ob_end_clean();
         json_out(['success' => true, 'message' => 'Documento spostato correttamente']);
-    }
-    elseif ($action === 'ocr') {
-        // Esegue OCR su un documento
-        $doc_id = intval($_POST['id'] ?? 0);
-        
-        if (!$doc_id) {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'ID mancante'], 400);
-        }
-        
-        // Verifica che il documento esista e appartenga all'utente
-        $st = db()->prepare("SELECT docanalyzer_doc_id, file_name, ocr_status FROM documents WHERE id=? AND user_id=?");
-        $st->bind_param("ii", $doc_id, $user['id']);
-        $st->execute();
-        $r = $st->get_result();
-        
-        if (!($doc = $r->fetch_assoc())) {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'Documento non trovato'], 404);
-        }
-        
-        // Controlla se OCR già fatto/in corso
-        if ($doc['ocr_status'] === 'completed') {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'OCR già eseguito su questo documento'], 400);
-        }
-        
-        if ($doc['ocr_status'] === 'pending') {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'OCR già in corso su questo documento'], 400);
-        }
-        
-        error_log("=== OCR REQUEST ===");
-        error_log("Doc ID: {$doc_id}, DocAnalyzer ID: {$doc['docanalyzer_doc_id']}, File: {$doc['file_name']}");
-        
-        try {
-            $docAnalyzer = new DocAnalyzerClient();
-            $result = $docAnalyzer->ocrDocument($doc['docanalyzer_doc_id']);
-            
-            if ($result && isset($result['queue'])) {
-                // Aggiorna stato a "pending"
-                $st = db()->prepare("UPDATE documents SET ocr_status='pending' WHERE id=?");
-                $st->bind_param("i", $doc_id);
-                $st->execute();
-                
-                error_log("OCR queued successfully: " . json_encode($result['queue']));
-                ob_end_clean();
-                json_out([
-                    'success' => true, 
-                    'message' => 'OCR avviato con successo. Il documento verrà processato nei prossimi minuti.',
-                    'queue' => $result['queue'],
-                    'status' => 'pending'
-                ]);
-            } else {
-                throw new Exception('Risposta OCR non valida');
-            }
-            
-        } catch (Exception $e) {
-            error_log("OCR Error: " . $e->getMessage());
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'Errore OCR: ' . $e->getMessage()], 500);
-        }
-    }
-    elseif ($action === 'ocr_complete') {
-        // Segna OCR come completato (chiamata manuale o webhook futuro)
-        $doc_id = intval($_POST['id'] ?? 0);
-        
-        if (!$doc_id) {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'ID mancante'], 400);
-        }
-        
-        $st = db()->prepare("UPDATE documents SET ocr_status='completed' WHERE id=? AND user_id=?");
-        $st->bind_param("ii", $doc_id, $user['id']);
-        $st->execute();
-        
-        if ($st->affected_rows > 0) {
-            error_log("OCR marked as completed for doc_id: $doc_id");
-            ob_end_clean();
-            json_out(['success' => true, 'message' => 'OCR segnato come completato']);
-        } else {
-            ob_end_clean();
-            json_out(['success' => false, 'message' => 'Documento non trovato o già completato'], 404);
-        }
     }
     elseif ($action === 'delete') {
         $id = intval($_POST['id'] ?? 0); 

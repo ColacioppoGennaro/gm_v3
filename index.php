@@ -178,8 +178,8 @@ function appView(){
         <a href="#" data-route="dashboard" class="active">📊 Dashboard</a>
         <a href="#" data-route="chat">💬 Chat AI</a>
         <a href="#" data-route="calendar">📅 Calendario</a>
+        <a href="#" data-route="account">👤 Account</a>
       </div>
-      <button class="btn warn" id="logoutBtn" style="margin-top:24px;width:100%">Logout</button>
     </aside>
     <main>
       <section data-page="dashboard">
@@ -296,6 +296,54 @@ function appView(){
           </table>
         </div>
       </section>
+
+      <section class="hidden" data-page="account">
+        <h1>👤 Account</h1>
+        
+        <div class="cards">
+          <div class="card">
+            <h3>Piano Attuale</h3>
+            <div style="font-size:32px;font-weight:700;margin:16px 0;color:var(--accent)">${isPro ? 'PRO' : 'FREE'}</div>
+            <div style="color:var(--muted);font-size:13px">Email: <b id="accountEmail">...</b></div>
+            <div style="color:var(--muted);font-size:13px;margin-top:4px">Membro da: <b id="accountSince">...</b></div>
+          </div>
+          
+          <div class="card">
+            <h3>Utilizzo</h3>
+            <div style="font-size:13px;margin:8px 0">Documenti: <b id="usageDocs">0</b> / ${isPro ? '200' : '5'}</div>
+            <div style="font-size:13px;margin:8px 0">Storage: <b id="usageStorage">0</b> MB / ${isPro ? '150' : '50'} MB</div>
+            <div style="font-size:13px;margin:8px 0">Chat oggi: <b id="usageChat">0</b> / ${isPro ? '200' : '20'}</div>
+            ${isPro ? '<div style="font-size:13px;margin:8px 0">Categorie: <b id="usageCategories">0</b></div>' : ''}
+          </div>
+        </div>
+
+        ${!isPro ? `
+        <div class="card">
+          <h3>⚡ Upgrade a Pro</h3>
+          <p style="color:var(--muted);margin-bottom:16px">Sblocca funzionalità avanzate e limiti aumentati</p>
+          <div class="form-group">
+            <label>Codice Promozionale</label>
+            <input type="text" id="promoCodePage" placeholder="Inserisci codice"/>
+          </div>
+          <div id="upgradePageError" class="error hidden"></div>
+          <div id="upgradePageSuccess" class="success hidden"></div>
+          <button class="btn" id="activateProPage">Attiva Pro</button>
+        </div>
+        ` : `
+        <div class="card">
+          <h3>⬇️ Downgrade a Free</h3>
+          <p style="color:var(--muted);margin-bottom:16px">Torna al piano gratuito. <b>ATTENZIONE:</b> Devi avere massimo 5 documenti.</p>
+          <div id="downgradeError" class="error hidden"></div>
+          <button class="btn warn" id="downgradeBtn">Downgrade a Free</button>
+        </div>
+        `}
+
+        <div class="card">
+          <h3>⚙️ Impostazioni</h3>
+          <button class="btn secondary" id="logoutBtn" style="width:100%;margin-bottom:12px">🚪 Logout</button>
+          <button class="btn del" id="deleteAccountBtn" style="width:100%">🗑️ Elimina Account</button>
+        </div>
+      </section>
     </main>
   </div>`;
 }
@@ -394,6 +442,9 @@ function route(r){
     updateChatCounter();
     if(S.user && S.user.role === 'pro') loadCategories();
   }
+  if(r==='account') {
+    loadAccountInfo();
+  }
 }
 
 function bind(){
@@ -441,6 +492,15 @@ function bind(){
       const btn = document.getElementById(id);
       if(btn) btn.onclick = showUpgradeModal;
     });
+    
+    // Bind account page buttons
+    const activateProPage = document.getElementById('activateProPage');
+    const downgradeBtn = document.getElementById('downgradeBtn');
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    
+    if(activateProPage) activateProPage.onclick = activateProFromPage;
+    if(downgradeBtn) downgradeBtn.onclick = doDowngrade;
+    if(deleteAccountBtn) deleteAccountBtn.onclick = doDeleteAccount;
     
     document.querySelectorAll('.nav a').forEach(a=>{
       a.onclick=(e)=>{e.preventDefault(); route(a.dataset.route);};
@@ -1092,6 +1152,119 @@ async function delEvent(id){
   fd.append('id', id);
   const r = await api('api/calendar.php?a=delete', fd);
   if(r.success) loadEvents();
+}
+
+async function loadAccountInfo(){
+  const r = await api('api/account.php?a=info');
+  if(!r.success) return;
+  
+  const accountEmail = document.getElementById('accountEmail');
+  const accountSince = document.getElementById('accountSince');
+  const usageDocs = document.getElementById('usageDocs');
+  const usageStorage = document.getElementById('usageStorage');
+  const usageChat = document.getElementById('usageChat');
+  const usageCategories = document.getElementById('usageCategories');
+  
+  if(accountEmail) accountEmail.textContent = r.account.email;
+  if(accountSince) accountSince.textContent = new Date(r.account.created_at).toLocaleDateString('it-IT');
+  if(usageDocs) usageDocs.textContent = r.usage.documents;
+  if(usageStorage) usageStorage.textContent = (r.usage.storage_bytes / (1024*1024)).toFixed(1);
+  if(usageChat) usageChat.textContent = r.usage.chat_today;
+  if(usageCategories) usageCategories.textContent = r.usage.categories;
+}
+
+async function activateProFromPage(){
+  const code = document.getElementById('promoCodePage').value.trim();
+  const err = document.getElementById('upgradePageError');
+  const success = document.getElementById('upgradePageSuccess');
+  const btn = document.getElementById('activateProPage');
+  
+  err.classList.add('hidden');
+  success.classList.add('hidden');
+  
+  if(!code){
+    err.textContent = 'Inserisci un codice';
+    err.classList.remove('hidden');
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = 'Attivazione... <span class="loader"></span>';
+  
+  const fd = new FormData();
+  fd.append('code', code);
+  
+  const r = await api('api/upgrade.php', fd);
+  
+  if(r.success){
+    success.textContent = '✓ Piano Pro attivato! Ricarico...';
+    success.classList.remove('hidden');
+    setTimeout(()=>{
+      S.user.role = 'pro';
+      render();
+      // Mostra modal organizzazione se ci sono documenti master
+      setTimeout(() => {
+        const masterDocs = S.docs.filter(d => d.category === 'master');
+        if(masterDocs.length > 0) {
+          showOrganizeModal();
+        }
+      }, 500);
+    }, 1500);
+  } else {
+    err.textContent = r.message || 'Codice non valido';
+    err.classList.remove('hidden');
+    btn.disabled = false;
+    btn.innerHTML = 'Attiva Pro';
+  }
+}
+
+async function doDowngrade(){
+  if(!confirm('Sei sicuro di voler passare al piano Free?\n\nDevi avere massimo 5 documenti. Tutti i documenti saranno spostati nella categoria principale.')) return;
+  
+  const btn = document.getElementById('downgradeBtn');
+  const err = document.getElementById('downgradeError');
+  
+  err.classList.add('hidden');
+  btn.disabled = true;
+  btn.innerHTML = 'Downgrade in corso... <span class="loader"></span>';
+  
+  const r = await api('api/account.php?a=downgrade', new FormData());
+  
+  if(r.success){
+    alert('✓ ' + r.message);
+    S.user.role = 'free';
+    render();
+  } else {
+    err.textContent = r.message || 'Errore durante il downgrade';
+    err.classList.remove('hidden');
+    btn.disabled = false;
+    btn.innerHTML = 'Downgrade a Free';
+  }
+}
+
+async function doDeleteAccount(){
+  // Prima conferma
+  if(!confirm('⚠️ ATTENZIONE ⚠️\n\nVuoi eliminare il tuo account?\n\nQuesta azione eliminerà:\n- Tutti i tuoi documenti\n- Tutte le chat\n- Tutti gli eventi\n- Il tuo account\n\nQuesta azione è IRREVERSIBILE.')) return;
+  
+  // Seconda conferma
+  if(!confirm('Confermi l\'eliminazione dell\'account?\n\nNon potrai più recuperare i tuoi dati.')) return;
+  
+  const btn = document.getElementById('deleteAccountBtn');
+  btn.disabled = true;
+  btn.innerHTML = 'Eliminazione... <span class="loader"></span>';
+  
+  const r = await api('api/account.php?a=delete', new FormData());
+  
+  if(r.success){
+    alert('Account eliminato. Arrivederci.');
+    S.user = null;
+    S.view = 'login';
+    render();
+  } else {
+    alert('Errore: ' + (r.message || 'Impossibile eliminare account'));
+    btn.disabled = false;
+    btn.innerHTML = '🗑️ Elimina Account';
+  }
 }
 
 render();

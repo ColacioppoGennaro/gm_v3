@@ -133,7 +133,7 @@ try {
         // Salva nel DB locale CON PATH e OCR status
         $ocr_status = 'none';
         $st = db()->prepare("INSERT INTO documents(user_id, label_id, file_name, mime, size, docanalyzer_doc_id, file_path, ocr_status) VALUES(?,?,?,?,?,?,?,?)"); 
-        $st->bind_param("iississ", $user['id'], $label_id, $f['name'], $f['type'], $f['size'], $docanalyzer_doc_id, $localPath, $ocr_status); 
+        $st->bind_param("iissiiss", $user['id'], $label_id, $f['name'], $f['type'], $f['size'], $docanalyzer_doc_id, $localPath, $ocr_status); 
         $st->execute();
         
         ob_end_clean();

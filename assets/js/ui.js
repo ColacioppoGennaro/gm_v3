@@ -1,8 +1,8 @@
-// === CHIAVI LOCALSTORAGE (AGGIUNTO) ===
+// === CHIAVI LOCALSTORAGE ===
 const LS_USER_KEY  = 'gmv3_user';
 const LS_ROUTE_KEY = 'gmv3_route';
 
-// === VIEW FUNCTIONS (invariate) ===
+// === VIEW FUNCTIONS ===
 function loginView(){
   return '<div class="auth-container">' +
     '<div class="auth-box">' +
@@ -67,12 +67,13 @@ function forgotView(){
     '</div></div></div>';
 }
 
+// ===== NUOVA FUNZIONE appView() =====
 function appView(){
   const isPro = S.user && S.user.role === 'pro';
   const maxDocs = isPro ? 200 : 5;
   const maxChat = isPro ? 200 : 20;
   const maxSize = isPro ? 150 : 50;
-  
+
   let html = '<div class="app">' +
     '<aside>' +
     '<div class="logo">✨ <b>gm_v3</b> ' + (isPro ? '<span class="badge-pro">PRO</span>' : '') + '</div>' +
@@ -82,28 +83,20 @@ function appView(){
     '<a href="#" data-route="calendar">📅 Calendario</a>' +
     '<a href="#" data-route="account">👤 Account</a>' +
     '</div></aside><main>' +
-    
+
+    // ===== DASHBOARD =====
     '<section data-page="dashboard">' +
     '<h1>Dashboard</h1>' +
     (!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
     '<div class="cards stats">' +
-      '<div class="card">' +
-        '<div class="stat-label">Documenti Archiviati</div>' +
-        '<div class="stat-number"><span id="docCount">0</span> / ' + maxDocs + '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="stat-label">Domande AI Oggi</div>' +
-        '<div class="stat-number"><span id="qCount">0</span> / ' + maxChat + '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="stat-label">Storage Usato</div>' +
-        '<div class="stat-number"><span id="storageUsed">0</span> MB / ' + maxSize + ' MB</div>' +
-      '</div>' +
+      '<div class="card"><div class="stat-label">Documenti Archiviati</div><div class="stat-number"><span id="docCount">0</span> / ' + maxDocs + '</div></div>' +
+      '<div class="card"><div class="stat-label">Domande AI Oggi</div><div class="stat-number"><span id="qCount">0</span> / ' + maxChat + '</div></div>' +
+      '<div class="card"><div class="stat-label">Storage Usato</div><div class="stat-number"><span id="storageUsed">0</span> MB / ' + maxSize + ' MB</div></div>' +
     '</div>' +
-    
+
     '<div class="card"><h3>📤 Carica Documento</h3>';
-    
-  if(isPro) {
+
+  if(isPro){
     html += '<div style="background:#1f2937;padding:16px;border-radius:10px;margin-bottom:16px">' +
       '<h4 style="margin:0 0 12px 0;font-size:14px;color:var(--accent)">🏷️ Le tue categorie</h4>' +
       '<div id="categoriesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;min-height:32px;align-items:center"></div>' +
@@ -113,136 +106,139 @@ function appView(){
       '</div></div>' +
       '<div class="form-group">' +
       '<label>Categoria documento *</label>' +
-      '<select id="uploadCategory" style="width:100%">' +
-      '<option value="">-- Seleziona una categoria --</option>' +
-      '</select>' +
+      '<select id="uploadCategory" style="width:100%"><option value="">-- Seleziona una categoria --</option></select>' +
       '<div style="font-size:12px;color:var(--muted);margin-top:4px">Devi scegliere una categoria prima di caricare</div>' +
       '</div>';
   }
-  
+
   html += '<div class="drop" id="drop">' +
-    '<div style="text-align:center">' +
-    '<div style="font-size:48px;margin-bottom:8px">📁</div>' +
-    '<div>Trascina qui un file o clicca per selezionare</div>' +
-    '<div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max ' + maxSize + 'MB)</div>' +
-    '</div></div>' +
-    '<input type="file" id="file" class="hidden"/>' +
-    '<button class="btn" id="uploadBtn" style="width:100%">Carica File</button>' +
-    '</div>' +
-    
+      '<div style="text-align:center">' +
+      '<div style="font-size:48px;margin-bottom:8px">📁</div>' +
+      '<div>Trascina qui un file o clicca per selezionare</div>' +
+      '<div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max ' + maxSize + 'MB)</div>' +
+      '</div></div>' +
+      '<input type="file" id="file" class="hidden"/>' +
+      '<button class="btn" id="uploadBtn" style="width:100%">Carica File</button>' +
+      '</div>' +
+
     (!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
-    
+
     '<div class="card"><h3>📚 I Tuoi Documenti</h3>';
-    
-  if(isPro) {
+
+  if(isPro){
     html += '<div class="filter-bar">' +
       '<label>Filtra per categoria:</label>' +
-      '<select id="filterCategory">' +
-      '<option value="">Tutte le categorie</option>' +
-      '</select>' +
+      '<select id="filterCategory"><option value="">Tutte le categorie</option></select>' +
       '<button class="btn secondary" id="organizeDocsBtn">🔧 Organizza Documenti</button>' +
       '</div>';
   }
-  
+
   html += '<table id="docsTable"><thead><tr>' +
-    '<th>Nome File</th>' +
-    (isPro ? '<th>Categoria</th>' : '') +
-    '<th>Dimensione</th><th>Data</th><th></th>' +
-    '</tr></thead><tbody></tbody></table></div></section>' +
-    
+      '<th>Nome File</th>' + (isPro ? '<th>Categoria</th>' : '') +
+      '<th>Dimensione</th><th>Data</th><th></th>' +
+      '</tr></thead><tbody></tbody></table></div></section>' +
+
+    // ===== CHAT =====
     '<section class="hidden" data-page="chat">' +
     '<h1>💬 Chat AI</h1>' +
-    (!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
-    
-    '<div class="card"><h3>📄 Chiedi ai tuoi documenti</h3>' +
-    '<div class="settings-row">' +
-    '<label>Aderenza:</label>' +
-    '<select id="adherence" style="width:auto;padding:6px 10px">' +
-    '<option value="strict">Strettamente documenti</option>' +
-    '<option value="high">Alta aderenza</option>' +
-    '<option value="balanced" selected>Bilanciata</option>' +
-    '<option value="low">Bassa aderenza</option>' +
-    '<option value="free">Libera interpretazione</option>' +
-    '</select>' +
-    '<label style="margin-left:16px;display:flex;align-items:center;gap:4px">' +
-    '<input type="checkbox" id="showRefs" checked style="width:auto;margin:0"/>' +
-    '<span style="font-size:13px">Mostra riferimenti pagine</span>' +
-    '</label></div>' +
-    '<div style="display:flex;gap:12px;margin-top:16px">' +
-    '<input id="qDocs" placeholder="Es: Quando scade l\'IMU?" style="flex:1"/>' +
-    (isPro ? '<select id="categoryDocs" style="width:200px"><option value="">-- Seleziona categoria --</option></select>' : 
-           '<select id="categoryDocs" style="width:180px"><option value="">(Free: tutti)</option></select>') +
-    '<button class="btn" id="askDocsBtn">🔍 Chiedi ai documenti</button>' +
-    '</div>' +
-    '<div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/' + maxChat + '</div>' +
-    '</div>' +
-    
+
+    // 1) ADS IN CIMA
     (!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
-    
+
+    // Card: chiedi ai documenti (più compatta)
+    '<div class="card"><h3>📄 Chiedi ai tuoi documenti</h3>' +
+      '<div class="settings-row settings-row--compact">' +
+        '<label>Aderenza:</label>' +
+        '<select id="adherence" style="width:auto;padding:6px 10px">' +
+          '<option value="strict">Strettamente documenti</option>' +
+          '<option value="high">Alta aderenza</option>' +
+          '<option value="balanced" selected>Bilanciata</option>' +
+          '<option value="low">Bassa aderenza</option>' +
+          '<option value="free">Libera interpretazione</option>' +
+        '</select>' +
+        '<label style="margin-left:8px;display:flex;align-items:center;gap:6px">' +
+          '<input type="checkbox" id="showRefs" checked style="width:auto;margin:0"/>' +
+          '<span style="font-size:13px">Mostra riferimenti pagine</span>' +
+        '</label>' +
+      '</div>' +
+
+      // Riga input + invio piccolo (solo icona)
+      '<div class="compose" style="margin-top:12px">' +
+        '<input id="qDocs" placeholder="Es: Quando scade l\'IMU?" />' +
+        '<button class="btn icon-only" id="askDocsBtn" title="Invia">➤</button>' +
+      '</div>' +
+
+      // Categoria: pill (Free) oppure select compatta (Pro)
+      (isPro
+        ? '<div class="chat-docs-actions"><select id="categoryDocs"><option value="">-- Seleziona categoria --</option></select></div>'
+        : '<div class="chat-docs-actions">' +
+            '<div class="pill">(Free: tutti)</div>' +
+            // tengo il select nascosto così askDocs() continua a leggere id="categoryDocs"
+            '<select id="categoryDocs" class="hidden"><option value="">(Free: tutti)</option></select>' +
+          '</div>'
+      ) +
+      '<div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/' + maxChat + '</div>' +
+    '</div>' +
+
+    // 2) Al posto del vecchio slot Ads: banner Upgrade
+    (!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
+
+    // Card: AI generica con input lungo + invio piccolo
     '<div class="card"><h3>🤖 Chat AI Generica (Google Gemini)</h3>' +
-    '<p style="color:var(--muted);font-size:13px;margin-bottom:16px">Chiedi qualsiasi cosa all\'AI generica, anche senza documenti</p>' +
-    '<div id="contextBox" class="hidden"></div>' +
-    '<div style="display:flex;gap:12px">' +
-    '<input id="qAI" placeholder="Es: Spiegami come funziona la fotosintesi..." style="flex:1"/>' +
-    '<button class="btn success" id="askAIBtn">🤖 Chiedi a Gemini</button>' +
-    '</div></div>' +
-    
-    '<div class="card"><h3>💬 Conversazione</h3>' +
-    '<div id="chatLog" style="min-height:200px"></div>' +
-    '</div></section>' +
-    
+      '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Chiedi qualsiasi cosa all\'AI generica, anche senza documenti</p>' +
+      '<div id="contextBox" class="hidden"></div>' +
+      '<div class="compose">' +
+        '<input id="qAI" placeholder="Es: Spiegami come funziona la fotosintesi..." />' +
+        '<button class="btn success icon-only" id="askAIBtn" title="Invia">➤</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card"><h3>💬 Conversazione</h3><div id="chatLog" style="min-height:200px"></div></div>' +
+    '</section>' +
+
+    // ===== CALENDARIO =====
     '<section class="hidden" data-page="calendar">' +
     '<h1>📅 Calendario</h1>' +
     (!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
-    (!isPro ? '<div class="abs">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
+    (!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
     '<div class="card"><h3>Aggiungi Evento</h3>' +
     '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:16px 0">' +
     '<input id="evTitle" placeholder="Titolo evento"/>' +
     '<input id="evStart" type="datetime-local"/>' +
     '<input id="evEnd" type="datetime-local"/>' +
     '<button class="btn" id="addEv">Aggiungi</button>' +
-    '</div><table id="evTable">' +
-    '<thead><tr><th>Data e Ora</th><th>Titolo</th><th></th></tr></thead>' +
-    '<tbody></tbody></table></div></section>' +
-    
+    '</div><table id="evTable"><thead><tr><th>Data e Ora</th><th>Titolo</th><th></th></tr></thead><tbody></tbody></table></div></section>' +
+
+    // ===== ACCOUNT =====
     '<section class="hidden" data-page="account">' +
     '<h1>👤 Account</h1>' +
     '<div class="cards">' +
-    '<div class="card"><h3>Piano Attuale</h3>' +
-    '<div style="font-size:32px;font-weight:700;margin:16px 0;color:var(--accent)">' + (isPro ? 'PRO' : 'FREE') + '</div>' +
-    '<div style="color:var(--muted);font-size:13px">Email: <b id="accountEmail">...</b></div>' +
-    '<div style="color:var(--muted);font-size:13px;margin-top:4px">Membro da: <b id="accountSince">...</b></div>' +
-    '</div>' +
-    '<div class="card"><h3>Utilizzo</h3>' +
-    '<div style="font-size:13px;margin:8px 0">Documenti: <b id="usageDocs">0</b> / ' + (isPro ? '200' : '5') + '</div>' +
-    '<div style="font-size:13px;margin:8px 0">Storage: <b id="usageStorage">0</b> MB / ' + (isPro ? '150' : '50') + ' MB</div>' +
-    '<div style="font-size:13px;margin:8px 0">Chat oggi: <b id="usageChat">0</b> / ' + (isPro ? '200' : '20') + '</div>' +
-    (isPro ? '<div style="font-size:13px;margin:8px 0">Categorie: <b id="usageCategories">0</b></div>' : '') +
-    '</div></div>';
-    
-  if(!isPro) {
-    html += '<div class="card"><h3>⚡ Upgrade a Pro</h3>' +
-      '<p style="color:var(--muted);margin-bottom:16px">Sblocca funzionalità avanzate e limiti aumentati</p>' +
-      '<div class="form-group"><label>Codice Promozionale</label>' +
-      '<input type="text" id="promoCodePage" placeholder="Inserisci codice"/>' +
+      '<div class="card"><h3>Piano Attuale</h3>' +
+      '<div style="font-size:32px;font-weight:700;margin:16px 0;color:var(--accent)">' + (isPro ? 'PRO' : 'FREE') + '</div>' +
+      '<div style="color:var(--muted);font-size:13px">Email: <b id="accountEmail">...</b></div>' +
+      '<div style="color:var(--muted);font-size:13px;margin-top:4px">Membro da: <b id="accountSince">...</b></div>' +
       '</div>' +
-      '<div id="upgradePageError" class="error hidden"></div>' +
-      '<div id="upgradePageSuccess" class="success hidden"></div>' +
-      '<button class="btn" id="activateProPage">Attiva Pro</button>' +
-      '</div>';
-  } else {
-    html += '<div class="card"><h3>⬇️ Downgrade a Free</h3>' +
-      '<p style="color:var(--muted);margin-bottom:16px">Torna al piano gratuito. <b>ATTENZIONE:</b> Devi avere massimo 5 documenti.</p>' +
-      '<div id="downgradeError" class="error hidden"></div>' +
-      '<button class="btn warn" id="downgradeBtn">Downgrade a Free</button>' +
-      '</div>';
-  }
-  
-  html += '<div class="card"><h3>⚙️ Impostazioni</h3>' +
+      '<div class="card"><h3>Utilizzo</h3>' +
+      '<div style="font-size:13px;margin:8px 0">Documenti: <b id="usageDocs">0</b> / ' + (isPro ? '200' : '5') + '</div>' +
+      '<div style="font-size:13px;margin:8px 0">Storage: <b id="usageStorage">0</b> MB / ' + (isPro ? '150' : '50') + ' MB</div>' +
+      '<div style="font-size:13px;margin:8px 0">Chat oggi: <b id="usageChat">0</b> / ' + (isPro ? '200' : '20') + '</div>' +
+      (isPro ? '<div style="font-size:13px;margin:8px 0">Categorie: <b id="usageCategories">0</b></div>' : '') +
+      '</div></div>' +
+
+    (!isPro
+      ? '<div class="card"><h3>⚡ Upgrade a Pro</h3><p style="color:var(--muted);margin-bottom:16px">Sblocca funzionalità avanzate e limiti aumentati</p>' +
+        '<div class="form-group"><label>Codice Promozionale</label><input type="text" id="promoCodePage" placeholder="Inserisci codice"/></div>' +
+        '<div id="upgradePageError" class="error hidden"></div><div id="upgradePageSuccess" class="success hidden"></div>' +
+        '<button class="btn" id="activateProPage">Attiva Pro</button></div>'
+      : '<div class="card"><h3>⬇️ Downgrade a Free</h3><p style="color:var(--muted);margin-bottom:16px">Torna al piano gratuito. <b>ATTENZIONE:</b> Devi avere massimo 5 documenti.</p>' +
+        '<div id="downgradeError" class="error hidden"></div><button class="btn warn" id="downgradeBtn">Downgrade a Free</button></div>'
+    ) +
+
+    '<div class="card"><h3>⚙️ Impostazioni</h3>' +
     '<button class="btn secondary" id="logoutBtn" style="width:100%;margin-bottom:12px">🚪 Logout</button>' +
     '<button class="btn del" id="deleteAccountBtn" style="width:100%">🗑️ Elimina Account</button>' +
     '</div></section></main></div>';
-  
+
   return html;
 }
 
@@ -263,7 +259,7 @@ function upgradeModal(){
 
 function organizeDocsModal(){
   const masterDocs = S.docs.filter(d => d.category === 'master');
-  
+
   if (masterDocs.length === 0) {
     return '<div class="modal" id="organizeModal">' +
       '<div class="modal-content">' +
@@ -272,7 +268,7 @@ function organizeDocsModal(){
       '<button class="btn" onclick="document.getElementById(\'organizeModal\').remove()">Chiudi</button>' +
       '</div></div>';
   }
-  
+
   let html = '<div class="modal" id="organizeModal">' +
     '<div class="modal-content">' +
     '<h2 style="margin-bottom:16px">🔧 Organizza Documenti</h2>' +
@@ -283,10 +279,10 @@ function organizeDocsModal(){
     '<input id="modalNewCategoryName" placeholder="Nome categoria (es. Lavoro, Fatture...)" style="flex:1"/>' +
     '<button class="btn small" id="modalAddCategoryBtn">Crea</button>' +
     '</div>' +
-    '<div style="margin-top:8px;font-size:12px;color:var(--muted)">Categorie esistenti: ' + 
+    '<div style="margin-top:8px;font-size:12px;color:var(--muted)">Categorie esistenti: ' +
     (S.categories.length > 0 ? S.categories.map(c => c.name).join(', ') : 'nessuna') + '</div>' +
     '</div><div id="organizeList">';
-    
+
   masterDocs.forEach(d => {
     html += '<div class="organize-item" data-docid="' + d.id + '">' +
       '<div class="filename">📄 ' + d.file_name + '</div>' +
@@ -297,12 +293,12 @@ function organizeDocsModal(){
     });
     html += '</select></div>';
   });
-  
+
   html += '</div><div class="btn-group" style="margin-top:24px">' +
     '<button class="btn secondary" onclick="document.getElementById(\'organizeModal\').remove()">Chiudi</button>' +
     '<button class="btn" id="saveOrganizeBtn">Salva Organizzazione</button>' +
     '</div></div></div>';
-  
+
   return html;
 }
 
@@ -382,14 +378,14 @@ function bind(){
 
   if(S.view === 'app'){
     const logoutBtn = document.getElementById('logoutBtn');
-    if(logoutBtn) logoutBtn.onclick = async()=>{ 
-      await api('api/auth.php?a=logout'); 
+    if(logoutBtn) logoutBtn.onclick = async()=>{
+      await api('api/auth.php?a=logout');
       // MODIFICATO: Pulisci localStorage al logout
       localStorage.removeItem(LS_USER_KEY);
       localStorage.removeItem(LS_ROUTE_KEY);
-      S.user=null; 
-      S.view='login'; 
-      render(); 
+      S.user=null;
+      S.view='login';
+      render();
     };
 
     ['upgradeBtn', 'upgradeBtn2', 'upgradeBtn3'].forEach(id => {
@@ -479,13 +475,13 @@ function bind(){
   }
 }
 
-// === FUNZIONI OPERATIVE (invariate, con aggiunte opzionali per coerenza) ===
+// === FUNZIONI OPERATIVE ===
 async function loadCategories(){
   const r = await api('api/categories.php?a=list');
   if(!r.success) return;
-  
+
   S.categories = r.data;
-  
+
   const uploadCategory = document.getElementById('uploadCategory');
   if(uploadCategory) {
     let opts = '<option value="">-- Seleziona una categoria --</option>';
@@ -494,7 +490,7 @@ async function loadCategories(){
     });
     uploadCategory.innerHTML = opts;
   }
-  
+
   const categoryDocs = document.getElementById('categoryDocs');
   if(categoryDocs) {
     let opts = '<option value="">-- Seleziona categoria --</option>';
@@ -503,7 +499,7 @@ async function loadCategories(){
     });
     categoryDocs.innerHTML = opts;
   }
-  
+
   const filterCategory = document.getElementById('filterCategory');
   if(filterCategory) {
     let opts = '<option value="">Tutte le categorie</option>';
@@ -512,7 +508,7 @@ async function loadCategories(){
     });
     filterCategory.innerHTML = opts;
   }
-  
+
   const categoriesList = document.getElementById('categoriesList');
   if(categoriesList) {
     if(S.categories.length === 0) {
@@ -532,22 +528,22 @@ async function createCategory(){
   const input = document.getElementById('newCategoryName');
   const btn = document.getElementById('addCategoryBtn');
   const name = input.value.trim();
-  
+
   if(!name){
     alert('Inserisci un nome per la categoria');
     input.focus();
     return;
   }
-  
+
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span>';
-  
+
   const fd = new FormData();
   fd.append('name', name);
-  
+
   try {
     const r = await api('api/categories.php?a=create', fd);
-    
+
     if(r.success){
       input.value = '';
       await loadCategories();
@@ -564,22 +560,22 @@ async function createCategoryInModal(){
   const input = document.getElementById('modalNewCategoryName');
   const btn = document.getElementById('modalAddCategoryBtn');
   const name = input.value.trim();
-  
+
   if(!name){
     alert('Inserisci un nome per la categoria');
     input.focus();
     return;
   }
-  
+
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span>';
-  
+
   const fd = new FormData();
   fd.append('name', name);
-  
+
   try {
     const r = await api('api/categories.php?a=create', fd);
-    
+
     if(r.success){
       input.value = '';
       await loadCategories();
@@ -596,12 +592,12 @@ async function createCategoryInModal(){
 
 async function deleteCategory(id){
   if(!confirm('Eliminare questa categoria?\n\nATTENZIONE: Non puoi eliminare categorie che contengono documenti.')) return;
-  
+
   const fd = new FormData();
   fd.append('id', id);
-  
+
   const r = await api('api/categories.php?a=delete', fd);
-  
+
   if(r.success){
     loadCategories();
     loadDocs();
@@ -621,7 +617,7 @@ function showOrganizeModal(){
   document.body.insertAdjacentHTML('beforeend', organizeDocsModal());
   const saveBtn = document.getElementById('saveOrganizeBtn');
   const modalAddBtn = document.getElementById('modalAddCategoryBtn');
-  
+
   if(saveBtn) saveBtn.onclick = saveOrganization;
   if(modalAddBtn) modalAddBtn.onclick = createCategoryInModal;
 }
@@ -629,7 +625,7 @@ function showOrganizeModal(){
 async function saveOrganization(){
   const selects = document.querySelectorAll('.organize-select');
   const updates = [];
-  
+
   selects.forEach(select => {
     const docid = select.dataset.docid;
     const category = select.value;
@@ -637,24 +633,24 @@ async function saveOrganization(){
       updates.push({docid: parseInt(docid), category});
     }
   });
-  
+
   if(updates.length === 0){
     alert('Seleziona almeno una categoria per i documenti');
     return;
   }
-  
+
   const saveBtn = document.getElementById('saveOrganizeBtn');
   saveBtn.disabled = true;
   saveBtn.innerHTML = 'Salvataggio... <span class="loader"></span>';
-  
+
   let success = 0;
   let errors = 0;
-  
+
   for(const update of updates){
     const fd = new FormData();
     fd.append('id', update.docid);
     fd.append('category', update.category);
-    
+
     try {
       const r = await api('api/documents.php?a=change_category', fd);
       if(r.success) success++;
@@ -663,15 +659,15 @@ async function saveOrganization(){
       errors++;
     }
   }
-  
+
   document.getElementById('organizeModal').remove();
-  
+
   if(errors === 0){
     alert('✓ ' + success + ' documento/i organizzato/i correttamente!');
   } else {
     alert('⚠ ' + success + ' documento/i organizzato/i, ' + errors + ' errore/i.');
   }
-  
+
   loadDocs();
 }
 
@@ -679,21 +675,21 @@ async function activatePro(){
   const code = document.getElementById('promoCode').value.trim();
   const err = document.getElementById('upgradeError');
   const success = document.getElementById('upgradeSuccess');
-  
+
   err.classList.add('hidden');
   success.classList.add('hidden');
-  
+
   if(!code){
     err.textContent = 'Inserisci un codice';
     err.classList.remove('hidden');
     return;
   }
-  
+
   const fd = new FormData();
   fd.append('code', code);
-  
+
   const r = await api('api/upgrade.php', fd);
-  
+
   if(r.success){
     success.textContent = '✓ Piano Pro attivato! Ricarico...';
     success.classList.remove('hidden');
@@ -723,7 +719,7 @@ async function loadStats(){
     const qCount = document.getElementById('qCount');
     const qCountChat = document.getElementById('qCountChat');
     const storageUsed = document.getElementById('storageUsed');
-    
+
     if(qCount) qCount.textContent = S.stats.chatToday || 0;
     if(qCountChat) qCountChat.textContent = S.stats.chatToday || 0;
     if(storageUsed) storageUsed.textContent = (S.stats.totalSize / (1024*1024)).toFixed(1);
@@ -739,25 +735,25 @@ async function doLogin(){
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
   const err = document.getElementById('loginError');
-  
+
   err.classList.add('hidden');
-  
+
   if(!email || !password){
     err.textContent = 'Inserisci email e password';
     err.classList.remove('hidden');
     return;
   }
-  
+
   const fd = new FormData();
   fd.append('email', email);
   fd.append('password', password);
-  
+
   const r = await api('api/auth.php?a=login', fd);
-  
+
   if(r.success){
     S.user = {email, role: r.role || 'free'};
     // MODIFICATO: Salva utente nel localStorage al login
-    localStorage.setItem(LS_USER_KEY, JSON.stringify(S.user)); 
+    localStorage.setItem(LS_USER_KEY, JSON.stringify(S.user));
     S.view = 'app';
     render();
   } else {
@@ -772,34 +768,34 @@ async function doRegister(){
   const passConfirm = document.getElementById('regPassConfirm').value;
   const err = document.getElementById('regError');
   const success = document.getElementById('regSuccess');
-  
+
   err.classList.add('hidden');
   success.classList.add('hidden');
-  
+
   if(!email || !pass || !passConfirm){
     err.textContent = 'Compila tutti i campi';
     err.classList.remove('hidden');
     return;
   }
-  
+
   if(pass !== passConfirm){
     err.textContent = 'Le password non coincidono';
     err.classList.remove('hidden');
     return;
   }
-  
+
   if(pass.length < 6){
     err.textContent = 'La password deve essere di almeno 6 caratteri';
     err.classList.remove('hidden');
     return;
   }
-  
+
   const fd = new FormData();
   fd.append('email', email);
   fd.append('password', pass);
-  
+
   const r = await api('api/auth.php?a=register', fd);
-  
+
   if(r.success){
     success.textContent = '✓ Registrazione completata! Ora puoi accedere.';
     success.classList.remove('hidden');
@@ -814,16 +810,16 @@ async function doForgot(){
   const email = document.getElementById('forgotEmail').value;
   const err = document.getElementById('forgotError');
   const success = document.getElementById('forgotSuccess');
-  
+
   err.classList.add('hidden');
   success.classList.add('hidden');
-  
+
   if(!email){
     err.textContent = 'Inserisci la tua email';
     err.classList.remove('hidden');
     return;
   }
-  
+
   success.textContent = '✓ Se l\'email esiste, riceverai un link per reimpostare la password.';
   success.classList.remove('hidden');
 }
@@ -831,12 +827,12 @@ async function doForgot(){
 async function loadDocs(){
   const r = await api('api/documents.php?a=list');
   if(!r.success) return;
-  
+
   S.docs = r.data;
-  
+
   const docCount = document.getElementById('docCount');
   if(docCount) docCount.textContent = S.docs.length;
-  
+
   renderDocsTable();
   loadStats();
 }
@@ -844,18 +840,18 @@ async function loadDocs(){
 function renderDocsTable(){
   const tb = document.querySelector('#docsTable tbody');
   if(!tb) return;
-  
+
   const isPro = S.user && S.user.role === 'pro';
-  
+
   let filteredDocs = S.docs;
   if(S.filterCategory) {
     filteredDocs = S.docs.filter(d => d.category === S.filterCategory);
   }
-  
+
   let html = '';
   filteredDocs.forEach(d => {
     html += '<tr><td>' + d.file_name + '</td>';
-    
+
     if(isPro) {
       html += '<td class="category-select-cell">' +
         '<select class="doc-category-select" data-docid="' + d.id + '" data-current="' + d.category + '">';
@@ -864,52 +860,52 @@ function renderDocsTable(){
       });
       html += '</select></td>';
     }
-    
+
     html += '<td>' + (d.size/(1024*1024)).toFixed(2) + ' MB</td>' +
       '<td>' + new Date(d.created_at).toLocaleString('it-IT') + '</td>' +
       '<td style="white-space:nowrap">' +
       '<a href="api/documents.php?a=download&id=' + d.id + '" class="btn small" style="margin-right:8px;text-decoration:none;display:inline-block">📥</a>';
-    
+
     if (d.ocr_recommended) {
       html += '<button class="btn small" data-id="' + d.id + '" data-action="ocr" style="background:#f59e0b;margin-right:8px" title="OCR Consigliato">🔍 OCR</button>';
     } else {
       html += '<button class="btn small secondary" data-id="' + d.id + '" data-action="ocr" style="margin-right:8px" title="OCR disponibile">🔍</button>';
     }
-    
+
     html += '<button class="btn del" data-id="' + d.id + '" data-action="delete">🗑️</button>' +
       '</td></tr>';
   });
-  
+
   tb.innerHTML = html;
-  
+
   tb.querySelectorAll('button[data-action="delete"]').forEach(b=>b.onclick=()=>delDoc(b.dataset.id));
   tb.querySelectorAll('button[data-action="ocr"]').forEach(b=>b.onclick=()=>doOCR(b.dataset.id));
-  
+
   if(isPro) {
     tb.querySelectorAll('.doc-category-select').forEach(select => {
       select.onchange = async (e) => {
         const docid = e.target.dataset.docid;
         const oldCategory = e.target.dataset.current;
         const newCategory = e.target.value;
-        
+
         if(oldCategory === newCategory) return;
-        
+
         if(!confirm('Spostare il documento nella categoria "' + newCategory + '"?\n\nIl documento verrà spostato anche su DocAnalyzer.')) {
           e.target.value = oldCategory;
           return;
         }
-        
+
         e.target.disabled = true;
         const originalHTML = e.target.innerHTML;
         e.target.innerHTML = '<option>Spostamento...</option>';
-        
+
         const fd = new FormData();
         fd.append('id', docid);
         fd.append('category', newCategory);
-        
+
         try {
           const r = await api('api/documents.php?a=change_category', fd);
-          
+
           if(r.success) {
             e.target.dataset.current = newCategory;
             await loadDocs();
@@ -936,31 +932,31 @@ async function uploadFile(){
   const uploadCategory = document.getElementById('uploadCategory');
   const f = file.files[0];
   if(!f) return alert('Seleziona un file');
-  
+
   if(S.user.role === 'pro' && uploadCategory && !uploadCategory.value){
     alert('Seleziona una categoria prima di caricare il file');
     uploadCategory.focus();
     return;
   }
-  
+
   uploadBtn.disabled = true;
   const originalText = uploadBtn.innerHTML;
   uploadBtn.innerHTML = 'Caricamento... <span class="loader"></span>';
-  
+
   if(drop) {
     drop.style.opacity = '0.5';
     drop.style.pointerEvents = 'none';
   }
-  
+
   const fd = new FormData();
   fd.append('file', f);
   if(uploadCategory && uploadCategory.value) {
     fd.append('category', uploadCategory.value);
   }
-  
+
   try {
     const r = await api('api/documents.php?a=upload', fd);
-    
+
     if(r.success){
       loadDocs();
       file.value = '';
@@ -982,17 +978,17 @@ async function uploadFile(){
 
 async function delDoc(id){
   if(!confirm('Eliminare questo documento?')) return;
-  
+
   const btn = document.querySelector('button[data-id="' + id + '"][data-action="delete"]');
   if(btn){
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span>';
   }
-  
+
   const fd = new FormData();
   fd.append('id', id);
   const r = await api('api/documents.php?a=delete', fd);
-  
+
   if(r.success) {
     loadDocs();
   } else {
@@ -1005,29 +1001,29 @@ async function delDoc(id){
 
 async function doOCR(id){
   const isPro = S.user && S.user.role === 'pro';
-  
+
   let confirmMsg = 'Avviare OCR su questo documento?\n\n';
-  
+
   if (!isPro) {
     confirmMsg += '⚠️ SEI FREE: Hai diritto a 1 SOLO OCR.\nDopo questo non potrai più usare OCR su altri documenti.\n\nPassa a Pro per OCR illimitato.\n\n';
   }
-  
+
   confirmMsg += '💰 Costo: 1 credito DocAnalyzer per pagina del documento.';
-  
+
   if(!confirm(confirmMsg)) return;
-  
+
   const btn = document.querySelector('button[data-id="' + id + '"][data-action="ocr"]');
   if(btn){
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span>';
   }
-  
+
   const fd = new FormData();
   fd.append('id', id);
-  
+
   try {
     const r = await api('api/documents.php?a=ocr', fd);
-    
+
     if(r.success) {
       alert('✓ ' + r.message);
       if(btn) {
@@ -1058,35 +1054,35 @@ async function askDocs(){
   const askBtn = document.getElementById('askDocsBtn');
   const adherence = document.getElementById('adherence');
   const showRefs = document.getElementById('showRefs');
-  
+
   if(!q.value.trim()){
     alert('Inserisci una domanda');
     q.focus();
     return;
   }
-  
+
   if(S.user.role === 'pro' && (!category.value || category.value === '')){
     alert('Seleziona una categoria prima di fare la domanda');
     category.focus();
     return;
   }
-  
+
   askBtn.disabled = true;
-  askBtn.innerHTML = 'Cerco nei documenti... <span class="loader"></span>';
-  
+  askBtn.innerHTML = '<span class="loader"></span>';
+
   const fd = new FormData();
   fd.append('q', q.value);
   fd.append('category', category.value || '');
   fd.append('mode', 'docs');
   fd.append('adherence', adherence.value);
   fd.append('show_refs', showRefs.checked ? '1' : '0');
-  
+
   try {
     const r = await api('api/chat.php', fd);
-    
+
     if(r.success && r.source !== 'none'){
       addMessageToLog(r.answer, 'docs', q.value);
-      
+
       q.value = '';
       S.stats.chatToday++;
       updateChatCounter();
@@ -1099,39 +1095,39 @@ async function askDocs(){
     }
   } finally {
     askBtn.disabled = false;
-    askBtn.innerHTML = '🔍 Chiedi ai documenti';
+    askBtn.innerHTML = '➤';
   }
 }
 
 async function askAI(){
   const q = document.getElementById('qAI');
   const askBtn = document.getElementById('askAIBtn');
-  
+
   if(!q.value.trim() && !S.chatContext){
     alert('Inserisci una domanda');
     q.focus();
     return;
   }
-  
+
   askBtn.disabled = true;
-  askBtn.innerHTML = 'Gemini sta pensando... <span class="loader"></span>';
-  
+  askBtn.innerHTML = '<span class="loader"></span>';
+
   const fd = new FormData();
-  
+
   let finalQuestion = q.value;
   if(S.chatContext) {
     finalQuestion = 'Contesto: ' + S.chatContext + '\n\nDomanda: ' + (q.value || 'Continua con questo contesto');
   }
-  
+
   fd.append('q', finalQuestion);
   fd.append('mode', 'ai');
-  
+
   try {
     const r = await api('api/chat.php', fd);
-    
+
     if(r.success){
       addMessageToLog(r.answer, 'ai', q.value || 'Continua contesto');
-      
+
       q.value = '';
       removeContext();
       S.stats.chatToday++;
@@ -1143,7 +1139,7 @@ async function askAI(){
     }
   } finally {
     askBtn.disabled = false;
-    askBtn.innerHTML = '🤖 Chiedi a Gemini';
+    askBtn.innerHTML = '➤';
   }
 }
 
@@ -1154,15 +1150,15 @@ function addMessageToLog(answer, type, question) {
   voices.forEach((v, i) => {
     voiceOptions += '<option value="' + i + '">' + v.name + ' (' + v.lang + ')</option>';
   });
-  
+
   const log = document.getElementById('chatLog');
   const item = document.createElement('div');
   item.className = 'chat-message ' + type;
   item.dataset.msgid = msgId;
-  
+
   const title = type === 'docs' ? '📄 Risposta dai documenti' : '🤖 Risposta AI Generica (Google Gemini)';
   const useContextBtn = type === 'docs' ? '<button class="btn small" onclick="useAsContext(\'' + msgId + '\')">📋 Usa come contesto</button>' : '';
-  
+
   item.innerHTML = '<div style="font-weight:600;margin-bottom:8px">' + title + '</div>' +
     '<div class="message-text" style="white-space:pre-wrap">' + answer + '</div>' +
     '<div class="chat-controls">' +
@@ -1179,14 +1175,14 @@ function addMessageToLog(answer, type, question) {
     '<button class="btn small icon play-btn" onclick="speakText(\'' + msgId + '\')" title="Leggi">▶️</button>' +
     '<button class="btn small icon stop-btn hidden" onclick="stopSpeaking(\'' + msgId + '\')" title="Stop">⏸️</button>' +
     '</div>';
-  
+
   log.insertBefore(item, log.firstChild);
 }
 
 async function loadEvents(){
   const r = await api('api/calendar.php?a=list');
   if(!r.success) return;
-  
+
   const tb = document.querySelector('#evTable tbody');
   if(tb){
     let html = '';
@@ -1206,19 +1202,19 @@ async function createEvent(){
   const evTitle = document.getElementById('evTitle');
   const evStart = document.getElementById('evStart');
   const evEnd = document.getElementById('evEnd');
-  
+
   if(!evTitle.value || !evStart.value){
     alert('Inserisci almeno titolo e data inizio');
     return;
   }
-  
+
   const fd = new FormData();
   fd.append('title', evTitle.value);
   fd.append('starts_at', evStart.value);
   fd.append('ends_at', evEnd.value);
-  
+
   const r = await api('api/calendar.php?a=create', fd);
-  
+
   if(r.success){
     loadEvents();
     evTitle.value = '';
@@ -1240,14 +1236,14 @@ async function delEvent(id){
 async function loadAccountInfo(){
   const r = await api('api/account.php?a=info');
   if(!r.success) return;
-  
+
   const accountEmail = document.getElementById('accountEmail');
   const accountSince = document.getElementById('accountSince');
   const usageDocs = document.getElementById('usageDocs');
   const usageStorage = document.getElementById('usageStorage');
   const usageChat = document.getElementById('usageChat');
   const usageCategories = document.getElementById('usageCategories');
-  
+
   if(accountEmail) accountEmail.textContent = r.account.email;
   if(accountSince) accountSince.textContent = new Date(r.account.created_at).toLocaleDateString('it-IT');
   if(usageDocs) usageDocs.textContent = r.usage.documents;
@@ -1261,24 +1257,24 @@ async function activateProFromPage(){
   const err = document.getElementById('upgradePageError');
   const success = document.getElementById('upgradePageSuccess');
   const btn = document.getElementById('activateProPage');
-  
+
   err.classList.add('hidden');
   success.classList.add('hidden');
-  
+
   if(!code){
     err.textContent = 'Inserisci un codice';
     err.classList.remove('hidden');
     return;
   }
-  
+
   btn.disabled = true;
   btn.innerHTML = 'Attivazione... <span class="loader"></span>';
-  
+
   const fd = new FormData();
   fd.append('code', code);
-  
+
   const r = await api('api/upgrade.php', fd);
-  
+
   if(r.success){
     success.textContent = '✓ Piano Pro attivato! Ricarico...';
     success.classList.remove('hidden');
@@ -1304,16 +1300,16 @@ async function activateProFromPage(){
 
 async function doDowngrade(){
   if(!confirm('Sei sicuro di voler passare al piano Free?\n\nDevi avere massimo 5 documenti. Tutti i documenti saranno spostati nella categoria principale.')) return;
-  
+
   const btn = document.getElementById('downgradeBtn');
   const err = document.getElementById('downgradeError');
-  
+
   err.classList.add('hidden');
   btn.disabled = true;
   btn.innerHTML = 'Downgrade in corso... <span class="loader"></span>';
-  
+
   const r = await api('api/account.php?a=downgrade', new FormData());
-  
+
   if(r.success){
     alert('✓ ' + r.message);
     S.user.role = 'free';
@@ -1330,15 +1326,15 @@ async function doDowngrade(){
 
 async function doDeleteAccount(){
   if(!confirm('⚠️ ATTENZIONE ⚠️\n\nVuoi eliminare il tuo account?\n\nQuesta azione eliminerà:\n- Tutti i tuoi documenti\n- Tutte le chat\n- Tutti gli eventi\n- Il tuo account\n\nQuesta azione è IRREVERSIBILE.')) return;
-  
+
   if(!confirm('Confermi l\'eliminazione dell\'account?\n\nNon potrai più recuperare i tuoi dati.')) return;
-  
+
   const btn = document.getElementById('deleteAccountBtn');
   btn.disabled = true;
   btn.innerHTML = 'Eliminazione... <span class="loader"></span>';
-  
+
   const r = await api('api/account.php?a=delete', new FormData());
-  
+
   if(r.success){
     alert('Account eliminato. Arrivederci.');
     // MODIFICATO: Pulisci localStorage all'eliminazione
@@ -1354,7 +1350,7 @@ async function doDeleteAccount(){
   }
 }
 
-// === BOOTSTRAP FUNCTION (AGGIUNTO) ===
+// === BOOTSTRAP FUNCTION ===
 async function bootstrap(){
   // 1) Ripristino ottimistico da cache (evita flash del login)
   const cachedUser = localStorage.getItem(LS_USER_KEY);
@@ -1394,6 +1390,6 @@ async function bootstrap(){
 }
 
 
-// === AVVIO (MODIFICATO) ===
+// === AVVIO ===
 bootstrap();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('assets/service-worker.js');

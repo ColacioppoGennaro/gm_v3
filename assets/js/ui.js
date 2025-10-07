@@ -82,20 +82,20 @@ function appView(){
     '<section data-page="dashboard">' +
     '<h1>Dashboard</h1>' +
     (!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
-    '<div class="cards">' +
-      '<div class="card">' +
-        '<div class="stat-label">Documenti Archiviati</div>' +
-        '<div class="stat-number"><span id="docCount">0</span> / ' + maxDocs + '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="stat-label">Domande AI Oggi</div>' +
-        '<div class="stat-number"><span id="qCount">0</span> / ' + maxChat + '</div>' +
-      '</div>' +
-      '<div class="card">' +
-        '<div class="stat-label">Storage Usato</div>' +
-        '<div class="stat-number"><span id="storageUsed">0</span> MB / ' + maxSize + ' MB</div>' +
-      '</div>' +
-    '</div>' +
+    '<div class="cards stats">' +
+      '<div class="card">' +
+        '<div class="stat-label">Documenti Archiviati</div>' +
+        '<div class="stat-number"><span id="docCount">0</span> / ' + maxDocs + '</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="stat-label">Domande AI Oggi</div>' +
+        '<div class="stat-number"><span id="qCount">0</span> / ' + maxChat + '</div>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="stat-label">Storage Usato</div>' +
+        '<div class="stat-number"><span id="storageUsed">0</span> MB / ' + maxSize + ' MB</div>' +
+      '</div>' +
+    '</div>' +
     
     '<div class="card"><h3>📤 Carica Documento</h3>';
     

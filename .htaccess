@@ -1,9 +1,21 @@
 DirectoryIndex index.php
-
 Options -Indexes
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
-# Block direct access to internal directories
+
+# Blocca accesso a directory interne
 RewriteRule ^(_core|_migrations|_var)/ - [F,L]
+
+# Blocca file sensibili
+RewriteRule (^|/)\.env - [F,L]
+RewriteRule (^|/)\.git - [F,L]
+RewriteRule (^|/)composer\.(json|lock)$ - [F,L]
+RewriteRule (^|/)package(-lock)?\.json$ - [F,L]
+RewriteRule (^|/)yarn\.lock$ - [F,L]
 </IfModule>
+
+# Fallback: nega in modo esplicito (per sicurezza aggiuntiva)
+<FilesMatch "^(\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|yarn\.lock)$">
+  Require all denied
+</FilesMatch>

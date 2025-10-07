@@ -181,3 +181,15 @@ h1{margin-bottom:8px}
   /* banner meno invadente */
   .banner{ padding:10px 12px; font-size:13px; border-left-width:3px }
 }
+
+/* Gruppo statistiche più denso */
+.cards.stats{ margin:12px 0; gap:12px }
+.cards.stats .card{ padding:12px; margin:0 }      /* niente margin tra le card */
+.stat-number{ margin-top:4px }                    /* meno spazio tra label e numero */
+
+/* Mobile: ancora più compatto */
+@media (max-width:768px){
+  .cards.stats{ margin:8px 0; gap:8px }
+  .cards.stats .card{ padding:10px }
+  .stat-number{ font-size:18px; margin-top:2px }
+}

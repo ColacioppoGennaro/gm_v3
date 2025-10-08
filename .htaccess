@@ -1,9 +1,14 @@
+# Abilita il motore di riscrittura
+RewriteEngine On
+
+# Redirect www a non-www
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+
 DirectoryIndex index.php
 Options -Indexes
 
 <IfModule mod_rewrite.c>
-RewriteEngine On
-
 # Blocca accesso a directory interne
 RewriteRule ^(_core|_migrations|_var)/ - [F,L]
 
@@ -71,3 +76,4 @@ RewriteRule (^|/)yarn\.lock$ - [F,L]
   ExpiresByType font/woff "access plus 1 year"
   ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>
+

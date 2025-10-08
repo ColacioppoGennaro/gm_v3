@@ -285,10 +285,11 @@ function organizeDocsModal() {
 // ===================================================
 // FUNZIONE UNICA PER LE CHIAMATE API
 // ===================================================
-async function api(url, method = 'GET', body = null) {
+async function api(url, body = null) {
+    const method = body ? 'POST' : 'GET';
     const opts = {
         method,
-        credentials: 'same-origin', // << obbligatorio per mandare cookie
+        credentials: 'same-origin',
         headers: {}
     };
 
@@ -1286,4 +1287,6 @@ window.addEventListener('load', () => {
         }
     });
 });
+
+" from the most up-to-date file for "assets/js/ui.js" is selected.
 

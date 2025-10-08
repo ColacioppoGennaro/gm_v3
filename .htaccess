@@ -51,7 +51,7 @@ RewriteRule (^|/)yarn\.lock$ - [F,L]
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   
   # Permetti solo risorse dallo stesso origin (modifica se usi CDN)
-  Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com"
+  Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://cdn.jsdelivr.net https://unpkg.com"
 </IfModule>
 
 # ===== COMPRESSIONE GZIP =====

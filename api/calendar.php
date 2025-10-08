@@ -4,15 +4,21 @@ ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
 ini_set('session.use_strict_mode', '1');
 session_start();
+// DEBUG - RIMUOVI DOPO
+error_log("=== CALENDAR DEBUG ===");
+error_log("Session ID: " . session_id());
+error_log("User ID in session: " . ($_SESSION['user_id'] ?? 'VUOTO'));
+error_log("Cookie PHPSESSID: " . ($_COOKIE['PHPSESSID'] ?? 'VUOTO'));
+error_log("======================");
 require_once __DIR__.'/../_core/helpers.php';
 require_login();
 
 // Nota: Assicurati che questo sia il modo corretto per ottenere l'ID dell'utente.
 // Se la tua funzione require_login() è ancora necessaria, puoi inserirla qui.
-$user_id = $_SESSION['user']['id'] ?? null; 
-if (!$user_id) { 
-    http_response_code(401); 
-    exit('not logged'); 
+$user_id = $_SESSION['user']['id'] ?? null;
+if (!$user_id) {
+    http_response_code(401);
+    exit('not logged');
 }
 
 $db = db();
@@ -23,12 +29,12 @@ $method = $_SERVER['REQUEST_METHOD'];
  * Esce con errore 400 se mancano chiavi richieste.
  */
 function json_body($required = []) {
-  $raw = file_get_contents('php://input'); 
+  $raw = file_get_contents('php://input');
   $data = json_decode($raw, true) ?: [];
   foreach($required as $k) {
-      if(!array_key_exists($k, $data)) { 
-          http_response_code(400); 
-          exit("missing $k"); 
+      if(!array_key_exists($k, $data)) {
+          http_response_code(400);
+          exit("missing $k");
       }
   }
   return $data;
@@ -37,21 +43,21 @@ function json_body($required = []) {
 /**
  * Formatta una data in formato ISO 8601 (richiesto da FullCalendar).
  */
-function iso($ts){ 
-    return $ts ? date('c', strtotime($ts)) : null; 
+function iso($ts){
+    return $ts ? date('c', strtotime($ts)) : null;
 }
 
 /**
  * Ottiene un parametro dalla query string GET.
  * Esce con errore 400 se il parametro è obbligatorio e manca.
  */
-function req($k, $must = false){ 
-    $v = $_GET[$k] ?? null; 
-    if ($must && !$v) { 
-        http_response_code(400); 
-        exit("missing $k"); 
-    } 
-    return $v; 
+function req($k, $must = false){
+    $v = $_GET[$k] ?? null;
+    if ($must && !$v) {
+        http_response_code(400);
+        exit("missing $k");
+    }
+    return $v;
 }
 
 // === GESTIONE RICHIESTA GET (Lettura eventi) ===
@@ -62,10 +68,10 @@ if ($method === 'GET') {
   $stmt = $db->prepare("SELECT id, title, description, starts_at, ends_at, all_day, color, rrule, reminders
                           FROM events WHERE user_id=? AND starts_at < ? AND (ends_at IS NULL OR ends_at >= ?)");
   $stmt->bind_param('iss', $user_id, $end, $start);
-  $stmt->execute(); 
+  $stmt->execute();
   $res = $stmt->get_result();
 
-  $out = []; 
+  $out = [];
   while($r = $res->fetch_assoc()){
     $out[] = [
       'id'    => $r['id'],
@@ -82,8 +88,8 @@ if ($method === 'GET') {
     ];
   }
 
-  header('Content-Type: application/json'); 
-  echo json_encode($out); 
+  header('Content-Type: application/json');
+  echo json_encode($out);
   exit;
 }
 
@@ -97,8 +103,8 @@ if ($method === 'POST') {
   $stmt->bind_param('issssisss', $user_id, $in['title'], $in['description'], $in['start'], $in['end'], $in['allDay'], $in['color'], $in['rrule'], $rem);
   $stmt->execute();
 
-  header('Content-Type: application/json'); 
-  echo json_encode(['id' => $db->insert_id]); 
+  header('Content-Type: application/json');
+  echo json_encode(['id' => $db->insert_id]);
   exit;
 }
 
@@ -109,20 +115,20 @@ if ($method === 'PATCH' || $method === 'PUT') {
   $rem = array_key_exists('reminders', $in) ? json_encode($in['reminders']) : null;
 
   $stmt = $db->prepare("UPDATE events SET
-      title = COALESCE(?, title), 
+      title = COALESCE(?, title),
       description = COALESCE(?, description),
-      starts_at = COALESCE(?, starts_at), 
+      starts_at = COALESCE(?, starts_at),
       ends_at = COALESCE(?, ends_at),
-      all_day = COALESCE(?, all_day), 
+      all_day = COALESCE(?, all_day),
       color = COALESCE(?, color),
-      rrule = COALESCE(?, rrule), 
+      rrule = COALESCE(?, rrule),
       reminders = COALESCE(?, reminders)
     WHERE id = ? AND user_id = ?");
   $stmt->bind_param('ssssisssii', $in['title'], $in['description'], $in['start'], $in['end'], $in['allDay'], $in['color'], $in['rrule'], $rem, $id, $user_id);
-  $stmt->execute(); 
-  
-  header('Content-Type: application/json'); 
-  echo '{"ok":true}'; 
+  $stmt->execute();
+
+  header('Content-Type: application/json');
+  echo '{"ok":true}';
   exit;
 }
 
@@ -131,11 +137,11 @@ if ($method === 'DELETE') {
   $id = req('id', true);
 
   $stmt = $db->prepare("DELETE FROM events WHERE id=? AND user_id=?");
-  $stmt->bind_param('ii', $id, $user_id); 
+  $stmt->bind_param('ii', $id, $user_id);
   $stmt->execute();
 
-  header('Content-Type: application/json'); 
-  echo '{"ok":true}'; 
+  header('Content-Type: application/json');
+  echo '{"ok":true}';
   exit;
 }
 

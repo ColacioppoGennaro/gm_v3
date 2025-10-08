@@ -290,9 +290,18 @@ function render() {
         forgot: forgotView,
         app: appView
     };
-    document.getElementById('root').innerHTML = views[S.view]();
+    
+    // Hardening: Assicurati che l'elemento root esista prima di scriverci
+    const root = document.getElementById('app') || document.body; // fallback sul body
+    if (!root) {
+        console.error('Elemento root #app non trovato!');
+        return;
+    }
+
+    root.innerHTML = views[S.view]();
     bind();
 }
+
 
 // MODIFICATO: La logica di routing ora è separata e gestita da showPage()
 function showPage(pageName) {
@@ -318,9 +327,16 @@ function showPage(pageName) {
         loadDocs();
         if (S.user && S.user.role === 'pro') loadCategories();
     }
-    // MODIFICATO: Chiama la funzione per renderizzare FullCalendar
+    // PATCH C: Router con degradazione (non bloccare l’app)
     if (pageName === 'calendar') {
-        calendarView();
+        if (window.FullCalendar) {
+            calendarView();
+        } else {
+            console.warn('FullCalendar non caricato: salto la vista calendario');
+            alert('Calendario temporaneamente non disponibile. Riprova tra poco.');
+            // Torna alla dashboard per evitare una pagina vuota
+            location.hash = '#/dashboard';
+        }
     }
     if (pageName === 'chat') {
         updateChatCounter();
@@ -1446,3 +1462,4 @@ window.addEventListener('load', route);
 // === AVVIO ===
 bootstrap();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('assets/service-worker.js');
+

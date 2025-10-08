@@ -5,7 +5,7 @@ export async function enablePush() {
     return false;
   }
 
-  const reg = await navigator.serviceWorker.register('/gm_v3/assets/service-worker.js');
+  const reg = await navigator.serviceWorker.register('/gm_v3/assets/service-worker.js?v=2');
   await navigator.serviceWorker.ready;
 
   const perm = await Notification.requestPermission();

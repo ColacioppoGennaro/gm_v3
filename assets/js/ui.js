@@ -376,7 +376,8 @@ function showPage(pageName) {
 
     if (pageName === 'dashboard') {
         loadDocs();
-        if (S.user?.role === 'pro') loadCategories();
+        loadStats();
+        if (S.user && S.user.role === 'pro') loadCategories();
     } else if (pageName === 'calendar') {
         if (window.FullCalendar) {
             calendarView();
@@ -455,10 +456,6 @@ function bind() {
         document.getElementById('addCategoryBtn')?.addEventListener('click', createCategoryFromDashboard);
         document.getElementById('organizeDocsBtn')?.addEventListener('click', showOrganizeModal);
         document.getElementById('filterCategory')?.addEventListener('change', (e) => { S.filterCategory = e.target.value; renderDocsTable(); });
-
-        loadDocs();
-        loadStats();
-        if (S.user.role === 'pro') loadCategories();
     }
 }
 

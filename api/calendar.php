@@ -1,11 +1,11 @@
 <?php
-// File: public_html/gm_v3/api/calendar.php
-
-require_once __DIR__.'/../_core/helpers.php';
-
-require_login();
-
+// Configurazione sessione
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', '1');
 session_start();
+require_once __DIR__.'/../_core/helpers.php';
+require_login();
 
 // Nota: Assicurati che questo sia il modo corretto per ottenere l'ID dell'utente.
 // Se la tua funzione require_login() è ancora necessaria, puoi inserirla qui.
@@ -141,3 +141,4 @@ if ($method === 'DELETE') {
 
 // Se il metodo HTTP non è tra quelli gestiti, rispondi con un errore.
 http_response_code(405); // Method Not Allowed
+

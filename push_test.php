@@ -1,4 +1,3 @@
-cat > push_test.php <<'PHP'
 <?php require __DIR__ . '/_core/bootstrap.php'; ?>
 <!doctype html>
 <html lang="it">
@@ -93,4 +92,3 @@ document.getElementById('btnTest').addEventListener('click', testPush);
 </script>
 </body>
 </html>
-PHP

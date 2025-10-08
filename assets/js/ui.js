@@ -1,3 +1,5 @@
+// assets/js/ui.js - Versione Aggiornata con FullCalendar
+
 // === CHIAVI LOCALSTORAGE ===
 const LS_USER_KEY  = 'gmv3_user';
 const LS_ROUTE_KEY = 'gmv3_route';
@@ -141,11 +143,7 @@ function appView(){
     // ===== CHAT =====
     '<section class="hidden" data-page="chat">' +
     '<h1>💬 Chat AI</h1>' +
-
-    // 1) ADS IN CIMA
     (!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
-
-    // Card: chiedi ai documenti (più compatta)
     '<div class="card"><h3>📄 Chiedi ai tuoi documenti</h3>' +
       '<div class="settings-row settings-row--compact">' +
         '<label>Aderenza:</label>' +
@@ -161,29 +159,20 @@ function appView(){
           '<span style="font-size:13px">Mostra riferimenti pagine</span>' +
         '</label>' +
       '</div>' +
-
-      // Riga input + invio piccolo (solo icona)
       '<div class="compose" style="margin-top:12px">' +
         '<input id="qDocs" placeholder="Es: Quando scade l\'IMU?" />' +
         '<button class="btn icon-only" id="askDocsBtn" title="Invia">➤</button>' +
       '</div>' +
-
-      // Categoria: pill (Free) oppure select compatta (Pro)
       (isPro
         ? '<div class="chat-docs-actions"><select id="categoryDocs"><option value="">-- Seleziona categoria --</option></select></div>'
         : '<div class="chat-docs-actions">' +
             '<div class="pill">(Free: tutti)</div>' +
-            // tengo il select nascosto così askDocs() continua a leggere id="categoryDocs"
             '<select id="categoryDocs" class="hidden"><option value="">(Free: tutti)</option></select>' +
           '</div>'
       ) +
       '<div style="margin-top:8px;font-size:12px;color:var(--muted)">Domande oggi: <b id="qCountChat">0</b>/' + maxChat + '</div>' +
     '</div>' +
-
-    // 2) Al posto del vecchio slot Ads: banner Upgrade
     (!isPro ? '<div class="banner" id="upgradeBtn2">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
-
-    // Card: AI generica con input lungo + invio piccolo
     '<div class="card"><h3>🤖 Chat AI Generica (Google Gemini)</h3>' +
       '<p style="color:var(--muted);font-size:13px;margin-bottom:12px">Chiedi qualsiasi cosa all\'AI generica, anche senza documenti</p>' +
       '<div id="contextBox" class="hidden"></div>' +
@@ -192,22 +181,12 @@ function appView(){
         '<button class="btn success icon-only" id="askAIBtn" title="Invia">➤</button>' +
       '</div>' +
     '</div>' +
-
     '<div class="card"><h3>💬 Conversazione</h3><div id="chatLog" style="min-height:200px"></div></div>' +
     '</section>' +
 
-    // ===== CALENDARIO =====
-    '<section class="hidden" data-page="calendar">' +
-    '<h1>📅 Calendario</h1>' +
-    (!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : '') +
-    (!isPro ? '<div class="ads">[Slot Pubblicitario - Upgrade a Pro per rimuoverlo]</div>' : '') +
-    '<div class="card"><h3>Aggiungi Evento</h3>' +
-    '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;margin:16px 0">' +
-    '<input id="evTitle" placeholder="Titolo evento"/>' +
-    '<input id="evStart" type="datetime-local"/>' +
-    '<input id="evEnd" type="datetime-local"/>' +
-    '<button class="btn" id="addEv">Aggiungi</button>' +
-    '</div><table id="evTable"><thead><tr><th>Data e Ora</th><th>Titolo</th><th></th></tr></thead><tbody></tbody></table></div></section>' +
+    // ===== CALENDARIO (MODIFICATO) =====
+    // Ora è un contenitore vuoto che verrà riempito da renderFullCalendar()
+    '<section class="hidden" data-page="calendar"></section>' +
 
     // ===== ACCOUNT =====
     '<section class="hidden" data-page="account">' +
@@ -338,7 +317,10 @@ function route(r){
     loadDocs();
     if(S.user && S.user.role === 'pro') loadCategories();
   }
-  if(r==='calendar') loadEvents();
+  // MODIFICATO: Chiama la funzione per renderizzare FullCalendar
+  if(r==='calendar') {
+    renderFullCalendar();
+  }
   if(r==='chat') {
     updateChatCounter();
     if(S.user && S.user.role === 'pro') loadCategories();
@@ -454,7 +436,6 @@ function bind(){
     const uploadBtn = document.getElementById('uploadBtn');
     const askDocsBtn = document.getElementById('askDocsBtn');
     const askAIBtn = document.getElementById('askAIBtn');
-    const addEv = document.getElementById('addEv');
     const addCategoryBtn = document.getElementById('addCategoryBtn');
     const organizeDocsBtn = document.getElementById('organizeDocsBtn');
     const filterCategory = document.getElementById('filterCategory');
@@ -462,7 +443,6 @@ function bind(){
     if(uploadBtn) uploadBtn.onclick=uploadFile;
     if(askDocsBtn) askDocsBtn.onclick=askDocs;
     if(askAIBtn) askAIBtn.onclick=askAI;
-    if(addEv) addEv.onclick=createEvent;
     if(addCategoryBtn) addCategoryBtn.onclick=createCategory;
     if(organizeDocsBtn) organizeDocsBtn.onclick=showOrganizeModal;
     if(filterCategory) filterCategory.onchange=(e)=>{S.filterCategory=e.target.value; renderDocsTable();};
@@ -476,6 +456,124 @@ function bind(){
 }
 
 // === FUNZIONI OPERATIVE ===
+
+// NUOVA FUNZIONE PER IL CALENDARIO
+async function renderFullCalendar() {
+    const pageContainer = document.querySelector('[data-page="calendar"]');
+    if (!pageContainer) return;
+
+    // Evita di renderizzare nuovamente il calendario se è già presente
+    if (pageContainer.querySelector('#cal')) return;
+    
+    const isPro = S.user && S.user.role === 'pro';
+
+    pageContainer.innerHTML = `
+        <h1>📅 Calendario</h1>
+        ${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        <div class="card">
+            <div class="toolbar" style="padding: 10px; display: flex; gap: 10px; justify-content: flex-end;">
+              <button id="btnPush" class="btn">🔔 Abilita notifiche</button>
+              <button id="btnNew" class="btn">＋ Nuovo Evento</button>
+            </div>
+            <div id="cal" style="height: calc(100vh - 250px); padding: 10px;"></div>
+        </div>
+    `;
+
+    // Aggiungo il listener per l'upgrade qui, perché il bottone viene creato dinamicamente
+    const upgradeBtn3 = document.getElementById('upgradeBtn3');
+    if(upgradeBtn3) upgradeBtn3.onclick = showUpgradeModal;
+
+    const calEl = document.getElementById('cal');
+    const calendar = new FullCalendar.Calendar(calEl, {
+        initialView: 'dayGridMonth',
+        locale: 'it', // Imposta la lingua italiana
+        headerToolbar: { 
+            left: 'prev,next today', 
+            center: 'title', 
+            right: 'dayGridMonth,timeGridWeek,timeGridDay' 
+        },
+        buttonText: { // Traduzioni dei bottoni
+            today:    'Oggi',
+            month:    'Mese',
+            week:     'Settimana',
+            day:      'Giorno'
+        },
+        selectable: true,
+        editable: true,
+        // CREAZIONE EVENTO (cliccando su una data)
+        select: async (info) => {
+            const title = prompt('Titolo evento:'); 
+            if (!title) return;
+            
+            await fetch('api/calendar.php', { 
+                method:'POST', 
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ 
+                    title, 
+                    start: info.startStr, 
+                    end: info.endStr, 
+                    allDay: info.allDay, 
+                    reminders:[] // Esempio: [2880] = 2 giorni prima
+                })
+            });
+            calendar.refetchEvents();
+        },
+        // SPOSTAMENTO EVENTO (drag & drop)
+        eventDrop: async (info) => {
+            await fetch(`api/calendar.php?id=${info.event.id}`, { 
+                method:'PATCH', 
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ 
+                    start: info.event.start?.toISOString(), 
+                    end: info.event.end?.toISOString(), 
+                    allDay: info.event.allDay 
+                }) 
+            });
+        },
+        // RIDIMENSIONAMENTO EVENTO
+        eventResize: async (info) => {
+            await fetch(`api/calendar.php?id=${info.event.id}`, { 
+                method:'PATCH', 
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ end: info.event.end?.toISOString() }) 
+            });
+        },
+        // ELIMINAZIONE EVENTO (cliccando sull'evento)
+        eventClick: async (info) => {
+            if (confirm(`Vuoi eliminare l'evento "${info.event.title}"?`)) {
+                await fetch(`api/calendar.php?id=${info.event.id}`, { method: 'DELETE' });
+                calendar.refetchEvents();
+            }
+        },
+        events: { 
+            url: 'api/calendar.php', 
+            method: 'GET' 
+        }
+    });
+    calendar.render();
+
+    // Listener per i bottoni custom
+    document.getElementById('btnPush')?.addEventListener('click', () => window.gm_enablePush && window.gm_enablePush());
+    document.getElementById('btnNew')?.addEventListener('click', async () => {
+        const title = prompt('Titolo evento:'); 
+        if (!title) return;
+        const start = new Date(); 
+        const end = new Date(start.getTime() + 60 * 60 * 1000); // Default 1 ora dopo
+        await fetch('api/calendar.php', { 
+            method:'POST', 
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ 
+                title, 
+                start: start.toISOString(), 
+                end: end.toISOString(), 
+                reminders:[] 
+            }) 
+        });
+        calendar.refetchEvents();
+    });
+}
+
+
 async function loadCategories(){
   const r = await api('api/categories.php?a=list');
   if(!r.success) return;
@@ -1179,59 +1277,7 @@ function addMessageToLog(answer, type, question) {
   log.insertBefore(item, log.firstChild);
 }
 
-async function loadEvents(){
-  const r = await api('api/calendar.php?a=list');
-  if(!r.success) return;
-
-  const tb = document.querySelector('#evTable tbody');
-  if(tb){
-    let html = '';
-    r.data.forEach(e => {
-      html += '<tr>' +
-        '<td>' + new Date(e.start).toLocaleString('it-IT') + '</td>' +
-        '<td>' + e.title + '</td>' +
-        '<td><button class="btn del" data-id="' + e.id + '">Elimina</button></td>' +
-        '</tr>';
-    });
-    tb.innerHTML = html;
-    tb.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>delEvent(b.dataset.id));
-  }
-}
-
-async function createEvent(){
-  const evTitle = document.getElementById('evTitle');
-  const evStart = document.getElementById('evStart');
-  const evEnd = document.getElementById('evEnd');
-
-  if(!evTitle.value || !evStart.value){
-    alert('Inserisci almeno titolo e data inizio');
-    return;
-  }
-
-  const fd = new FormData();
-  fd.append('title', evTitle.value);
-  fd.append('starts_at', evStart.value);
-  fd.append('ends_at', evEnd.value);
-
-  const r = await api('api/calendar.php?a=create', fd);
-
-  if(r.success){
-    loadEvents();
-    evTitle.value = '';
-    evStart.value = '';
-    evEnd.value = '';
-  } else {
-    alert(r.message || 'Errore');
-  }
-}
-
-async function delEvent(id){
-  if(!confirm('Eliminare questo evento?')) return;
-  const fd = new FormData();
-  fd.append('id', id);
-  const r = await api('api/calendar.php?a=delete', fd);
-  if(r.success) loadEvents();
-}
+// FUNZIONI DEL VECCHIO CALENDARIO RIMOSSE (loadEvents, createEvent, delEvent)
 
 async function loadAccountInfo(){
   const r = await api('api/account.php?a=info');
@@ -1280,7 +1326,6 @@ async function activateProFromPage(){
     success.classList.remove('hidden');
     setTimeout(()=>{
       S.user.role = 'pro';
-      // MODIFICATO (FACOLTATIVO): Aggiorna LS dopo upgrade
       localStorage.setItem(LS_USER_KEY, JSON.stringify(S.user));
       render();
       setTimeout(() => {
@@ -1313,7 +1358,6 @@ async function doDowngrade(){
   if(r.success){
     alert('✓ ' + r.message);
     S.user.role = 'free';
-    // MODIFICATO (FACOLTATIVO): Aggiorna LS dopo downgrade
     localStorage.setItem(LS_USER_KEY, JSON.stringify(S.user));
     render();
   } else {
@@ -1337,7 +1381,6 @@ async function doDeleteAccount(){
 
   if(r.success){
     alert('Account eliminato. Arrivederci.');
-    // MODIFICATO: Pulisci localStorage all'eliminazione
     localStorage.removeItem(LS_USER_KEY);
     localStorage.removeItem(LS_ROUTE_KEY);
     S.user = null;

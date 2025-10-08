@@ -286,61 +286,39 @@ function organizeDocsModal() {
 // FUNZIONE UNICA PER LE CHIAMATE API
 // ===================================================
 async function api(url, body = null) {
-    const method = body ? 'POST' : 'GET';
     const opts = {
-        method,
+        method: body ? 'POST' : 'GET',
         credentials: 'same-origin',
         headers: {}
     };
-
     if (body) {
         if (body instanceof FormData) {
             opts.body = body;
-            // Per FormData, il browser imposta Content-Type automaticamente con il boundary corretto.
-            // Non impostarlo manualmente.
         } else {
-            // Altrimenti, si presume sia JSON
             opts.headers['Content-Type'] = 'application/json';
             opts.body = JSON.stringify(body);
         }
     }
-
     try {
         const res = await fetch(url, opts);
-
         if (res.status === 401) {
-            console.warn('⚠️ Non sei loggato, redirect a login...');
+            console.warn('⚠️ Sessione scaduta');
             S.view = 'login';
             S.user = null;
-            localStorage.removeItem(LS_USER_KEY);
-            localStorage.removeItem(LS_ROUTE_KEY);
+            localStorage.clear();
             render();
-            // Non serve location.hash, render() gestisce la vista
             throw new Error('AUTH');
         }
-
         const ct = res.headers.get('content-type') || '';
         if (ct.includes('application/json')) {
-            const data = await res.json();
-            if (!res.ok) {
-                // Se la risposta JSON contiene un messaggio di errore, mostralo
-                alert(data.message || 'Errore API');
-            }
-            return data;
-        } else {
-            const textData = await res.text();
-             if (!res.ok) {
-                alert(textData || 'Errore API');
-            }
-            return textData;
+            return await res.json();
         }
-
+        return await res.text();
     } catch (e) {
         if (e.message !== 'AUTH') {
-            console.error('Errore di rete o fetch fallita', e);
-            alert('Errore di connessione. Controlla la tua rete.');
+            console.error('Errore:', e);
+            alert('Errore di connessione');
         }
-        // Rilancia l'errore per interrompere l'esecuzione nella funzione chiamante
         throw e;
     }
 }
@@ -420,7 +398,7 @@ function bind() {
     if (S.view === 'app') {
         document.getElementById('logoutBtn')?.addEventListener('click', async () => {
             try {
-                await api('api/auth.php?a=logout', 'POST');
+                await api('api/auth.php?a=logout', {}); // Pass an empty object for POST
             } catch (e) {
                 console.error("Logout fallito ma procedo con la pulizia del client", e);
             } finally {
@@ -478,7 +456,7 @@ function bind() {
         document.getElementById('uploadBtn')?.addEventListener('click', uploadFile);
         document.getElementById('askDocsBtn')?.addEventListener('click', askDocs);
         document.getElementById('askAIBtn')?.addEventListener('click', askAI);
-        document.getElementById('addCategoryBtn')?.addEventListener('click', createCategory);
+        document.getElementById('addCategoryBtn')?.addEventListener('click', createCategoryFromDashboard);
         document.getElementById('organizeDocsBtn')?.addEventListener('click', showOrganizeModal);
         document.getElementById('filterCategory')?.addEventListener('change', (e) => { S.filterCategory = e.target.value; renderDocsTable(); });
 
@@ -523,7 +501,7 @@ async function calendarView() {
             const title = prompt('Titolo evento:');
             if (!title) return;
             try {
-                await api('api/calendar.php', 'POST', {
+                await api('api/calendar.php', {
                     title,
                     start: info.startStr,
                     end: info.endStr,
@@ -536,7 +514,7 @@ async function calendarView() {
         
         eventDrop: async (info) => {
             try {
-                await api(`api/calendar.php?id=${info.event.id}`, 'PATCH', {
+                await api(`api/calendar.php?id=${info.event.id}`, {
                     start: info.event.start?.toISOString(),
                     end: info.event.end?.toISOString(),
                     allDay: info.event.allDay
@@ -546,7 +524,7 @@ async function calendarView() {
         
         eventResize: async (info) => {
              try {
-                await api(`api/calendar.php?id=${info.event.id}`, 'PATCH', {
+                await api(`api/calendar.php?id=${info.event.id}`, {
                     end: info.event.end?.toISOString()
                 });
             } catch (e) { console.error('Ridimensionamento evento fallito', e); info.revert(); }
@@ -555,7 +533,7 @@ async function calendarView() {
         eventClick: async (info) => {
             if (confirm(`Vuoi eliminare l'evento "${info.event.title}"?`)) {
                  try {
-                    await api(`api/calendar.php?id=${info.event.id}`, 'DELETE');
+                    await api(`api/calendar.php?id=${info.event.id}`, {});
                     calendar.refetchEvents();
                 } catch (e) { console.error('Eliminazione evento fallita', e); }
             }
@@ -571,7 +549,7 @@ async function calendarView() {
         const start = new Date();
         const end = new Date(start.getTime() + 60 * 60 * 1000);
         try {
-            await api('api/calendar.php', 'POST', {
+            await api('api/calendar.php', {
                 title,
                 start: start.toISOString(),
                 end: end.toISOString(),
@@ -688,7 +666,7 @@ function showUpgradeModal() {
     if (document.getElementById('upgradeModal')) return;
     document.body.insertAdjacentHTML('beforeend', upgradeModal());
     document.getElementById('closeModal').onclick = () => document.getElementById('upgradeModal').remove();
-    document.getElementById('activateBtn').onclick = activatePro;
+    document.getElementById('activateBtn').onclick = activateProFromModal;
 }
 
 function showOrganizeModal() {
@@ -812,7 +790,10 @@ async function loadStats() {
 }
 
 function updateChatCounter() {
-    document.getElementById('qCountChat').textContent = S.stats.chatToday || 0;
+    const qCountChat = document.getElementById('qCountChat');
+    if (qCountChat && S.stats) {
+        qCountChat.textContent = S.stats.chatToday || 0;
+    }
 }
 
 async function doLogin() {
@@ -1188,7 +1169,7 @@ async function doDowngrade() {
     btn.innerHTML = 'Downgrade... <span class="loader"></span>';
 
     try {
-        const r = await api('api/account.php?a=downgrade', 'POST');
+        const r = await api('api/account.php?a=downgrade', {}); // Pass empty object for POST
         if (r.success) {
             alert('✓ ' + r.message);
             S.user.role = 'free';
@@ -1217,7 +1198,7 @@ async function doDeleteAccount() {
     btn.innerHTML = 'Eliminazione... <span class="loader"></span>';
 
     try {
-        await api('api/account.php?a=delete', 'POST');
+        await api('api/account.php?a=delete', {}); // Pass empty object for POST
         alert('Account eliminato. Arrivederci.');
         S.user = null; S.view = 'login';
         localStorage.clear();

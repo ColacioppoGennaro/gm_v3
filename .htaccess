@@ -19,3 +19,55 @@ RewriteRule (^|/)yarn\.lock$ - [F,L]
 <FilesMatch "^(\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|yarn\.lock)$">
   Require all denied
 </FilesMatch>
+
+# ===== CONFIGURAZIONE PHP PER SESSIONI =====
+<IfModule mod_php.c>
+  # Configurazione sessioni PHP
+  php_flag session.cookie_httponly On
+  php_value session.cookie_samesite Lax
+  php_flag session.use_strict_mode On
+  php_value session.gc_maxlifetime 86400
+  php_value session.cookie_lifetime 0
+  
+  # Limiti upload
+  php_value upload_max_filesize 150M
+  php_value post_max_size 150M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
+
+# ===== HEADERS DI SICUREZZA =====
+<IfModule mod_headers.c>
+  # Previeni clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+  
+  # Previeni MIME sniffing
+  Header always set X-Content-Type-Options "nosniff"
+  
+  # XSS Protection (legacy browsers)
+  Header always set X-XSS-Protection "1; mode=block"
+  
+  # Referrer Policy
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  
+  # Permetti solo risorse dallo stesso origin (modifica se usi CDN)
+  Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com"
+</IfModule>
+
+# ===== COMPRESSIONE GZIP =====
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ===== CACHE STATICO =====
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>

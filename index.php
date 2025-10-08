@@ -10,7 +10,7 @@ require_once __DIR__.'/_core/helpers.php';
 <html lang="it">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width-device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>gm_v3 - Assistente AI</title>
 <link rel="manifest" href="assets/manifest.webmanifest">
 <meta name="theme-color" content="#111827"/>

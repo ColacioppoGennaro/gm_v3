@@ -10,14 +10,14 @@ require_once __DIR__.'/_core/helpers.php';
 <html lang="it">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width-device-width,initial-scale=1"/>
 <title>gm_v3 - Assistente AI</title>
 <link rel="manifest" href="assets/manifest.webmanifest">
 <meta name="theme-color" content="#111827"/>
 
-<!-- FullCalendar CSS e JS (caricato prima) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<!-- FullCalendar CSS e JS (caricato da unpkg) -->
+<link rel="stylesheet" href="https://unpkg.com/fullcalendar@6.1.15/index.global.min.css">
+<script src="https://unpkg.com/fullcalendar@6.1.15/index.global.min.js"></script>
 
 <!-- CSS dell'applicazione -->
 <link rel="stylesheet" href="assets/css/app.css">
@@ -41,3 +41,4 @@ require_once __DIR__.'/_core/helpers.php';
 
 </body>
 </html>
+

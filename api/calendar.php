@@ -3,6 +3,8 @@
 
 require_once __DIR__.'/../_core/helpers.php';
 
+require_login();
+
 session_start();
 
 // Nota: Assicurati che questo sia il modo corretto per ottenere l'ID dell'utente.
@@ -58,7 +60,7 @@ if ($method === 'GET') {
   $end = req('end');     // Fine dell'intervallo di date (formato ISO)
 
   $stmt = $db->prepare("SELECT id, title, description, starts_at, ends_at, all_day, color, rrule, reminders
-                        FROM events WHERE user_id=? AND starts_at < ? AND (ends_at IS NULL OR ends_at >= ?)");
+                          FROM events WHERE user_id=? AND starts_at < ? AND (ends_at IS NULL OR ends_at >= ?)");
   $stmt->bind_param('iss', $user_id, $end, $start);
   $stmt->execute(); 
   $res = $stmt->get_result();
@@ -91,7 +93,7 @@ if ($method === 'POST') {
   $rem = isset($in['reminders']) ? json_encode($in['reminders']) : '[]';
 
   $stmt = $db->prepare("INSERT INTO events(user_id, title, description, starts_at, ends_at, all_day, color, rrule, reminders, source)
-                        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'ui')");
+                         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'ui')");
   $stmt->bind_param('issssisss', $user_id, $in['title'], $in['description'], $in['start'], $in['end'], $in['allDay'], $in['color'], $in['rrule'], $rem);
   $stmt->execute();
 

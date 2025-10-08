@@ -459,12 +459,13 @@ function bind() {
     }
 }
 
+// SOSTITUISCI LA FUNZIONE calendarView() IN ui.js CON QUESTA
 async function calendarView() {
     const pageContainer = document.querySelector('[data-page="calendar"]');
     if (!pageContainer || pageContainer.querySelector('#cal')) return;
-
     const isPro = S.user && S.user.role === 'pro';
-    pageContainer.innerHTML = `<h1>📅 Calendario</h1>
+    pageContainer.innerHTML = `
+        <h1>📅 Calendario</h1>
         ${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
         <div class="card">
             <div class="toolbar" style="padding: 10px; display: flex; gap: 10px; justify-content: flex-end;">
@@ -472,61 +473,195 @@ async function calendarView() {
                 <button id="btnNew" class="btn">＋ Nuovo Evento</button>
             </div>
             <div id="cal" style="height: calc(100vh - 250px); padding: 10px;"></div>
-        </div>`;
-
+        </div>
+    `;
     document.getElementById('upgradeBtn3')?.addEventListener('click', showUpgradeModal);
-
     const calEl = document.getElementById('cal');
+    
+    // CONFIGURAZIONE FULLCALENDAR CON INTEGRAZIONE CORRETTA
     const calendar = new FullCalendar.Calendar(calEl, {
         initialView: 'dayGridMonth',
         locale: 'it',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
-        buttonText: { today: 'Oggi', month: 'Mese', week: 'Settimana', day: 'Giorno' },
+        headerToolbar: { 
+            left: 'prev,next today', 
+            center: 'title', 
+            right: 'dayGridMonth,timeGridWeek,timeGridDay' 
+        },
+        buttonText: { 
+            today: 'Oggi', 
+            month: 'Mese', 
+            week: 'Settimana', 
+            day: 'Giorno' 
+        },
         selectable: true,
         editable: true,
-        events: { url: 'api/calendar.php', method: 'GET' },
         
+        // CARICAMENTO EVENTI - USA LA NOSTRA FUNZIONE api()
+        events: async (info, successCallback, failureCallback) => {
+            try {
+                const start = encodeURIComponent(info.startStr);
+                const end = encodeURIComponent(info.endStr);
+                const url = `api/calendar.php?start=${start}&end=${end}`;
+                
+                console.log('📅 Caricamento eventi calendario:', url);
+                const events = await api(url);
+                
+                console.log('✅ Eventi ricevuti:', events);
+                successCallback(events);
+            } catch (e) {
+                console.error('❌ Errore caricamento eventi:', e);
+                if (e.message !== 'AUTH') {
+                    alert('Errore nel caricamento degli eventi');
+                }
+                failureCallback(e);
+            }
+        },
+        
+        // SELEZIONE NUOVA DATA (click e drag)
         select: async (info) => {
             const title = prompt('Titolo evento:');
-            if (!title) return;
+            if (!title || title.trim() === '') {
+                calendar.unselect();
+                return;
+            }
+            
             try {
-                await api('api/calendar.php', { title, start: info.startStr, end: info.endStr, allDay: info.allDay, reminders: [2880] });
+                console.log('📝 Creazione evento:', title);
+                
+                const eventData = {
+                    title: title.trim(),
+                    start: info.startStr,
+                    end: info.endStr,
+                    allDay: info.allDay,
+                    reminders: [2880]
+                };
+                
+                const result = await api('api/calendar.php', eventData);
+                
+                console.log('✅ Evento creato:', result);
                 calendar.refetchEvents();
-            } catch (e) { console.error('Creazione evento fallita', e); }
+                calendar.unselect();
+            } catch (e) {
+                console.error('❌ Errore creazione evento:', e);
+                if (e.message !== 'AUTH') {
+                    alert('Errore nella creazione dell\'evento');
+                }
+                calendar.unselect();
+            }
         },
+        
+        // SPOSTAMENTO EVENTO (drag&drop)
         eventDrop: async (info) => {
             try {
-                await api(`api/calendar.php?id=${info.event.id}`, { start: info.event.start?.toISOString(), end: info.event.end?.toISOString(), allDay: info.event.allDay });
-            } catch (e) { console.error('Spostamento evento fallito', e); info.revert(); }
+                console.log('🔄 Spostamento evento:', info.event.id);
+                
+                const updateData = {
+                    start: info.event.start?.toISOString(),
+                    end: info.event.end?.toISOString(),
+                    allDay: info.event.allDay
+                };
+                
+                await api(`api/calendar.php?id=${info.event.id}`, updateData);
+                
+                console.log('✅ Evento spostato');
+            } catch (e) {
+                console.error('❌ Errore spostamento evento:', e);
+                info.revert();
+                if (e.message !== 'AUTH') {
+                    alert('Errore nello spostamento dell\'evento');
+                }
+            }
         },
+        
+        // RIDIMENSIONAMENTO EVENTO
         eventResize: async (info) => {
-             try {
-                await api(`api/calendar.php?id=${info.event.id}`, { end: info.event.end?.toISOString() });
-            } catch (e) { console.error('Ridimensionamento evento fallito', e); info.revert(); }
+            try {
+                console.log('↔️ Ridimensionamento evento:', info.event.id);
+                
+                const updateData = {
+                    end: info.event.end?.toISOString()
+                };
+                
+                await api(`api/calendar.php?id=${info.event.id}`, updateData);
+                
+                console.log('✅ Evento ridimensionato');
+            } catch (e) {
+                console.error('❌ Errore ridimensionamento evento:', e);
+                info.revert();
+                if (e.message !== 'AUTH') {
+                    alert('Errore nel ridimensionamento dell\'evento');
+                }
+            }
         },
+        
+        // CLICK SU EVENTO (per eliminare)
         eventClick: async (info) => {
             if (confirm(`Vuoi eliminare l'evento "${info.event.title}"?`)) {
-                 try {
-                    await api(`api/calendar.php?id=${info.event.id}`, {});
+                try {
+                    console.log('🗑️ Eliminazione evento:', info.event.id);
+                    
+                    // Usa la funzione DELETE tramite api modificata
+                    await fetch(`api/calendar.php?id=${info.event.id}`, {
+                        method: 'DELETE',
+                        credentials: 'same-origin'
+                    });
+                    
+                    console.log('✅ Evento eliminato');
                     calendar.refetchEvents();
-                } catch (e) { console.error('Eliminazione evento fallita', e); }
+                } catch (e) {
+                    console.error('❌ Errore eliminazione evento:', e);
+                    if (e.message !== 'AUTH') {
+                        alert('Errore nell\'eliminazione dell\'evento');
+                    }
+                }
             }
         }
     });
+    
     calendar.render();
-
-    document.getElementById('btnPush')?.addEventListener('click', () => window.gm_enablePush?.());
+    console.log('✅ Calendario renderizzato');
+    
+    // BOTTONE NOTIFICHE PUSH
+    document.getElementById('btnPush')?.addEventListener('click', () => {
+        if (window.gm_enablePush) {
+            window.gm_enablePush();
+        } else {
+            alert('Notifiche push non disponibili');
+        }
+    });
+    
+    // BOTTONE NUOVO EVENTO
     document.getElementById('btnNew')?.addEventListener('click', async () => {
         const title = prompt('Titolo evento:');
-        if (!title) return;
+        if (!title || title.trim() === '') return;
+        
         const start = new Date();
-        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 ora
+        
         try {
-            await api('api/calendar.php', { title, start: start.toISOString(), end: end.toISOString(), reminders: [] });
+            console.log('📝 Creazione evento manuale:', title);
+            
+            const eventData = {
+                title: title.trim(),
+                start: start.toISOString(),
+                end: end.toISOString(),
+                allDay: false,
+                reminders: []
+            };
+            
+            await api('api/calendar.php', eventData);
+            
+            console.log('✅ Evento manuale creato');
             calendar.refetchEvents();
-        } catch(e) { console.error("Creazione nuovo evento fallita", e); }
+        } catch(e) {
+            console.error('❌ Errore creazione evento manuale:', e);
+            if (e.message !== 'AUTH') {
+                alert('Errore nella creazione dell\'evento');
+            }
+        }
     });
 }
+// Esporta globalmente
 window.calendarView = calendarView;
 window.renderFullCalendar = calendarView;
 

@@ -7,7 +7,8 @@ $user = user();
 $action = $_GET['a'] ?? '';
 
 if ($action === 'list') {
-    $st = db()->prepare("SELECT id, name, docanalyzer_label_id, created_at FROM labels WHERE user_id=? AND name != 'master' ORDER BY name ASC");
+    $db = db();
+    $st = $db->prepare("SELECT id, name, docanalyzer_label_id, created_at FROM labels WHERE user_id=? AND name != 'master' ORDER BY name ASC");
     $st->execute([$user['id']]);
     $data = $st->fetchAll(PDO::FETCH_ASSOC);
 
@@ -16,6 +17,7 @@ if ($action === 'list') {
 }
 elseif ($action === 'create') {
     $name = trim($_POST['name'] ?? '');
+    $db = db();
 
     if (!$name) {
         ob_end_clean();
@@ -28,7 +30,7 @@ elseif ($action === 'create') {
     }
 
     // Verifica che non esista già
-    $st = db()->prepare("SELECT id FROM labels WHERE user_id=? AND name=?");
+    $st = $db->prepare("SELECT id FROM labels WHERE user_id=? AND name=?");
     $st->execute([$user['id'], $name]);
     if ($st->fetch(PDO::FETCH_ASSOC)) {
         ob_end_clean();
@@ -70,10 +72,10 @@ elseif ($action === 'create') {
     }
 
     // Inserisci nel DB locale
-    $st = db()->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?,?,?)");
+    $st = $db->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?,?,?)");
     $st->execute([$user['id'], $name, $docanalyzer_label_id]);
 
-    $newId = db()->lastInsertId();
+    $newId = $db->lastInsertId();
     error_log("Label created in DB: id=$newId");
 
     ob_end_clean();
@@ -81,13 +83,15 @@ elseif ($action === 'create') {
 }
 elseif ($action === 'delete') {
     $id = intval($_POST['id'] ?? 0);
+    $db = db();
+
     if (!$id) {
         ob_end_clean();
         json_out(['success' => false, 'message' => 'ID categoria mancante'], 400);
     }
 
     // Verifica che la label esista e sia dell'utente
-    $st = db()->prepare("SELECT id, docanalyzer_label_id FROM labels WHERE id=? AND user_id=?");
+    $st = $db->prepare("SELECT id, docanalyzer_label_id FROM labels WHERE id=? AND user_id=?");
     $st->execute([$id, $user['id']]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -106,7 +110,7 @@ elseif ($action === 'delete') {
     }
 
     // Elimina dal DB locale
-    $st = db()->prepare("DELETE FROM labels WHERE id=? AND user_id=?");
+    $st = $db->prepare("DELETE FROM labels WHERE id=? AND user_id=?");
     $st->execute([$id, $user['id']]);
 
     ob_end_clean();

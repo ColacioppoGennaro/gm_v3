@@ -2,15 +2,7 @@
 /**
  * _core/helpers.php
  * 
- * Funzioni helper globali per gm_v3:
- * - env_get(): Carica e legge variabili .env
- * - db(): Connessione database MySQL (RIMOSSA)
- * - json_out(): Output JSON standard
- * - require_login(), user(), is_pro(), is_admin(): Gestione autenticazione
- * - ratelimit(): Rate limiting semplice
- * - hash_password(), verify_password(): Gestione password
- * - shouldRecommendOCR(), pdfHasTextLayer(): Logica OCR per documenti
- * - ensure_ocr_table(): Auto-creazione tabella ocr_logs
+ * Funzioni helper globali per gm_v3
  */
 
 // Legge .env una sola volta, con gestione BOM/virgolette e commenti
@@ -47,6 +39,39 @@ function env_get($key, $default = null) {
     return array_key_exists($key, $E) ? $E[$key] : $default;
 }
 
+// ✅ FUNZIONE DB RIPRISTINATA CON PDO
+function db() {
+    static $pdo = null;
+    if ($pdo === null) {
+        $host = env_get('DB_HOST', '127.0.0.1');
+        $name = env_get('DB_NAME', 'ywrloefq_gm_v3');
+        $user = env_get('DB_USER', 'ywrloefq_gm_user');
+        $pass = env_get('DB_PASS', '77453209**--Gm');
+        $charset = env_get('DB_CHARSET', 'utf8mb4');
+
+        // Rimuovi virgolette dalla password se presenti
+        if ($pass && $pass[0] === '"' && substr($pass, -1) === '"') {
+            $pass = substr($pass, 1, -1);
+        }
+
+        $dsn = "mysql:host=$host;dbname=$name;charset=$charset";
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+        
+        try {
+            $pdo = new PDO($dsn, $user, $pass, $options);
+        } catch (PDOException $e) {
+            error_log("DB connection failed: " . $e->getMessage());
+            http_response_code(500);
+            die(json_encode(['success' => false, 'message' => 'Database connection error']));
+        }
+    }
+    return $pdo;
+}
+
 function json_out($a, $code = 200) {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
@@ -55,36 +80,60 @@ function json_out($a, $code = 200) {
 }
 
 function require_login() {
-    if (!isset($_SESSION['user_id'])) json_out(['success' => false, 'message' => 'Accesso negato'], 401);
+    if (!isset($_SESSION['user_id'])) {
+        json_out(['success' => false, 'message' => 'Accesso negato'], 401);
+    }
 }
-function user() { return ['id' => $_SESSION['user_id'] ?? null, 'role' => $_SESSION['role'] ?? 'free', 'email' => $_SESSION['email'] ?? null]; }
-function is_pro() { return (user()['role'] ?? 'free') === 'pro'; }
-function is_admin() { return (user()['role'] ?? 'free') === 'admin'; }
+
+function user() { 
+    return [
+        'id' => $_SESSION['user_id'] ?? null, 
+        'role' => $_SESSION['role'] ?? 'free', 
+        'email' => $_SESSION['email'] ?? null
+    ]; 
+}
+
+function is_pro() { 
+    return (user()['role'] ?? 'free') === 'pro'; 
+}
+
+function is_admin() { 
+    return (user()['role'] ?? 'free') === 'admin'; 
+}
 
 function ratelimit($key, $limit, $window = 60) {
     $file = sys_get_temp_dir() . "/gmv3_rl_" . md5($key);
     $data = ['count' => 0, 'until' => time() + $window];
-    if (file_exists($file)) $data = json_decode(file_get_contents($file), true) ?: $data;
-    if (time() > ($data['until'] ?? 0)) $data = ['count' => 0, 'until' => time() + $window];
+    if (file_exists($file)) {
+        $data = json_decode(file_get_contents($file), true) ?: $data;
+    }
+    if (time() > ($data['until'] ?? 0)) {
+        $data = ['count' => 0, 'until' => time() + $window];
+    }
     $data['count']++;
     file_put_contents($file, json_encode($data));
-    if ($data['count'] > $limit) json_out(['success' => false, 'message' => 'Troppi tentativi, riprova tra poco']);
+    if ($data['count'] > $limit) {
+        json_out(['success' => false, 'message' => 'Troppi tentativi, riprova tra poco'], 429);
+    }
 }
-function hash_password($p){ return password_hash($p, PASSWORD_BCRYPT); }
-function verify_password($p,$h){ return password_verify($p,$h); }
+
+function hash_password($p) { 
+    return password_hash($p, PASSWORD_BCRYPT); 
+}
+
+function verify_password($p, $h) { 
+    return password_verify($p, $h); 
+}
 
 function shouldRecommendOCR($filePath, $mime) {
-    // Solo per PDF e immagini
     if (!in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'])) {
         return false;
     }
     
-    // Per immagini: sempre consigliato
     if (strpos($mime, 'image/') === 0) {
         return true;
     }
     
-    // Per PDF: controlla text layer
     if ($mime === 'application/pdf') {
         return !pdfHasTextLayer($filePath);
     }
@@ -96,13 +145,9 @@ function pdfHasTextLayer($filePath) {
     if (!file_exists($filePath)) return false;
     
     try {
-        // Leggi primi 50KB del PDF
         $content = file_get_contents($filePath, false, null, 0, 51200);
-        
-        // Cerca stringhe ASCII lunghe (testo estratto)
         $textMatches = preg_match_all('/[\x20-\x7E]{50,}/', $content, $matches);
         
-        // Se trova >200 caratteri ASCII consecutivi → ha testo
         if ($textMatches > 0) {
             $totalChars = array_sum(array_map('strlen', $matches[0]));
             return $totalChars > 200;
@@ -111,7 +156,7 @@ function pdfHasTextLayer($filePath) {
         return false;
     } catch (\Throwable $e) {
         error_log("PDF text check failed: " . $e->getMessage());
-        return false; // default: consiglia OCR
+        return false;
     }
 }
 
@@ -119,23 +164,22 @@ function ensure_ocr_table() {
     static $checked = false;
     if ($checked) return;
     
-    // Questa funzione ora necessita di un'istanza DB passata come argomento
-    // Esempio di modifica: function ensure_ocr_table($db_connection) { ... }
-    // Poiché db() è stato rimosso, il codice qui sotto non funzionerà più
-    // e dovrà essere adattato dove viene chiamato.
-    /*
-    db()->query("
-        CREATE TABLE IF NOT EXISTS ocr_logs(
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NOT NULL,
-          document_id INT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_user(user_id),
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-    */
+    try {
+        $pdo = db();
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS ocr_logs(
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              user_id INT NOT NULL,
+              document_id INT NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              INDEX idx_user(user_id),
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+              FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (PDOException $e) {
+        error_log("OCR table creation failed: " . $e->getMessage());
+    }
     
     $checked = true;
 }

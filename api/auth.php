@@ -2,6 +2,7 @@
 /**
  * api/auth.php
  * Gestisce autenticazione: status, login, register, logout.
+ * ✅ CONVERTITO A PDO
  */
 
 // Configurazione sessione PRIMA di session_start()
@@ -20,16 +21,16 @@ header('Content-Type: application/json; charset=utf-8');
 $action = $_GET['a'] ?? '';
 
 try {
+    $db = db(); // ✅ Ottieni connessione PDO
+    
     if ($action === 'status') {
         $user_id = $_SESSION['user_id'] ?? null;
         
         if ($user_id) {
-            $st = db()->prepare("SELECT email, role FROM users WHERE id=?");
-            $st->bind_param("i", $user_id);
-            $st->execute();
-            $r = $st->get_result();
+            $st = $db->prepare("SELECT email, role FROM users WHERE id=?");
+            $st->execute([$user_id]);
             
-            if ($row = $r->fetch_assoc()) {
+            if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
                 ob_end_clean();
                 echo json_encode([
                     'success' => true,
@@ -63,12 +64,10 @@ try {
         // Rate limiting
         ratelimit("login_$email", 5, 300);
         
-        $st = db()->prepare("SELECT id, email, pass_hash, role FROM users WHERE email=?");
-        $st->bind_param("s", $email);
-        $st->execute();
-        $r = $st->get_result();
+        $st = $db->prepare("SELECT id, email, pass_hash, role FROM users WHERE email=?");
+        $st->execute([$email]);
         
-        if (!($row = $r->fetch_assoc())) {
+        if (!($row = $st->fetch(PDO::FETCH_ASSOC))) {
             ob_end_clean();
             http_response_code(401);
             echo json_encode(['success' => false, 'message' => 'Credenziali non valide']);
@@ -126,10 +125,9 @@ try {
         }
         
         // Verifica se email già esiste
-        $st = db()->prepare("SELECT id FROM users WHERE email=?");
-        $st->bind_param("s", $email);
-        $st->execute();
-        if ($st->get_result()->num_rows > 0) {
+        $st = $db->prepare("SELECT id FROM users WHERE email=?");
+        $st->execute([$email]);
+        if ($st->fetch(PDO::FETCH_ASSOC)) {
             ob_end_clean();
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Email già registrata']);
@@ -138,16 +136,14 @@ try {
         
         // Crea utente
         $hash = hash_password($password);
-        $st = db()->prepare("INSERT INTO users(email, pass_hash, role) VALUES(?, ?, 'free')");
-        $st->bind_param("ss", $email, $hash);
-        $st->execute();
-        $userId = db()->insert_id;
+        $st = $db->prepare("INSERT INTO users(email, pass_hash, role) VALUES(?, ?, 'free')");
+        $st->execute([$email, $hash]);
+        $userId = $db->lastInsertId();
         
         // Crea label master per l'utente
         $masterLabelId = 'user_' . $userId . '_master';
-        $st = db()->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?, 'master', ?)");
-        $st->bind_param("is", $userId, $masterLabelId);
-        $st->execute();
+        $st = $db->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?, 'master', ?)");
+        $st->execute([$userId, $masterLabelId]);
         
         error_log("Registration successful: user_id=$userId, email=$email");
         
@@ -185,6 +181,7 @@ try {
 } catch (Throwable $e) {
     ob_end_clean();
     error_log("Auth API Error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Errore server']);
+    echo json_encode(['success' => false, 'message' => 'Errore server: ' . $e->getMessage()]);
 }

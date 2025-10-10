@@ -1,13 +1,11 @@
 <?php
-// /gm_v3/api/diag.php
-header('Content-Type: application/json');
+// Diagnostica ambiente e DB
 
-// --- robust loader .env (niente parse_ini_file) ---
-function load_env_loose($file){
-    if (!is_file($file)) return ['used'=>false,'path'=>$file,'error'=>'not_found'];
+function load_env_loose($file) {
+    if (!is_readable($file)) return ['used'=>false,'path'=>$file,'error'=>'File non leggibile'];
     $raw = file_get_contents($file);
-    // rimuovi BOM eventuale
-    if (substr($raw,0,3) === "\xEF\xBB\xBF") $raw = substr($raw,3);
+    // rimuovi BOM se presente
+    if (substr($raw, 0, 3) === "\xEF\xBB\xBF") $raw = substr($raw, 3);
     $lines = preg_split("/\r\n|\n|\r/", $raw);
     foreach ($lines as $line){
         $line = trim($line);
@@ -29,7 +27,8 @@ function load_env_loose($file){
 $report = [];
 $report['php_version'] = PHP_VERSION;
 $report['extensions'] = [
-    'mysqli'=>extension_loaded('mysqli'),
+    'pdo'=>extension_loaded('pdo'),
+    'pdo_mysql'=>extension_loaded('pdo_mysql'),
     'curl'=>extension_loaded('curl'),
     'mbstring'=>extension_loaded('mbstring'),
     'json'=>extension_loaded('json'),
@@ -55,23 +54,28 @@ $DB_NAME = getenv('DB_NAME') ?: '';
 $DB_USER = getenv('DB_USER') ?: '';
 $DB_PASS = getenv('DB_PASS') ?: '';
 
-// prova connessione mysqli con fallback
+// prova connessione PDO
 $report['db_connection'] = false;
 $report['db_error'] = null;
+$report['db_server_info'] = null;
 $report['db_host_tried'] = [];
 
-mysqli_report(MYSQLI_REPORT_OFF);
 foreach ([$DB_HOST, ($DB_HOST==='localhost'?'127.0.0.1':null)] as $hostTry){
     if (!$hostTry) continue;
     $report['db_host_tried'][] = $hostTry;
-    $mysqli = @new mysqli($hostTry, $DB_USER, $DB_PASS, $DB_NAME);
-    if (!$mysqli->connect_errno){
+    try {
+        $dsn = "mysql:host=$hostTry;dbname=$DB_NAME;charset=utf8mb4";
+        $pdo = new PDO($dsn, $DB_USER, $DB_PASS, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]);
+        // Query test: SELECT VERSION()
+        $ver = $pdo->query("SELECT VERSION() AS ver")->fetch();
         $report['db_connection'] = true;
-        $report['db_server_info'] = $mysqli->server_info;
-        $mysqli->close();
+        $report['db_server_info'] = $ver['ver'] ?? 'unknown';
         break;
-    } else {
-        $report['db_error'] = $mysqli->connect_error;
+    } catch (Exception $e) {
+        $report['db_error'] = $e->getMessage();
     }
 }
 
@@ -85,4 +89,5 @@ foreach ($env_paths as $p){
 }
 $report['env_peek'] = $peek;
 
+header('Content-Type: application/json; charset=utf-8');
 echo json_encode($report, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);

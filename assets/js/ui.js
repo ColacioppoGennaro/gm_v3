@@ -554,15 +554,21 @@ async function calendarView() {
             try {
                 console.log('📝 Creazione evento Google:', title);
                 
-                const eventData = {
-                    calendarId: 'primary',
-                    title: title.trim(),
-                    start: info.startStr,
-                    end: info.endStr,
-                    reminders: [{ method: 'popup', minutes: 30 }]
-                };
+                // ✅ Prepara i dati con calendarId nel body
+                const response = await fetch('api/google/events.php?calendarId=primary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        calendarId: 'primary',
+                        title: title.trim(),
+                        start: info.startStr,
+                        end: info.endStr,
+                        reminders: [{ method: 'popup', minutes: 30 }]
+                    })
+                });
                 
-                const result = await api('api/google/events.php', eventData);
+                const result = await response.json();
                 
                 console.log('✅ Evento Google creato:', result);
                 calendar.refetchEvents();
@@ -1251,4 +1257,5 @@ window.addEventListener('load', () => {
         }
     });
 });
+"
 

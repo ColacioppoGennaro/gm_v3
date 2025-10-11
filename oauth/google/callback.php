@@ -6,8 +6,11 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
+ini_set('log_errors', '1');
+error_log("=== CALLBACK START ===");
 
 session_start();
+error_log("Session started, user_id: " . ($_SESSION['user_id'] ?? 'NULL'));
 
 require_once __DIR__ . '/../../_core/bootstrap.php';
 require_once __DIR__ . '/../../_core/helpers.php';

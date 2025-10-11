@@ -147,6 +147,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("Google Events API Error: " . $e->getMessage());
+    error_log("Full Google API Error: " . print_r($e, true));
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }

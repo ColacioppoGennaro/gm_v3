@@ -98,11 +98,16 @@ try {
                     'allDay' => (bool)$e->getStart()->getDate(),
                 ];
             }
+            // ✅ Ritorna sempre un array, anche se vuoto
             echo json_encode($out);
             break;
 
         case 'POST':
             $payload = json_decode(file_get_contents('php://input'), true);
+            
+            // ✅ CalendarId può venire dal body
+            $postCalendarId = $payload['calendarId'] ?? $calendarId;
+            
             $ev = new Google_Service_Calendar_Event([
                 'summary' => $payload['title'] ?? '',
                 'description' => $payload['description'] ?? '',
@@ -115,7 +120,7 @@ try {
                     'overrides' => array_map(fn($m) => ['method' => $m['method'], 'minutes' => $m['minutes']], $payload['reminders'] ?? [])
                 ],
             ]);
-            $created = $service->events->insert($calendarId, $ev);
+            $created = $service->events->insert($postCalendarId, $ev);
             echo json_encode(['id' => $created->getId()]);
             break;
 

@@ -1,5 +1,9 @@
 <?php
-// ✅ CONFIGURAZIONE SESSIONE E CARICAMENTO DIPENDENZE
+/**
+ * api/google/calendars.php
+ * ✅ VERSIONE MYSQLI
+ */
+
 ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
 ini_set('session.use_strict_mode', '1');
@@ -11,7 +15,6 @@ require_once __DIR__.'/../../_core/helpers.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// ✅ VERIFICA AUTENTICAZIONE
 if (!isset($_SESSION['user_id'])) {
     ob_end_clean();
     http_response_code(401);
@@ -20,32 +23,31 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$db = db(); // ✅ ORA FUNZIONA
+$db = db(); // ✅ mysqli object
 
-// Funzione per ottenere i dati OAuth dell'utente
+// ✅ Funzioni con mysqli
 function getOauth($db, $user_id) {
     $st = $db->prepare("SELECT google_oauth_token, google_oauth_refresh, google_oauth_expiry FROM users WHERE id=?");
-    $st->execute([$user_id]);
-    return $st->fetch(PDO::FETCH_ASSOC);
+    $st->bind_param("i", $user_id);
+    $st->execute();
+    $r = $st->get_result();
+    return $r->fetch_assoc();
 }
 
-// Funzione per salvare/aggiornare i dati OAuth
 function setOauth($db, $user_id, $token, $refresh, $expiry) {
     $st = $db->prepare("UPDATE users SET google_oauth_token=?, google_oauth_refresh=?, google_oauth_expiry=? WHERE id=?");
-    return $st->execute([$token, $refresh, $expiry, $user_id]);
+    $st->bind_param("sssi", $token, $refresh, $expiry, $user_id);
+    return $st->execute();
 }
 
-// Funzione per eliminare i dati OAuth dal DB
 function deleteOauth($db, $user_id) {
     $st = $db->prepare("UPDATE users SET google_oauth_token=NULL, google_oauth_refresh=NULL, google_oauth_expiry=NULL WHERE id=?");
-    return $st->execute([$user_id]);
+    $st->bind_param("i", $user_id);
+    return $st->execute();
 }
-
-// ---- API ----
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Restituisci i dati OAuth dell'utente
         $oauth = getOauth($db, $user_id);
 
         if (!$oauth || !$oauth['google_oauth_token']) {
@@ -66,7 +68,6 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Aggiorna/Salva i dati OAuth dell'utente
         $token = trim($_POST['token'] ?? '');
         $refresh = trim($_POST['refresh'] ?? '');
         $expiry = trim($_POST['expiry'] ?? '');
@@ -90,7 +91,6 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-        // Elimina i dati OAuth dell'utente
         if (deleteOauth($db, $user_id)) {
             ob_end_clean();
             echo json_encode(['success' => true]);
@@ -102,7 +102,6 @@ try {
         exit;
     }
 
-    // Se arriva altro metodo
     ob_end_clean();
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Metodo non supportato']);

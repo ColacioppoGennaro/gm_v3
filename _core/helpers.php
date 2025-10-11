@@ -1,11 +1,10 @@
 <?php
 /**
  * _core/helpers.php
- * 
- * Funzioni helper globali per gm_v3
+ * ✅ VERSIONE MYSQLI (compatibile con il tuo hosting)
  */
 
-// Legge .env una sola volta, con gestione BOM/virgolette e commenti
+// Legge .env una sola volta
 function env_get($key, $default = null) {
     static $E = null;
     if ($E === null) {
@@ -17,7 +16,6 @@ function env_get($key, $default = null) {
         foreach ($paths as $p) {
             if (!is_readable($p)) continue;
             $raw = file_get_contents($p);
-            // rimuovi BOM se presente
             if (substr($raw, 0, 3) === "\xEF\xBB\xBF") $raw = substr($raw, 3);
             foreach (preg_split("/\r\n|\n|\r/", $raw) as $line) {
                 $line = trim($line);
@@ -26,50 +24,44 @@ function env_get($key, $default = null) {
                 if (count($parts) !== 2) continue;
                 $k = trim($parts[0]);
                 $v = trim($parts[1]);
-                // togli eventuali virgolette avvolgenti
                 if ((str_starts_with($v, '"') && str_ends_with($v, '"')) ||
                     (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
                     $v = substr($v, 1, -1);
                 }
                 $E[$k] = $v;
             }
-            break; // usa il primo .env trovato
+            break;
         }
     }
     return array_key_exists($key, $E) ? $E[$key] : $default;
 }
 
-// ✅ FUNZIONE DB RIPRISTINATA CON PDO
+// ✅ FUNZIONE DB CON MYSQLI (non PDO)
 function db() {
-    static $pdo = null;
-    if ($pdo === null) {
+    static $mysqli = null;
+    if ($mysqli === null) {
         $host = env_get('DB_HOST', '127.0.0.1');
         $name = env_get('DB_NAME', 'ywrloefq_gm_v3');
         $user = env_get('DB_USER', 'ywrloefq_gm_user');
         $pass = env_get('DB_PASS', '77453209**--Gm');
-        $charset = env_get('DB_CHARSET', 'utf8mb4');
+        $port = env_get('DB_PORT', 3306);
 
         // Rimuovi virgolette dalla password se presenti
         if ($pass && $pass[0] === '"' && substr($pass, -1) === '"') {
             $pass = substr($pass, 1, -1);
         }
 
-        $dsn = "mysql:host=$host;dbname=$name;charset=$charset";
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
+        $mysqli = new mysqli($host, $user, $pass, $name, $port);
         
-        try {
-            $pdo = new PDO($dsn, $user, $pass, $options);
-        } catch (PDOException $e) {
-            error_log("DB connection failed: " . $e->getMessage());
+        if ($mysqli->connect_error) {
+            error_log("DB connection failed: " . $mysqli->connect_error);
             http_response_code(500);
             die(json_encode(['success' => false, 'message' => 'Database connection error']));
         }
+        
+        $mysqli->set_charset('utf8mb4');
     }
-    return $pdo;
+    return $mysqli;
 }
 
 function json_out($a, $code = 200) {
@@ -165,8 +157,8 @@ function ensure_ocr_table() {
     if ($checked) return;
     
     try {
-        $pdo = db();
-        $pdo->exec("
+        $db = db();
+        $db->query("
             CREATE TABLE IF NOT EXISTS ocr_logs(
               id INT AUTO_INCREMENT PRIMARY KEY,
               user_id INT NOT NULL,
@@ -177,7 +169,7 @@ function ensure_ocr_table() {
               FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         error_log("OCR table creation failed: " . $e->getMessage());
     }
     

@@ -4,7 +4,7 @@
  * Pagina per collegare Google Calendar
  */
 session_start();
-require_once __DIR__.'/_core/bootstrap.php';
+require_once __DIR__.'/_core/helpers.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -77,7 +77,10 @@ if (isset($_POST['disconnect'])) {
                     </ul>
                 </div>
                 
-                <?php if (env_get('GOOGLE_CLIENT_ID')): ?>
+                <?php 
+                $clientId = env_get('GOOGLE_CLIENT_ID') ?: getenv('GOOGLE_CLIENT_ID') ?: $_ENV['GOOGLE_CLIENT_ID'] ?? '';
+                if ($clientId): 
+                ?>
                     <a href="oauth/google/login.php" class="btn" style="width: 100%; display: block; text-align: center; text-decoration: none;">
                         🔗 Collega Google Calendar
                     </a>

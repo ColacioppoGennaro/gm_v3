@@ -4,7 +4,7 @@
  * Pagina per collegare Google Calendar
  */
 session_start();
-require_once __DIR__.'/_core/helpers.php';
+require_once __DIR__.'/_core/bootstrap.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');

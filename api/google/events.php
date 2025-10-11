@@ -47,9 +47,15 @@ $stmt->execute();
 $result = $stmt->get_result();
 $oauth = $result->fetch_assoc();
 
+error_log("OAuth data for user $user_id: token=" . ($oauth['google_oauth_token'] ? 'EXISTS' : 'NULL') . 
+          ", refresh=" . ($oauth['google_oauth_refresh'] ? 'EXISTS' : 'NULL') . 
+          ", expiry=" . ($oauth['google_oauth_expiry'] ?? 'NULL'));
+
 if (!$oauth || !$oauth['google_oauth_token']) {
+    error_log("Token Google mancante per user $user_id");
+    ob_end_clean();
     http_response_code(401);
-    echo json_encode(['error' => 'Token Google non trovato. Collega il tuo account Google.']);
+    echo json_encode(['error' => 'Token Google non trovato. Devi ricollegare il tuo account Google da google_connect.php']);
     exit;
 }
 
@@ -147,7 +153,6 @@ try {
     }
 } catch (Exception $e) {
     error_log("Google Events API Error: " . $e->getMessage());
-    error_log("Full Google API Error: " . print_r($e, true));
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }

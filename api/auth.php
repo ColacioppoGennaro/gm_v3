@@ -1,16 +1,13 @@
 <?php
 /**
  * api/auth.php
- * Gestisce autenticazione: status, login, register, logout.
- * ✅ CONVERTITO A PDO
+ * ✅ VERSIONE MYSQLI
  */
 
-// Configurazione sessione PRIMA di session_start()
 ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
 ini_set('session.use_strict_mode', '1');
 
-// Disabilita output buffering per questa API
 ob_start();
 
 require_once __DIR__.'/../_core/helpers.php';
@@ -21,16 +18,18 @@ header('Content-Type: application/json; charset=utf-8');
 $action = $_GET['a'] ?? '';
 
 try {
-    $db = db(); // ✅ Ottieni connessione PDO
+    $db = db(); // ✅ mysqli object
     
     if ($action === 'status') {
         $user_id = $_SESSION['user_id'] ?? null;
         
         if ($user_id) {
             $st = $db->prepare("SELECT email, role FROM users WHERE id=?");
-            $st->execute([$user_id]);
+            $st->bind_param("i", $user_id);
+            $st->execute();
+            $r = $st->get_result();
             
-            if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            if ($row = $r->fetch_assoc()) {
                 ob_end_clean();
                 echo json_encode([
                     'success' => true,
@@ -61,13 +60,14 @@ try {
             exit;
         }
         
-        // Rate limiting
         ratelimit("login_$email", 5, 300);
         
         $st = $db->prepare("SELECT id, email, pass_hash, role FROM users WHERE email=?");
-        $st->execute([$email]);
+        $st->bind_param("s", $email);
+        $st->execute();
+        $r = $st->get_result();
         
-        if (!($row = $st->fetch(PDO::FETCH_ASSOC))) {
+        if (!($row = $r->fetch_assoc())) {
             ob_end_clean();
             http_response_code(401);
             echo json_encode(['success' => false, 'message' => 'Credenziali non valide']);
@@ -81,7 +81,6 @@ try {
             exit;
         }
         
-        // Rigenera session ID per sicurezza
         session_regenerate_id(true);
         
         $_SESSION['user_id'] = $row['id'];
@@ -124,26 +123,26 @@ try {
             exit;
         }
         
-        // Verifica se email già esiste
         $st = $db->prepare("SELECT id FROM users WHERE email=?");
-        $st->execute([$email]);
-        if ($st->fetch(PDO::FETCH_ASSOC)) {
+        $st->bind_param("s", $email);
+        $st->execute();
+        if ($st->get_result()->num_rows > 0) {
             ob_end_clean();
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Email già registrata']);
             exit;
         }
         
-        // Crea utente
         $hash = hash_password($password);
         $st = $db->prepare("INSERT INTO users(email, pass_hash, role) VALUES(?, ?, 'free')");
-        $st->execute([$email, $hash]);
-        $userId = $db->lastInsertId();
+        $st->bind_param("ss", $email, $hash);
+        $st->execute();
+        $userId = $db->insert_id;
         
-        // Crea label master per l'utente
         $masterLabelId = 'user_' . $userId . '_master';
         $st = $db->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?, 'master', ?)");
-        $st->execute([$userId, $masterLabelId]);
+        $st->bind_param("is", $userId, $masterLabelId);
+        $st->execute();
         
         error_log("Registration successful: user_id=$userId, email=$email");
         

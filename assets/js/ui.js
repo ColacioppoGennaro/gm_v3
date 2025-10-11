@@ -459,26 +459,51 @@ function bind() {
     }
 }
 
-// SOSTITUISCI LA FUNZIONE calendarView() IN ui.js CON QUESTA
+// SOSTITUISCI LA FUNZIONE calendarView() IN assets/js/ui.js CON QUESTA
 async function calendarView() {
     const pageContainer = document.querySelector('[data-page="calendar"]');
     if (!pageContainer || pageContainer.querySelector('#cal')) return;
+    
     const isPro = S.user && S.user.role === 'pro';
+    
+    // Verifica se Google Calendar è collegato
+    let isGoogleConnected = false;
+    try {
+        const checkResponse = await api('api/google/calendars.php');
+        isGoogleConnected = checkResponse.success === true;
+    } catch (e) {
+        console.log('Google Calendar non collegato');
+    }
+    
     pageContainer.innerHTML = `
         <h1>📅 Calendario</h1>
         ${!isPro ? '<div class="banner" id="upgradeBtn3">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+        ${!isGoogleConnected ? `
+            <div class="card" style="background: #1f2937; border-left: 4px solid #f59e0b;">
+                <h3 style="color: #f59e0b;">⚠️ Google Calendar non collegato</h3>
+                <p style="color: var(--muted); margin: 12px 0;">Per usare Google Calendar devi collegare il tuo account Google.</p>
+                <a href="google_connect.php" class="btn" style="text-decoration: none;">
+                    🔗 Collega Google Calendar
+                </a>
+            </div>
+        ` : ''}
         <div class="card">
             <div class="toolbar" style="padding: 10px; display: flex; gap: 10px; justify-content: flex-end;">
-                <button id="btnPush" class="btn">🔔 Abilita notifiche</button>
-                <button id="btnNew" class="btn">＋ Nuovo Evento</button>
+                ${isGoogleConnected ? '<button id="btnNew" class="btn">＋ Nuovo Evento</button>' : ''}
             </div>
             <div id="cal" style="height: calc(100vh - 250px); padding: 10px;"></div>
         </div>
     `;
+    
     document.getElementById('upgradeBtn3')?.addEventListener('click', showUpgradeModal);
+    
+    if (!isGoogleConnected) {
+        return; // Non inizializzare il calendario se non collegato
+    }
+    
     const calEl = document.getElementById('cal');
     
-    // CONFIGURAZIONE FULLCALENDAR CON INTEGRAZIONE CORRETTA
+    // CONFIGURAZIONE FULLCALENDAR CON GOOGLE CALENDAR
     const calendar = new FullCalendar.Calendar(calEl, {
         initialView: 'dayGridMonth',
         locale: 'it',
@@ -496,14 +521,15 @@ async function calendarView() {
         selectable: true,
         editable: true,
         
-        // CARICAMENTO EVENTI - USA LA NOSTRA FUNZIONE api()
+        // CARICAMENTO EVENTI DA GOOGLE CALENDAR
         events: async (info, successCallback, failureCallback) => {
             try {
                 const start = encodeURIComponent(info.startStr);
                 const end = encodeURIComponent(info.endStr);
-                const url = `api/calendar.php?start=${start}&end=${end}`;
+                const calendarId = 'primary'; // Usa il calendario primario di Google
+                const url = `api/google/events.php?calendarId=${calendarId}&start=${start}&end=${end}`;
                 
-                console.log('📅 Caricamento eventi calendario:', url);
+                console.log('📅 Caricamento eventi Google Calendar:', url);
                 const events = await api(url);
                 
                 console.log('✅ Eventi ricevuti:', events);
@@ -511,7 +537,7 @@ async function calendarView() {
             } catch (e) {
                 console.error('❌ Errore caricamento eventi:', e);
                 if (e.message !== 'AUTH') {
-                    alert('Errore nel caricamento degli eventi');
+                    alert('Errore nel caricamento degli eventi Google Calendar');
                 }
                 failureCallback(e);
             }
@@ -526,25 +552,25 @@ async function calendarView() {
             }
             
             try {
-                console.log('📝 Creazione evento:', title);
+                console.log('📝 Creazione evento Google:', title);
                 
                 const eventData = {
+                    calendarId: 'primary',
                     title: title.trim(),
                     start: info.startStr,
                     end: info.endStr,
-                    allDay: info.allDay,
-                    reminders: [2880]
+                    reminders: [{ method: 'popup', minutes: 30 }]
                 };
                 
-                const result = await api('api/calendar.php', eventData);
+                const result = await api('api/google/events.php', eventData);
                 
-                console.log('✅ Evento creato:', result);
+                console.log('✅ Evento Google creato:', result);
                 calendar.refetchEvents();
                 calendar.unselect();
             } catch (e) {
                 console.error('❌ Errore creazione evento:', e);
                 if (e.message !== 'AUTH') {
-                    alert('Errore nella creazione dell\'evento');
+                    alert('Errore nella creazione dell\'evento su Google Calendar');
                 }
                 calendar.unselect();
             }
@@ -553,17 +579,22 @@ async function calendarView() {
         // SPOSTAMENTO EVENTO (drag&drop)
         eventDrop: async (info) => {
             try {
-                console.log('🔄 Spostamento evento:', info.event.id);
+                console.log('🔄 Spostamento evento Google:', info.event.id);
                 
                 const updateData = {
+                    calendarId: 'primary',
                     start: info.event.start?.toISOString(),
-                    end: info.event.end?.toISOString(),
-                    allDay: info.event.allDay
+                    end: info.event.end?.toISOString()
                 };
                 
-                await api(`api/calendar.php?id=${info.event.id}`, updateData);
+                await fetch(`api/google/events.php?calendarId=primary&id=${info.event.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(updateData)
+                });
                 
-                console.log('✅ Evento spostato');
+                console.log('✅ Evento Google spostato');
             } catch (e) {
                 console.error('❌ Errore spostamento evento:', e);
                 info.revert();
@@ -576,15 +607,21 @@ async function calendarView() {
         // RIDIMENSIONAMENTO EVENTO
         eventResize: async (info) => {
             try {
-                console.log('↔️ Ridimensionamento evento:', info.event.id);
+                console.log('↔️ Ridimensionamento evento Google:', info.event.id);
                 
                 const updateData = {
+                    calendarId: 'primary',
                     end: info.event.end?.toISOString()
                 };
                 
-                await api(`api/calendar.php?id=${info.event.id}`, updateData);
+                await fetch(`api/google/events.php?calendarId=primary&id=${info.event.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(updateData)
+                });
                 
-                console.log('✅ Evento ridimensionato');
+                console.log('✅ Evento Google ridimensionato');
             } catch (e) {
                 console.error('❌ Errore ridimensionamento evento:', e);
                 info.revert();
@@ -596,17 +633,16 @@ async function calendarView() {
         
         // CLICK SU EVENTO (per eliminare)
         eventClick: async (info) => {
-            if (confirm(`Vuoi eliminare l'evento "${info.event.title}"?`)) {
+            if (confirm(`Vuoi eliminare l'evento "${info.event.title}" da Google Calendar?`)) {
                 try {
-                    console.log('🗑️ Eliminazione evento:', info.event.id);
+                    console.log('🗑️ Eliminazione evento Google:', info.event.id);
                     
-                    // Usa la funzione DELETE tramite api modificata
-                    await fetch(`api/calendar.php?id=${info.event.id}`, {
+                    await fetch(`api/google/events.php?calendarId=primary&id=${info.event.id}`, {
                         method: 'DELETE',
                         credentials: 'same-origin'
                     });
                     
-                    console.log('✅ Evento eliminato');
+                    console.log('✅ Evento Google eliminato');
                     calendar.refetchEvents();
                 } catch (e) {
                     console.error('❌ Errore eliminazione evento:', e);
@@ -619,16 +655,7 @@ async function calendarView() {
     });
     
     calendar.render();
-    console.log('✅ Calendario renderizzato');
-    
-    // BOTTONE NOTIFICHE PUSH
-    document.getElementById('btnPush')?.addEventListener('click', () => {
-        if (window.gm_enablePush) {
-            window.gm_enablePush();
-        } else {
-            alert('Notifiche push non disponibili');
-        }
-    });
+    console.log('✅ Calendario Google renderizzato');
     
     // BOTTONE NUOVO EVENTO
     document.getElementById('btnNew')?.addEventListener('click', async () => {
@@ -639,19 +666,19 @@ async function calendarView() {
         const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 ora
         
         try {
-            console.log('📝 Creazione evento manuale:', title);
+            console.log('📝 Creazione evento manuale Google:', title);
             
             const eventData = {
+                calendarId: 'primary',
                 title: title.trim(),
                 start: start.toISOString(),
                 end: end.toISOString(),
-                allDay: false,
                 reminders: []
             };
             
-            await api('api/calendar.php', eventData);
+            await api('api/google/events.php', eventData);
             
-            console.log('✅ Evento manuale creato');
+            console.log('✅ Evento Google manuale creato');
             calendar.refetchEvents();
         } catch(e) {
             console.error('❌ Errore creazione evento manuale:', e);
@@ -661,6 +688,7 @@ async function calendarView() {
         }
     });
 }
+
 // Esporta globalmente
 window.calendarView = calendarView;
 window.renderFullCalendar = calendarView;

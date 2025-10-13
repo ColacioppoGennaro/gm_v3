@@ -562,8 +562,8 @@ async function calendarView() {
                     body: JSON.stringify({
                         calendarId: 'primary',
                         title: title.trim(),
-                        start: info.startStr,
-                        end: info.endStr,
+                        start: info.start.toISOString(),
+                        end: info.end.toISOString(),
                         reminders: [{ method: 'popup', minutes: 30 }]
                     })
                 });
@@ -1258,4 +1258,35 @@ window.addEventListener('load', () => {
         }
     });
 });
+" in the canvas, and I am asking the following query:
+"sempre dentro ui.js per favore faiq ueste istruzioni  Calendario funziona ma errore 400/500 nella creazione eventi!
+Il calendario carica ma non crea eventi. Errori 400 (bad request) e 500 (server error).
+
+🔧 Problema: Formato date non valido per Google API
+Google Calendar richiede date in formato RFC3339 con timezone.
+✅ Soluzione: Correggi assets/js/ui.js
+Cerca questa parte nella funzione calendarView() e sostituiscila:
+
+❌ SBAGLIATO (current):
+
+
+javascript
+start: info.startStr,end: info.endStr,
+✅ CORRETTO:
+
+
+javascript
+start: info.start.toISOString(),end: info.end.toISOString(),
+Applica questa correzione in 3 punti:
+Evento da selezione (riga ~560)
+Evento manuale btnNew (riga ~680)
+Evento drag (se presente)
+📝 Esempio completo (evento da selezione):
+
+
+javascript
+select: async (info) => {    const title = prompt('Titolo evento:');    if (!title || title.trim() === '') {        calendar.unselect();        return;    }        try {        const response = await fetch('api/google/events.php?calendarId=primary', {            method: 'POST',            headers: { 'Content-Type': 'application/json' },            credentials: 'same-origin',            body: JSON.stringify({                calendarId: 'primary',                title: title.trim(),                start: info.start.toISOString(),  // ✅ CORRETTO                end: info.end.toISOString(),      // ✅ CORRETTO                reminders: [{ method: 'popup', minutes: 30 }]            })        });                const result = await response.json();        console.log('✅ Evento creato:', result);        calendar.refetchEvents();        calendar.unselect();    } catch (e) {        console.error('❌ Errore:', e);        calendar.unselect();    }}
+Applica queste correzioni e gli eventi si creeranno! 🚀
+
+non togliere altre funzionalità. grazie"
 

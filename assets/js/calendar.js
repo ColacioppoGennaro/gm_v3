@@ -121,9 +121,9 @@ function initFullCalendar() {
     height: 'auto',
     contentHeight: 'auto',
     expandRows: true,
-    handleWindowResize: false, // <-- ✅ CORREZIONE: Impostato a false per evitare il loop di rendering
+    handleWindowResize: false, // Lasciamo questa modifica per sicurezza
     stickyHeaderDates: true,
-    aspectRatio: isMobile ? 0.95 : 1.4,
+    // aspectRatio: isMobile ? 0.95 : 1.4, // <-- ✅ CORREZIONE: Commentata per evitare conflitti con height: 'auto'
 
     // Densità e visibilità eventi
     dayMaxEventRows: true,

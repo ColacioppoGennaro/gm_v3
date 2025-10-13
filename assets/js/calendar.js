@@ -276,7 +276,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
-  _reminders = []; // Azzera i promemoria ogni volta
+  _reminders = [];
 
   const title = event?.title || '';
   const description = event?.extendedProps?.description || '';
@@ -299,7 +299,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         <div class="form-group"><label>Fine *</label><input type="${allDay?'date':'datetime-local'}" id="eventEnd" value="${allDay?formatDateLocal(end):formatDateTimeLocal(end)}" required/></div>
       </div>
       <div class="form-group"><label>Ricorrenza</label><select id="eventRecurrence"><option value="none">Non ripetere</option><option value="DAILY">Ogni giorno</option><option value="WEEKLY">Ogni settimana</option><option value="MONTHLY">Ogni mese</option><option value="YEARLY">Ogni anno</option></select></div>
-      
       <div class="form-group">
         <label>Promemoria</label>
         <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
@@ -310,7 +309,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           <button class="btn secondary" id="addReminderBtn" type="button" style="padding: 8px 12px;">+</button>
         </div>
       </div>
-
       <div id="eventError" class="error hidden"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn secondary" id="closeEventModal">Annulla</button>
@@ -321,7 +319,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
 
-  // --- Logica interna del modal ---
   const reminderListEl = document.getElementById('reminderList');
   
   function formatReminderMinutes(minutes) {
@@ -347,7 +344,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   
   reminderListEl.addEventListener('click', (e) => {
     if (e.target.classList.contains('chip-x')) {
-      _reminders.splice(e.target.closest('.chip').dataset.idx, 1);
+      const idx = parseInt(e.target.closest('.chip').dataset.idx, 10);
+      _reminders.splice(idx, 1);
       renderReminderChips();
     }
   });
@@ -369,7 +367,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   });
 
-  // Pre-compilazione campi in modifica
+  // ✅ FIX: LOGICA DI CARICAMENTO PROMEMORIA CORRETTA
   if (isEdit && event.extendedProps) {
     const recurSel = document.getElementById('eventRecurrence');
     const rrule = event.extendedProps.recurrence?.[0] || '';
@@ -378,14 +376,23 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     else if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
     else if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
     
-    const rem = event.extendedProps.reminders;
-    if (rem?.overrides && Array.isArray(rem.overrides)) {
-      _reminders = rem.overrides.map(r => ({ method: r.method || 'popup', minutes: Number(r.minutes || 30) }));
-      renderReminderChips();
+    // Il backend restituisce un array JSON, lo parsa e lo usa
+    let savedReminders = event.extendedProps.reminders;
+    if (typeof savedReminders === 'string') {
+        try { savedReminders = JSON.parse(savedReminders); }
+        catch (e) { savedReminders = []; }
     }
+
+    if (Array.isArray(savedReminders)) {
+        _reminders = savedReminders;
+    } 
+    // Fallback per la struttura di Google API se presente
+    else if (savedReminders?.overrides && Array.isArray(savedReminders.overrides)) {
+      _reminders = savedReminders.overrides.map(r => ({ method: r.method || 'popup', minutes: Number(r.minutes || 30) }));
+    }
+    renderReminderChips();
   }
 
-  // Listeners bottoni principali
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);

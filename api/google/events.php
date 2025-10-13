@@ -92,12 +92,22 @@ function list_events($service, $calendarId) {
         $endObj   = $e->getEnd();
         $isAllDay = (bool)$startObj->getDate();
 
-        // ✅ BUG FIX: Includi sempre i dati estesi necessari al frontend
+        // ✅ BUG FIX: Estrai e formatta correttamente i promemoria per il frontend
+        $remindersObj = $e->getReminders();
+        $remindersArr = [];
+        if ($remindersObj && $remindersObj->getOverrides()) {
+            foreach ($remindersObj->getOverrides() as $override) {
+                $remindersArr[] = [
+                    'method' => $override->getMethod(),
+                    'minutes' => $override->getMinutes()
+                ];
+            }
+        }
+        
         $extendedProps = [
             'description' => $e->getDescription(),
             'recurrence'  => $e->getRecurrence(),
-            // I promemoria vengono passati come JSON per coerenza con il salvataggio
-            'reminders'   => json_encode($e->getReminders())
+            'reminders'   => json_encode($remindersArr) // Ora invia un JSON valido
         ];
 
         $out[] = [
@@ -116,39 +126,27 @@ function create_or_update_event($service, $calendarId) {
     $eventId = $_GET['id'] ?? null;
     $in = read_input();
     
-    // Se è un update, carica l'evento esistente. Altrimenti, ne crea uno nuovo.
     $event = $eventId ? $service->events->get($calendarId, $eventId) : new Google_Service_Calendar_Event();
 
-    // Imposta i campi comuni
     if (isset($in['title'])) $event->setSummary($in['title']);
     if (isset($in['description'])) $event->setDescription($in['description']);
 
-    // Gestione date/ore
     $isAllDay = isset($in['allDay']) && ($in['allDay'] === '1' || $in['allDay'] === 1);
     if ($isAllDay) {
-        if (!empty($in['startDate'])) {
-            $event->setStart(new Google_Service_Calendar_EventDateTime(['date' => $in['startDate']]));
-        }
-        if (!empty($in['endDate'])) {
-            $event->setEnd(new Google_Service_Calendar_EventDateTime(['date' => $in['endDate']]));
-        }
+        if (!empty($in['startDate'])) $event->setStart(new Google_Service_Calendar_EventDateTime(['date' => $in['startDate']]));
+        if (!empty($in['endDate'])) $event->setEnd(new Google_Service_Calendar_EventDateTime(['date' => $in['endDate']]));
     } else {
         $timeZone = $in['timeZone'] ?? 'Europe/Rome';
-        if (!empty($in['startDateTime'])) {
-            $event->setStart(new Google_Service_Calendar_EventDateTime(['dateTime' => $in['startDateTime'], 'timeZone' => $timeZone]));
-        }
-        if (!empty($in['endDateTime'])) {
-            $event->setEnd(new Google_Service_Calendar_EventDateTime(['dateTime' => $in['endDateTime'], 'timeZone' => $timeZone]));
-        }
+        if (!empty($in['startDateTime'])) $event->setStart(new Google_Service_Calendar_EventDateTime(['dateTime' => $in['startDateTime'], 'timeZone' => $timeZone]));
+        if (!empty($in['endDateTime'])) $event->setEnd(new Google_Service_Calendar_EventDateTime(['dateTime' => $in['endDateTime'], 'timeZone' => $timeZone]));
     }
 
-    // Gestione Ricorrenza
+    // ✅ BUG FIX: Gestisci correttamente la cancellazione della ricorrenza
     if (isset($in['recurrence'])) {
         $rrule = $in['recurrence'];
-        $event->setRecurrence($rrule ? [$rrule] : null);
+        $event->setRecurrence($rrule ? [$rrule] : []); // Usa un array vuoto per cancellare
     }
     
-    // Gestione Promemoria
     if (isset($in['reminders'])) {
         $remindersData = is_string($in['reminders']) ? json_decode($in['reminders'], true) : $in['reminders'];
         $overrides = [];
@@ -162,7 +160,6 @@ function create_or_update_event($service, $calendarId) {
         $event->setReminders(['useDefault' => false, 'overrides' => $overrides]);
     }
     
-    // Salva l'evento
     if ($eventId) {
         $updatedEvent = $service->events->update($calendarId, $eventId, $event);
         echo json_encode(['id' => $updatedEvent->getId()]);
@@ -190,7 +187,6 @@ try {
             list_events($service, $calendarId);
             break;
 
-        // ✅ BUG FIX: Unificato POST/PUT/PATCH per evitare duplicati
         case 'POST':
         case 'PUT':
         case 'PATCH':
@@ -210,3 +206,4 @@ try {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }
+

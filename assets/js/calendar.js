@@ -16,7 +16,7 @@ function toLocalRFC3339(dtLocal) {
   if (/Z$/.test(dtLocal)) {
     const d = new Date(dtLocal);
     return toRFC3339WithOffset(d);
-  }
+    }
   const [d, t = '00:00'] = dtLocal.split('T');
   const [Y, M, D] = d.split('-').map(Number);
   const [h, m] = t.split(':').map(Number);
@@ -99,12 +99,13 @@ export async function renderCalendar() {
   });
 }
 
-/** Inizializza FullCalendar (responsive) */
+/** Inizializza FullCalendar (responsive, senza loop resize) */
 function initFullCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
 
-  const isMobile = window.matchMedia('(max-width: 700px)').matches;
+  const mq = window.matchMedia('(max-width: 700px)');
+  const isMobile = mq.matches;
 
   calendar = new FullCalendar.Calendar(calEl, {
     initialView: isMobile ? 'timeGridDay' : 'dayGridMonth',
@@ -120,9 +121,9 @@ function initFullCalendar() {
     height: 'auto',
     contentHeight: 'auto',
     expandRows: true,
-    handleWindowResize: true,
+    handleWindowResize: true, // lascia a FC la gestione dimensioni interne
     stickyHeaderDates: true,
-    aspectRatio: isMobile ? 0.95 : 1.4, // meno schiacciato su mobile
+    aspectRatio: isMobile ? 0.95 : 1.4,
 
     // Densità e visibilità eventi
     dayMaxEventRows: true,
@@ -217,16 +218,19 @@ function initFullCalendar() {
 
   calendar.render();
 
-  // Adatta la vista quando cambia dimensione/rotazione
-  window.addEventListener('resize', () => {
-    const mobileNow = window.matchMedia('(max-width: 700px)').matches;
-    const isDay = calendar.view.type === 'timeGridDay';
-    if (mobileNow && !isDay) {
-      calendar.changeView('timeGridDay');
-    } else if (!mobileNow && isDay) {
-      calendar.changeView('dayGridMonth');
+  // 🔒 Evita loop: cambia vista solo quando cambia davvero il breakpoint
+  let lastIsMobile = mq.matches;
+  function onMediaChange(e) {
+    const isNowMobile = e.matches;
+    if (isNowMobile === lastIsMobile) return;
+    lastIsMobile = isNowMobile;
+    const targetView = isNowMobile ? 'timeGridDay' : 'dayGridMonth';
+    if (calendar.view?.type !== targetView) {
+      calendar.changeView(targetView);
     }
-  }, { passive: true });
+  }
+  if (mq.addEventListener) mq.addEventListener('change', onMediaChange);
+  else mq.addListener(onMediaChange);
 }
 
 /** Modal evento (crea/modifica) — logica invariata salvo markup */
@@ -403,7 +407,7 @@ async function createEvent() {
     if (allDay) {
       fd.append('allDay', '1');
       fd.append('startDate', start);
-      fd.append('endDate', nextDate(end));  // end esclusivo
+      fd.append('endDate', nextDate(end)); // end esclusivo
     } else {
       fd.append('allDay', '0');
       fd.append('startDateTime', toLocalRFC3339(start));
@@ -418,8 +422,9 @@ async function createEvent() {
     document.getElementById('eventModal').remove();
   } catch (e) {
     console.error('❌ Errore creazione evento:', e);
-    errEl.textContent = 'Errore nella creazione dell\'evento';
-    errEl.classList.remove('hidden');
+    const errEl2 = document.getElementById('eventError');
+    errEl2.textContent = 'Errore nella creazione dell\'evento';
+    errEl2.classList.remove('hidden');
     btn.disabled = false; btn.innerHTML = 'Crea';
   }
 }
@@ -447,7 +452,7 @@ async function updateEvent(event) {
     if (allDay) {
       fd.append('allDay', '1');
       fd.append('startDate', start);
-      fd.append('endDate', nextDate(end));  // end esclusivo
+      fd.append('endDate', nextDate(end));
     } else {
       fd.append('allDay', '0');
       fd.append('startDateTime', toLocalRFC3339(start));
@@ -461,8 +466,9 @@ async function updateEvent(event) {
     document.getElementById('eventModal').remove();
   } catch (e) {
     console.error('❌ Errore aggiornamento evento:', e);
-    errEl.textContent = 'Errore nell\'aggiornamento dell\'evento';
-    errEl.classList.remove('hidden');
+    const errEl2 = document.getElementById('eventError');
+    errEl2.textContent = 'Errore nell\'aggiornamento dell\'evento';
+    errEl2.classList.remove('hidden');
     btn.disabled = false; btn.innerHTML = 'Salva';
   }
 }

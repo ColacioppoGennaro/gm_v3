@@ -1,11 +1,13 @@
 /**
  * assets/js/calendar.js
- * Calendario (Google) con layout responsive e UI pulita
+ * Calendario ibrido: Desktop = FullCalendar, Mobile = Mini Grid + Lista
  */
 
 import { API } from './api.js';
 
 let calendar = null;
+let currentDate = new Date();
+let allEvents = [];
 
 // === Time helpers (RFC3339 locale + end esclusivo per all-day)
 const TZ = 'Europe/Rome';
@@ -55,6 +57,7 @@ export async function renderCalendar() {
   if (!page || page.querySelector('#cal')) return;
 
   const isPro = window.S.user && window.S.user.role === 'pro';
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
   // Verifica connessione Google
   let isGoogleConnected = false;
@@ -91,12 +94,236 @@ export async function renderCalendar() {
 
   if (!isGoogleConnected) return;
 
-  initFullCalendar();
+  // Scegli rendering in base a dispositivo
+  if (isMobile) {
+    await renderMobileCalendar();
+  } else {
+    initFullCalendar();
+  }
 
   document.getElementById('btnNewEvent')?.addEventListener('click', () => {
     showEventModal();
   });
 }
+
+/**
+ * MOBILE: Mini Grid + Lista Eventi
+ */
+async function renderMobileCalendar() {
+  const calEl = document.getElementById('cal');
+  if (!calEl) return;
+
+  calEl.innerHTML = `
+    <div class="mobile-calendar">
+      <div class="mini-month-grid" id="miniMonthGrid"></div>
+      
+      <div class="day-events-list" id="dayEventsList">
+        <div class="day-events-header" id="dayEventsHeader">
+          <h3>Oggi</h3>
+        </div>
+        <div class="day-events-content" id="dayEventsContent">
+          <div class="loading">Caricamento eventi...</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await loadEventsForMonth();
+  renderMiniMonthGrid();
+  renderDayEvents(currentDate);
+}
+
+/**
+ * Carica eventi del mese corrente
+ */
+async function loadEventsForMonth() {
+  const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  
+  try {
+    allEvents = await API.listGoogleEvents(
+      'primary',
+      start.toISOString(),
+      end.toISOString()
+    );
+  } catch (e) {
+    console.error('Errore caricamento eventi:', e);
+    allEvents = [];
+  }
+}
+
+/**
+ * Renderizza mini griglia mese (stile Google Calendar mobile)
+ */
+function renderMiniMonthGrid() {
+  const gridEl = document.getElementById('miniMonthGrid');
+  if (!gridEl) return;
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = new Date();
+  
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // 0=Lun, 6=Dom
+  const daysInMonth = lastDay.getDate();
+
+  const monthNames = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                      'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  
+  let html = `
+    <div class="mini-month-header">
+      <button class="month-nav-btn" id="prevMonth">‹</button>
+      <h3>${monthNames[month]} ${year}</h3>
+      <button class="month-nav-btn" id="nextMonth">›</button>
+    </div>
+    <div class="mini-month-days-header">
+      <div>L</div><div>M</div><div>M</div><div>G</div><div>V</div><div>S</div><div>D</div>
+    </div>
+    <div class="mini-month-days">
+  `;
+
+  // Celle vuote prima del 1° giorno
+  for (let i = 0; i < startDay; i++) {
+    html += '<div class="mini-day empty"></div>';
+  }
+
+  // Giorni del mese
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const isToday = date.toDateString() === today.toDateString();
+    const isSelected = date.toDateString() === currentDate.toDateString();
+    
+    // Conta eventi del giorno
+    const dayEvents = allEvents.filter(e => {
+      const eventDate = new Date(e.start);
+      return eventDate.toDateString() === date.toDateString();
+    });
+    
+    const hasEvents = dayEvents.length > 0;
+    const eventDots = hasEvents ? '<div class="event-dots">' + '●'.repeat(Math.min(dayEvents.length, 3)) + '</div>' : '';
+    
+    html += `
+      <div class="mini-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}" 
+           data-date="${dateStr}" 
+           onclick="window.selectDate('${dateStr}')">
+        <span class="day-number">${day}</span>
+        ${eventDots}
+      </div>
+    `;
+  }
+
+  html += '</div></div>';
+  gridEl.innerHTML = html;
+
+  // Event listeners navigazione mese
+  document.getElementById('prevMonth')?.addEventListener('click', () => {
+    currentDate = new Date(year, month - 1, 1);
+    loadEventsForMonth().then(() => {
+      renderMiniMonthGrid();
+      renderDayEvents(currentDate);
+    });
+  });
+
+  document.getElementById('nextMonth')?.addEventListener('click', () => {
+    currentDate = new Date(year, month + 1, 1);
+    loadEventsForMonth().then(() => {
+      renderMiniMonthGrid();
+      renderDayEvents(currentDate);
+    });
+  });
+}
+
+/**
+ * Seleziona data e mostra eventi
+ */
+window.selectDate = function(dateStr) {
+  currentDate = new Date(dateStr + 'T12:00:00');
+  renderMiniMonthGrid();
+  renderDayEvents(currentDate);
+};
+
+/**
+ * Renderizza lista eventi del giorno selezionato
+ */
+function renderDayEvents(date) {
+  const headerEl = document.getElementById('dayEventsHeader');
+  const contentEl = document.getElementById('dayEventsContent');
+  if (!headerEl || !contentEl) return;
+
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  
+  const dateStr = date.toLocaleDateString('it-IT', { 
+    weekday: 'long', 
+    day: 'numeric', 
+    month: 'long' 
+  });
+
+  headerEl.innerHTML = `<h3>${isToday ? 'Oggi' : dateStr}</h3>`;
+
+  // Filtra eventi del giorno
+  const dayEvents = allEvents.filter(e => {
+    const eventDate = new Date(e.start);
+    return eventDate.toDateString() === date.toDateString();
+  }).sort((a, b) => new Date(a.start) - new Date(b.start));
+
+  if (dayEvents.length === 0) {
+    contentEl.innerHTML = `
+      <div class="no-events">
+        <div style="font-size:48px;margin-bottom:12px">📭</div>
+        <div>Nessun evento</div>
+      </div>
+    `;
+    return;
+  }
+
+  contentEl.innerHTML = dayEvents.map(event => {
+    const startTime = new Date(event.start).toLocaleTimeString('it-IT', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    const endTime = event.end ? new Date(event.end).toLocaleTimeString('it-IT', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    }) : '';
+
+    const timeStr = event.allDay ? 'Tutto il giorno' : `${startTime}${endTime ? ' - ' + endTime : ''}`;
+
+    return `
+      <div class="event-item" onclick="window.openEventDetail('${event.id}')">
+        <div class="event-time">${timeStr}</div>
+        <div class="event-details">
+          <div class="event-title">${event.title}</div>
+          ${event.extendedProps?.description ? `<div class="event-description">${event.extendedProps.description}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Apri dettaglio evento
+ */
+window.openEventDetail = async function(eventId) {
+  const event = allEvents.find(e => e.id === eventId);
+  if (!event) return;
+  
+  // Converti in formato FullCalendar event object
+  const fcEvent = {
+    id: event.id,
+    title: event.title,
+    start: new Date(event.start),
+    end: event.end ? new Date(event.end) : null,
+    allDay: event.allDay || false,
+    extendedProps: event.extendedProps || {}
+  };
+  
+  showEventModal(fcEvent);
+};
 
 /** Inizializza FullCalendar con configurazione performante */
 function initFullCalendar() {

@@ -277,7 +277,11 @@ async function saveEvent() {
     const fd = getFormDataFromModal();
     if (!fd) return;
     try {
-        await API[eventId ? 'updateGoogleEvent' : 'createGoogleEvent']('primary', eventId || fd, eventId ? fd : null);
+        if (eventId) {
+            await API.updateGoogleEvent('primary', eventId, fd);
+        } else {
+            await API.createGoogleEvent('primary', fd);
+        }
         document.getElementById('eventModal').remove();
         await _refreshCalendar();
     } catch (e) {

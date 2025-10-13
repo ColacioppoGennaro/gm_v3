@@ -8,16 +8,15 @@ import { API } from './api.js';
 let calendar = null;
 let currentDate = new Date();
 let allEvents = [];
-let _reminders = []; // Stato per i promemoria del modal
+let _reminders = []; // Stato per i promemoria del modal, si resetta a ogni apertura
 
 const TZ = 'Europe/Rome';
 
+// --- Utility Functions ---
+
 function toLocalRFC3339(dtLocal) {
   if (!dtLocal) return null;
-  if (/Z$/.test(dtLocal)) {
-    const d = new Date(dtLocal);
-    return toRFC3339WithOffset(d);
-  }
+  if (/Z$/.test(dtLocal)) return toRFC3339WithOffset(new Date(dtLocal));
   const [d, t = '00:00'] = dtLocal.split('T');
   const [Y, M, D] = d.split('-').map(Number);
   const [h, m] = t.split(':').map(Number);
@@ -58,7 +57,7 @@ function formatLocalYMD(d) {
   return `${y}-${m}-${day}`;
 }
 
-
+// --- Main Render Function ---
 
 export async function renderCalendar() {
   const page = document.querySelector('[data-page="calendar"]');
@@ -112,6 +111,8 @@ export async function renderCalendar() {
     showEventModal(null, start, end);
   });
 }
+
+// --- Mobile Calendar Logic ---
 
 async function renderMobileCalendar() {
   const calEl = document.getElementById('cal');
@@ -233,6 +234,8 @@ window.openEventDetail = async function(eventId) {
   });
 };
 
+// --- Desktop FullCalendar ---
+
 function initFullCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
@@ -267,11 +270,13 @@ function initFullCalendar() {
   calendar.render();
 }
 
+// --- Event Modal (Unified for Mobile/Desktop) ---
+
 function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
-  _reminders = [];
+  _reminders = []; // Azzera i promemoria ogni volta
 
   const title = event?.title || '';
   const description = event?.extendedProps?.description || '';
@@ -283,7 +288,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const formatDateTimeLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   const formatDateLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  // ✅ HTML AGGIORNATO CON SELETTORE UNITÀ (minuti, ore, giorni)
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
@@ -295,6 +299,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         <div class="form-group"><label>Fine *</label><input type="${allDay?'date':'datetime-local'}" id="eventEnd" value="${allDay?formatDateLocal(end):formatDateTimeLocal(end)}" required/></div>
       </div>
       <div class="form-group"><label>Ricorrenza</label><select id="eventRecurrence"><option value="none">Non ripetere</option><option value="DAILY">Ogni giorno</option><option value="WEEKLY">Ogni settimana</option><option value="MONTHLY">Ogni mese</option><option value="YEARLY">Ogni anno</option></select></div>
+      
       <div class="form-group">
         <label>Promemoria</label>
         <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
@@ -305,6 +310,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           <button class="btn secondary" id="addReminderBtn" type="button" style="padding: 8px 12px;">+</button>
         </div>
       </div>
+
       <div id="eventError" class="error hidden"></div>
       <div class="btn-group" style="margin-top:20px">
         <button class="btn secondary" id="closeEventModal">Annulla</button>
@@ -315,26 +321,25 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
 
+  // --- Logica interna del modal ---
   const reminderListEl = document.getElementById('reminderList');
   
-  // ✅ FUNZIONE AGGIORNATA PER MOSTRARE L'UNITÀ CORRETTA
   function formatReminderMinutes(minutes) {
-      if (minutes === 0) return 'Al momento dell\'evento';
-      if (minutes % 1440 === 0) {
+      if (minutes % 1440 === 0 && minutes !== 0) {
           const days = minutes / 1440;
-          return `${days} ${days > 1 ? 'giorni' : 'giorno'} prima`;
+          return `${days} ${days > 1 ? 'giorni' : 'giorno'}`;
       }
-      if (minutes % 60 === 0) {
+      if (minutes % 60 === 0 && minutes !== 0) {
           const hours = minutes / 60;
-          return `${hours} ${hours > 1 ? 'ore' : 'ora'} prima`;
+          return `${hours} ${hours > 1 ? 'ore' : 'ora'}`;
       }
-      return `${minutes} minuti prima`;
+      return `${minutes} minuti`;
   }
 
   function renderReminderChips() {
     reminderListEl.innerHTML = _reminders.map((r, i) =>
       `<span class="chip" data-idx="${i}" style="display:inline-flex;align-items:center;gap:6px;background:#334155;color:white;padding:5px 10px;border-radius:16px;font-size:14px;">
-         ${r.method === 'email' ? '📧' : '🔔'} ${formatReminderMinutes(r.minutes)}
+         ${r.method === 'email' ? '📧' : '🔔'} ${formatReminderMinutes(r.minutes)} prima
          <button type="button" class="chip-x" style="border:none;background:transparent;color:#cbd5e1;cursor:pointer;font-weight:700;padding:0 0 0 4px;">✕</button>
        </span>`
     ).join('');
@@ -347,10 +352,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   });
 
-  // ✅ LOGICA AGGIORNATA PER CALCOLARE I MINUTI TOTALI
   document.getElementById('addReminderBtn').addEventListener('click', () => {
     const method = document.getElementById('reminderMethod').value;
-    const value = Math.max(0, Number(document.getElementById('reminderValue').value || 0));
+    const value = Math.max(1, Number(document.getElementById('reminderValue').value || 1));
     const unit = document.getElementById('reminderUnit').value;
     let minutes = 0;
     if (unit === 'hours') minutes = value * 60;
@@ -365,13 +369,14 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   });
 
+  // Pre-compilazione campi in modifica
   if (isEdit && event.extendedProps) {
     const recurSel = document.getElementById('eventRecurrence');
     const rrule = event.extendedProps.recurrence?.[0] || '';
     if (rrule.includes('FREQ=DAILY')) recurSel.value = 'DAILY';
-    if (rrule.includes('FREQ=WEEKLY')) recurSel.value = 'WEEKLY';
-    if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
-    if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
+    else if (rrule.includes('FREQ=WEEKLY')) recurSel.value = 'WEEKLY';
+    else if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
+    else if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
     
     const rem = event.extendedProps.reminders;
     if (rem?.overrides && Array.isArray(rem.overrides)) {
@@ -380,10 +385,13 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   }
 
+  // Listeners bottoni principali
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
 }
+
+// --- Event C.R.U.D. Logic ---
 
 function getFormDataFromModal() {
     const title = document.getElementById('eventTitle').value.trim();
@@ -440,9 +448,9 @@ async function deleteEvent(event) {
 }
 
 async function _refreshCalendar() {
-  if (calendar) {
+  if (calendar) { // Desktop
     calendar.refetchEvents();
-  } else {
+  } else { // Mobile
     await loadEventsForMonth();
     renderMiniMonthGrid();
     renderDayEvents(currentDate);

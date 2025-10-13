@@ -111,7 +111,12 @@ export async function renderCalendar() {
   }
 
   document.getElementById('btnNewEvent')?.addEventListener('click', () => {
-    showEventModal();
+  // Usa l’ultimo giorno selezionato nella mini-griglia
+  const start = new Date(currentDate);
+  // opzionale: imposta un orario di default (es. 09:00 locali)
+  start.setHours(9, 0, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000); // +1h
+  showEventModal(null, start, end);
   });
 }
 

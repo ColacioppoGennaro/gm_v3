@@ -276,7 +276,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
-  _reminders = []; // Azzera i promemoria ogni volta
+  _reminders = [];
 
   const title = event?.title || '';
   const description = event?.extendedProps?.description || '';
@@ -290,6 +290,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
+      <input type="hidden" id="eventId" value="${event?.id || ''}" />
       <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
       <div class="form-group"><label>Titolo *</label><input type="text" id="eventTitle" value="${title}" required/></div>
       <div class="form-group"><label>Descrizione</label><textarea id="eventDescription" rows="3">${description}</textarea></div>
@@ -313,7 +314,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       <div class="btn-group" style="margin-top:20px">
         <button class="btn secondary" id="closeEventModal">Annulla</button>
         ${isEdit ? `<button class="btn del" id="deleteEventBtn">🗑️ Elimina</button>` : ''}
-        <button class="btn" id="saveEventBtn">${isEdit ? 'Salva' : 'Crea'}</button>
+        <button class="btn" id="saveEventBtn">${isEdit ? 'Salva Modifiche' : 'Crea Evento'}</button>
       </div>
     </div>
   </div>`;
@@ -367,7 +368,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   });
 
-  // ✅ BUG FIX: Logica di caricamento promemoria resa più robusta.
   if (isEdit && event.extendedProps) {
     const recurSel = document.getElementById('eventRecurrence');
     const rrule = event.extendedProps.recurrence?.[0] || '';
@@ -380,19 +380,13 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     let loadedReminders = [];
 
     if (savedRemindersData) {
-        // Caso 1: I dati sono una stringa JSON (dal nostro backend)
         if (typeof savedRemindersData === 'string') {
-            try {
-                loadedReminders = JSON.parse(savedRemindersData);
-            } catch (e) {
-                console.error("Errore nel parsing dei promemoria:", savedRemindersData);
-            }
+            try { loadedReminders = JSON.parse(savedRemindersData); }
+            catch (e) { console.error("Errore parsing promemoria:", e); }
         }
-        // Caso 2: I dati sono già un array
         else if (Array.isArray(savedRemindersData)) {
             loadedReminders = savedRemindersData;
         }
-        // Caso 3: I dati sono nel formato dell'API di Google
         else if (savedRemindersData.overrides && Array.isArray(savedRemindersData.overrides)) {
             loadedReminders = savedRemindersData.overrides.map(r => ({
                 method: r.method || 'popup',
@@ -400,21 +394,18 @@ function showEventModal(event = null, startDate = null, endDate = null) {
             }));
         }
     }
-
-    // Controlla che il risultato sia un array prima di assegnarlo
     if (Array.isArray(loadedReminders)) {
         _reminders = loadedReminders;
     }
-    
     renderReminderChips();
   }
 
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
-  document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
-  if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
+  document.getElementById('saveEventBtn').onclick = saveEvent;
+  if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event.id);
 }
 
-// --- Event C.R.U.D. Logic ---
+// --- Event C.R.U.D. Logic Refactored ---
 
 function getFormDataFromModal() {
     const title = document.getElementById('eventTitle').value.trim();
@@ -437,34 +428,33 @@ function getFormDataFromModal() {
     }
     const recur = document.getElementById('eventRecurrence')?.value;
     if (recur && recur !== 'none') fd.append('recurrence', `RRULE:FREQ=${recur}`);
-    if (_reminders.length > 0) fd.append('reminders', JSON.stringify(_reminders));
+    fd.append('reminders', JSON.stringify(_reminders));
     return fd;
 }
 
-async function createEvent() {
-  const fd = getFormDataFromModal();
-  if (!fd) return;
-  try {
-    await API.createGoogleEvent('primary', fd);
-    document.getElementById('eventModal').remove();
-    _refreshCalendar();
-  } catch (e) { alert("Errore nella creazione dell'evento"); }
+async function saveEvent() {
+    const eventId = document.getElementById('eventId').value;
+    const fd = getFormDataFromModal();
+    if (!fd) return;
+
+    try {
+        if (eventId) {
+            await API.updateGoogleEvent('primary', eventId, fd);
+        } else {
+            await API.createGoogleEvent('primary', fd);
+        }
+        document.getElementById('eventModal').remove();
+        _refreshCalendar();
+    } catch (e) {
+        console.error("Errore nel salvataggio dell'evento:", e);
+        alert("Si è verificato un errore durante il salvataggio dell'evento.");
+    }
 }
 
-async function updateEvent(event) {
-  const fd = getFormDataFromModal();
-  if (!fd) return;
+async function deleteEvent(eventId) {
+  if (!confirm(`Sei sicuro di voler eliminare questo evento?`)) return;
   try {
-    await API.updateGoogleEvent('primary', event.id, fd);
-    document.getElementById('eventModal').remove();
-    _refreshCalendar();
-  } catch (e) { alert("Errore nell'aggiornamento dell'evento"); }
-}
-
-async function deleteEvent(event) {
-  if (!confirm(`Vuoi eliminare l'evento "${event.title}"?`)) return;
-  try {
-    await API.deleteGoogleEvent('primary', event.id);
+    await API.deleteGoogleEvent('primary', eventId);
     document.getElementById('eventModal').remove();
     _refreshCalendar();
   } catch (e) { alert("Errore nell'eliminazione dell'evento"); }

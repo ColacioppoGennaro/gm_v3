@@ -150,492 +150,312 @@ h1{margin-bottom:8px}
 }
 
 /* ====================================================================== */
-/* ⚠️ CALENDARIO MOBILE V3 - VERSIONE POTENZIATA ⚠️ */
-/* ⚠️ SOSTITUISCI IL BLOCCO PRECEDENTE CON QUESTO ⚠️ */
+/* CALENDARIO MOBILE IBRIDO - Sostituisci il blocco calendario in app.css */
 /* ====================================================================== */
 
-/* === Container calendario === */
-.calendar-card {
-  background: var(--panel) !important;
-  border: 1px solid #1f2937 !important;
-  border-radius: 14px !important;
-  padding: 16px !important;
-  margin-bottom: 20px !important;
-  width: 100% !important;
-  overflow: visible !important;
+/* === Mobile Calendar Container === */
+.mobile-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px;
 }
 
-.calendar-card-warning {
-  background: var(--panel) !important;
-  border: 1px solid #374151 !important;
-  border-left: 4px solid var(--warn) !important;
-  border-radius: 10px !important;
-  padding: 16px !important;
-  margin-bottom: 20px !important;
+/* === Mini Month Grid (stile Google Calendar) === */
+.mini-month-grid {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid #374151;
 }
 
-.calendar-toolbar {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  margin-bottom: 16px !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
+.mini-month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 0 4px;
 }
 
-/* === FullCalendar root === */
-#cal {
-  background: var(--bg) !important;
-  border-radius: 12px !important;
-  overflow: visible !important;
-  width: 100% !important;
-  max-width: 100% !important;
+.mini-month-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
 }
 
-.fc {
-  width: 100% !important;
-  max-width: 100% !important;
+.month-nav-btn {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: var(--fg);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
 
-/* === Toolbar base === */
-.fc .fc-toolbar {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
-  padding: 8px !important;
-  margin-bottom: 12px !important;
+.month-nav-btn:hover {
+  background: #374151;
+  border-color: var(--accent);
 }
 
-.fc .fc-toolbar-chunk {
-  display: flex !important;
-  gap: 6px !important;
-  align-items: center !important;
+/* Headers giorni settimana */
+.mini-month-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+  text-align: center;
 }
 
-.fc .fc-toolbar-title {
-  font-size: 18px !important;
-  color: var(--fg) !important;
-  font-weight: 600 !important;
-  margin: 0 !important;
-  padding: 0 8px !important;
+.mini-month-days-header div {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding: 4px 0;
 }
 
-/* === Buttons FullCalendar === */
-.fc .fc-button {
-  display: inline-block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  background: #1f2937 !important;
-  border: 1px solid #374151 !important;
-  color: var(--fg) !important;
-  padding: 8px 12px !important;
-  border-radius: 8px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  cursor: pointer !important;
-  transition: all 0.2s !important;
-  min-height: 38px !important;
-  line-height: 1.4 !important;
+/* Griglia giorni */
+.mini-month-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
 }
 
-.fc .fc-button:hover {
-  background: #374151 !important;
-  border-color: var(--accent) !important;
+.mini-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 42px;
 }
 
-.fc .fc-button-active,
-.fc .fc-button:active {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: white !important;
+.mini-day.empty {
+  cursor: default;
+  opacity: 0;
 }
 
-.fc .fc-button:disabled {
-  opacity: 0.5 !important;
-  cursor: not-allowed !important;
+.mini-day .day-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 2px;
 }
 
-/* Button group */
-.fc .fc-button-group {
-  display: inline-flex !important;
-  gap: 4px !important;
+.mini-day.today {
+  background: rgba(124, 58, 237, 0.15);
 }
 
-.fc .fc-button-group > .fc-button {
-  margin: 0 !important;
-  border-radius: 8px !important;
+.mini-day.today .day-number {
+  background: var(--accent);
+  color: white;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 600;
 }
 
-/* === Headers === */
-.fc .fc-col-header {
-  width: 100% !important;
+.mini-day.selected {
+  background: #1f2937;
+  border: 2px solid var(--accent);
 }
 
-.fc .fc-col-header-cell {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
-  padding: 8px 4px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  color: var(--muted) !important;
-  text-align: center !important;
+.mini-day:not(.empty):hover {
+  background: #1f2937;
+  transform: scale(1.05);
 }
 
-/* === Day cells === */
-.fc .fc-daygrid-day,
-.fc .fc-timegrid-col {
-  background: var(--bg) !important;
-  border-color: #374151 !important;
-  min-height: 80px !important;
+/* Pallini eventi */
+.event-dots {
+  position: absolute;
+  bottom: 2px;
+  font-size: 6px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  line-height: 1;
 }
 
-.fc .fc-daygrid-day-frame {
-  min-height: 80px !important;
-  padding: 4px !important;
+/* === Lista Eventi Giorno === */
+.day-events-list {
+  background: var(--panel);
+  border-radius: 12px;
+  border: 1px solid #374151;
+  min-height: 300px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
 }
 
-.fc .fc-daygrid-day-top {
-  display: flex !important;
-  justify-content: center !important;
-  padding: 4px !important;
+.day-events-header {
+  padding: 16px;
+  border-bottom: 1px solid #374151;
 }
 
-.fc .fc-daygrid-day-number {
-  color: var(--fg) !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
-  padding: 4px 6px !important;
+.day-events-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  text-transform: capitalize;
 }
 
-.fc .fc-day-today {
-  background: rgba(124, 58, 237, 0.15) !important;
+.day-events-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
 
-.fc .fc-day-today .fc-daygrid-day-number {
-  background: var(--accent) !important;
-  color: white !important;
-  border-radius: 50% !important;
-  width: 28px !important;
-  height: 28px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+/* Evento singolo nella lista */
+.event-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #0b1220;
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* === Eventi === */
-.fc-event {
-  background: var(--accent) !important;
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 4px 8px !important;
-  margin: 2px 0 !important;
-  cursor: pointer !important;
-  font-size: 12px !important;
-  line-height: 1.3 !important;
-  color: white !important;
+.event-item:hover {
+  background: #1f2937;
+  transform: translateX(4px);
 }
 
-.fc-event:hover {
-  background: #9333ea !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4) !important;
+.event-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 65px;
+  flex-shrink: 0;
 }
 
-.fc-event-title {
-  font-weight: 500 !important;
+.event-details {
+  flex: 1;
+  min-width: 0;
 }
 
-/* === TimeGrid === */
-.fc .fc-timegrid-slot {
-  height: 50px !important;
-  border-color: #374151 !important;
+.event-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fc .fc-timegrid-slot-label {
-  color: var(--muted) !important;
-  font-size: 11px !important;
-  padding: 4px !important;
+.event-description {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fc .fc-timegrid-axis {
-  width: 50px !important;
+/* Nessun evento */
+.no-events {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
-/* === Scrollgrid === */
-.fc .fc-scrollgrid {
-  border-color: #374151 !important;
-  width: 100% !important;
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
-.fc .fc-scrollgrid-section > * {
-  border-color: #374151 !important;
+/* === Desktop (FullCalendar rimane) === */
+@media (min-width: 769px) {
+  .mobile-calendar {
+    display: none;
+  }
 }
 
-/* === Popover === */
-.fc .fc-popover {
-  background: var(--panel) !important;
-  border: 1px solid #374151 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
-  z-index: 9999 !important;
-}
-
-.fc .fc-popover-header {
-  background: #1f2937 !important;
-  color: var(--fg) !important;
-  padding: 10px !important;
-  border-radius: 12px 12px 0 0 !important;
-  font-weight: 600 !important;
-}
-
-.fc .fc-popover-body {
-  padding: 10px !important;
-}
-
-/* === More link === */
-.fc .fc-daygrid-more-link {
-  background: #1f2937 !important;
-  color: var(--accent) !important;
-  border-radius: 6px !important;
-  padding: 4px 8px !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  margin-top: 2px !important;
-}
-
-/* Grid helper */
-.grid-2 {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 12px !important;
-}
-
-/* ====================================================================== */
-/* === MOBILE RESPONSIVE (≤ 768px) === */
-/* ====================================================================== */
+/* === MobileOnly === */
 @media (max-width: 768px) {
-  
-  /* Container */
-  .calendar-card {
-    padding: 8px !important;
-    margin: 0 -8px 16px -8px !important;
-    border-radius: 0 !important;
-  }
-
-  .calendar-toolbar {
-    flex-direction: column !important;
-    padding: 8px !important;
-  }
-
-  .calendar-toolbar button {
-    width: 100% !important;
-  }
-
-  /* Root calendar */
-  #cal {
-    width: 100% !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-
+  /* Nascondi FullCalendar su mobile */
   .fc {
-    font-size: 12px !important;
-    width: 100% !important;
-    min-width: 100% !important;
+    display: none !important;
   }
 
-  /* === TOOLBAR MOBILE === */
-  .fc .fc-toolbar {
-    flex-direction: column !important;
-    gap: 6px !important;
-    padding: 4px !important;
-    width: 100% !important;
+  .calendar-card {
+    padding: 8px;
   }
 
-  .fc .fc-toolbar-chunk {
-    width: 100% !important;
-    justify-content: center !important;
-    flex-wrap: wrap !important;
+  /* Ottimizza per schermi piccoli */
+  .mini-day .day-number {
+    font-size: 13px;
   }
 
-  .fc .fc-toolbar-title {
-    font-size: 14px !important;
-    text-align: center !important;
-    padding: 8px 4px !important;
-    width: 100% !important;
+  .event-item {
+    padding: 10px;
+    gap: 10px;
   }
 
-  /* === BUTTONS MOBILE (FORZATI VISIBILI) === */
-  .fc .fc-button {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    padding: 10px 6px !important;
-    font-size: 11px !important;
-    min-width: 52px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    border-radius: 10px !important;
-    flex: 1 !important;
-    white-space: nowrap !important;
+  .event-time {
+    font-size: 11px;
+    min-width: 60px;
   }
 
-  .fc .fc-prev-button,
-  .fc .fc-next-button {
-    min-width: 44px !important;
-    flex: 0 0 44px !important;
+  .event-title {
+    font-size: 13px;
   }
 
-  .fc .fc-today-button {
-    min-width: 60px !important;
-    flex: 0 0 auto !important;
-  }
-
-  /* Button group compatto */
-  .fc .fc-button-group {
-    display: flex !important;
-    width: 100% !important;
-    gap: 4px !important;
-    margin-top: 6px !important;
-  }
-
-  .fc .fc-button-group > .fc-button {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-
-  /* === HEADERS MOBILE === */
-  .fc .fc-col-header-cell {
-    padding: 6px 1px !important;
-    font-size: 9px !important;
-    min-width: 40px !important;
-  }
-
-  /* === DAY CELLS MOBILE === */
-  .fc .fc-daygrid-day {
-    min-height: 65px !important;
-  }
-
-  .fc .fc-daygrid-day-frame {
-    min-height: 65px !important;
-    padding: 2px !important;
-  }
-
-  .fc .fc-daygrid-day-top {
-    padding: 2px !important;
-  }
-
-  .fc .fc-daygrid-day-number {
-    font-size: 12px !important;
-    padding: 3px 5px !important;
-    min-width: 24px !important;
-    min-height: 24px !important;
-  }
-
-  /* === EVENTI MOBILE === */
-  .fc-event {
-    font-size: 10px !important;
-    padding: 3px 5px !important;
-    margin: 1px 0 !important;
-    border-radius: 5px !important;
-  }
-
-  .fc-event-title {
-    font-size: 10px !important;
-    line-height: 1.2 !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-
-  .fc-event-time {
-    font-size: 9px !important;
-  }
-
-  /* === TIMEGRID MOBILE === */
-  .fc .fc-timegrid-slot {
-    height: 44px !important;
-  }
-
-  .fc .fc-timegrid-slot-label {
-    font-size: 9px !important;
-    padding: 2px !important;
-  }
-
-  .fc .fc-timegrid-axis {
-    width: 38px !important;
-  }
-
-  .fc .fc-timegrid-col {
-    min-width: 100px !important;
-  }
-
-  /* === SCROLLGRID MOBILE === */
-  .fc .fc-scrollgrid {
-    width: 100% !important;
-    overflow-x: auto !important;
-  }
-
-  /* === MORE LINK MOBILE === */
-  .fc .fc-daygrid-more-link {
-    padding: 2px 5px !important;
-    font-size: 9px !important;
-  }
-
-  /* === MODAL MOBILE === */
-  .grid-2 {
-    grid-template-columns: 1fr !important;
-  }
-
-  .settings-row {
-    flex-direction: column !important;
-  }
-
-  .settings-row select,
-  .settings-row input {
-    width: 100% !important;
-  }
-
-  /* === LANDSCAPE === */
-  @media (orientation: landscape) {
-    .fc {
-      height: 65vh !important;
-    }
+  .event-description {
+    font-size: 11px;
   }
 }
 
-/* ====================================================================== */
-/* === EXTRA SMALL (≤ 400px) === */
-/* ====================================================================== */
+/* Extra small mobile */
 @media (max-width: 400px) {
-  .fc .fc-toolbar-title {
-    font-size: 12px !important;
+  .mini-month-header h3 {
+    font-size: 14px;
   }
 
-  .fc .fc-button {
-    font-size: 10px !important;
-    padding: 8px 4px !important;
-    min-width: 48px !important;
+  .month-nav-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
   }
 
-  .fc .fc-col-header-cell {
-    font-size: 8px !important;
-    padding: 4px 0px !important;
+  .mini-day {
+    min-height: 38px;
   }
 
-  .fc .fc-daygrid-day-number {
-    font-size: 11px !important;
+  .mini-day .day-number {
+    font-size: 12px;
   }
 
-  .fc-event {
-    font-size: 9px !important;
-    padding: 2px 4px !important;
+  .event-dots {
+    font-size: 5px;
   }
 }
 
 /* ====================================================================== */
-/* FINE CALENDARIO MOBILE V3 */
+/* FINE CALENDARIO MOBILE IBRIDO */
 /* ====================================================================== */

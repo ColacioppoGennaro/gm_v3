@@ -99,7 +99,7 @@ export async function renderCalendar() {
   });
 }
 
-/** Inizializza FullCalendar — responsive senza auto-switch (niente loop) */
+/** Inizializza FullCalendar con configurazione performante */
 function initFullCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
@@ -107,26 +107,22 @@ function initFullCalendar() {
   const isMobile = window.matchMedia('(max-width: 700px)').matches;
 
   calendar = new FullCalendar.Calendar(calEl, {
-    // Scegli la vista iniziale solo all'avvio; poi l'utente cambia manualmente
     initialView: isMobile ? 'timeGridDay' : 'dayGridMonth',
     locale: 'it',
-
-    // Header responsive (ma non cambiamo più vista automaticamente)
+    
     headerToolbar: isMobile
       ? { left: 'prev,next today', center: 'title', right: 'timeGridDay,dayGridMonth' }
       : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
     buttonText: { today: 'Oggi', month: 'Mese', week: 'Settimana', day: 'Giorno' },
 
-    // Layout e dimensioni
-    height: 'auto',
-    contentHeight: 'auto',
-    expandRows: true,
-    handleWindowResize: false, // Lasciamo questa modifica per sicurezza
+    // --- ✅ CONFIGURAZIONE PERFORMANTE ---
+    // Rimosse le opzioni 'height: auto', 'contentHeight: auto', 'expandRows' e 'aspectRatio'.
+    // Impostiamo un'altezza fissa e lasciamo che il calendario gestisca lo scroll interno.
+    height: '80vh',          // Altezza fissa (80% dell'altezza della viewport)
+    handleWindowResize: true,  // Ora è sicuro e utile riattivarlo
+    
     stickyHeaderDates: true,
-    // aspectRatio: isMobile ? 0.95 : 1.4, // <-- ✅ CORREZIONE: Commentata per evitare conflitti con height: 'auto'
-
-    // Densità e visibilità eventi
-    dayMaxEventRows: true,
+    dayMaxEventRows: true,     // Limita il numero di eventi per cella, creando il link "+altri"
     eventMaxStack: isMobile ? 2 : 3,
     nowIndicator: true,
 
@@ -140,7 +136,6 @@ function initFullCalendar() {
     selectable: true,
     editable: true,
 
-    // Caricamento eventi
     events: async (info, success, failure) => {
       try {
         const events = await API.listGoogleEvents('primary', info.startStr, info.endStr);
@@ -152,13 +147,11 @@ function initFullCalendar() {
       }
     },
 
-    // Selezione range
     select: (info) => {
       showEventModal(null, info.start, info.end);
       calendar.unselect();
     },
 
-    // Drag & drop
     eventDrop: async (info) => {
       try {
         const allDay = info.event.allDay === true;
@@ -184,7 +177,6 @@ function initFullCalendar() {
       }
     },
 
-    // Resize evento
     eventResize: async (info) => {
       try {
         const allDay = info.event.allDay === true;
@@ -210,7 +202,6 @@ function initFullCalendar() {
       }
     },
 
-    // Click su evento
     eventClick: (info) => {
       showEventModal(info.event);
     }
@@ -219,7 +210,7 @@ function initFullCalendar() {
   calendar.render();
 }
 
-/** Modal evento (crea/modifica) — logica invariata salvo markup */
+/** Modal evento (crea/modifica) — logica invariata */
 function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
@@ -242,24 +233,20 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
-
       <div class="form-group">
         <label>Titolo *</label>
         <input type="text" id="eventTitle" value="${title}" placeholder="Titolo evento" required/>
       </div>
-
       <div class="form-group">
         <label>Descrizione</label>
         <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
       </div>
-
       <div class="settings-row settings-row--compact">
         <label style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" id="eventAllDay" ${allDay ? 'checked' : ''} style="width:auto;margin:0"/>
           <span>Tutto il giorno</span>
         </label>
       </div>
-
       <div class="grid-2">
         <div class="form-group" id="eventStartGroup">
           <label>Inizio *</label>
@@ -272,7 +259,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
                  value="${allDay ? formatDateLocal(end) : formatDateTimeLocal(end)}" required/>
         </div>
       </div>
-
       <div class="grid-2">
         <div class="form-group">
           <label>Ricorrenza</label>
@@ -290,9 +276,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           <button type="button" class="btn small" id="addReminderBtn">+ Aggiungi Promemoria</button>
         </div>
       </div>
-
       <div id="eventError" class="error hidden"></div>
-
       <div class="btn-group" style="margin-top:20px">
         <button class="btn secondary" id="closeEventModal">Annulla</button>
         ${isEdit ? '<button class="btn del" id="deleteEventBtn">🗑️ Elimina</button>' : ''}

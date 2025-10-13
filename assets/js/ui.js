@@ -318,41 +318,45 @@ function organizeDocsModal() {
 // FUNZIONE UNICA PER LE CHIAMATE API
 // ===================================================
 async function api(url, body = null) {
-    const opts = {
-        method: body ? 'POST' : 'GET',
-        credentials: 'same-origin',
-        headers: {}
-    };
-    if (body) {
-        if (body instanceof FormData) {
-            opts.body = body;
-        } else {
-            opts.headers['Content-Type'] = 'application/json';
-            opts.body = JSON.stringify(body);
-        }
+  const opts = {
+    method: body ? 'POST' : 'GET',
+    credentials: 'same-origin',
+    headers: {}
+  };
+  if (body) {
+    if (body instanceof FormData) {
+      opts.body = body;
+    } else {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
     }
-    try {
-        const res = await fetch(url, opts);
-        if (res.status === 401) {
-            console.warn('⚠️ Sessione scaduta');
-            S.view = 'login';
-            S.user = null;
-            localStorage.clear();
-            render();
-            throw new Error('AUTH');
-        }
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-            return await res.json();
-        }
-        return await res.text();
-    } catch (e) {
-        if (e.message !== 'AUTH') {
-            console.error('Errore:', e);
-            alert('Errore di connessione');
-        }
-        throw e;
+  }
+  try {
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      console.warn('⚠️ Sessione scaduta');
+      S.view = 'login';
+      S.user = null;
+      localStorage.clear();
+      render();
+      throw new Error('AUTH');
     }
+    const ct = res.headers.get('content-type') || '';
+    // ⬇️ NUOVO: se non ok, prova a leggere testo o json e lancia
+    if (!res.ok) {
+      const errText = await res.text().catch(()=>'');
+      const err = new Error('HTTP ' + res.status + ' ' + errText);
+      err.status = res.status;
+      throw err;
+    }
+    return ct.includes('application/json') ? await res.json() : await res.text();
+  } catch (e) {
+    if (e.message !== 'AUTH') {
+      console.error('Errore:', e);
+      alert('Errore di connessione');
+    }
+    throw e;
+  }
 }
 
 
@@ -459,7 +463,6 @@ function bind() {
     }
 }
 
-// SOSTITUISCI LA FUNZIONE calendarView() IN assets/js/ui.js CON QUESTA
 async function calendarView() {
     const pageContainer = document.querySelector('[data-page="calendar"]');
     if (!pageContainer || pageContainer.querySelector('#cal')) return;
@@ -554,7 +557,6 @@ async function calendarView() {
             try {
                 console.log('📝 Creazione evento Google:', title);
                 
-                // ✅ Prepara i dati con RFC3339 (toISOString)
                 const response = await fetch('api/google/events.php?calendarId=primary', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -667,30 +669,39 @@ async function calendarView() {
     document.getElementById('btnNew')?.addEventListener('click', async () => {
         const title = prompt('Titolo evento:');
         if (!title || title.trim() === '') return;
-        
+
         const start = new Date();
         const end = new Date(start.getTime() + 60 * 60 * 1000); // +1 ora
-        
+
         try {
             console.log('📝 Creazione evento manuale Google:', title);
-            
-            const eventData = {
-                calendarId: 'primary',
-                title: title.trim(),
-                start: start.toISOString(),
-                end: end.toISOString(),
-                reminders: []
-            };
-            
-            await api('api/google/events.php', eventData);
-            
-            console.log('✅ Evento Google manuale creato');
-            calendar.refetchEvents();
-        } catch(e) {
-            console.error('❌ Errore creazione evento manuale:', e);
-            if (e.message !== 'AUTH') {
-                alert('Errore nella creazione dell\'evento');
+
+            const res = await fetch('api/google/events.php?calendarId=primary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    calendarId: 'primary',
+                    title: title.trim(),
+                    start: start.toISOString(),
+                    end: end.toISOString(),
+                    reminders: []
+                })
+            });
+
+            if (!res.ok) {
+                const txt = await res.text().catch(()=> '');
+                console.error('❌ Creazione evento 400/500', res.status, txt);
+                alert('Errore nella creazione dell\'evento (HTTP ' + res.status + ').');
+                return;
             }
+
+            const result = await res.json().catch(()=> ({}));
+            console.log('✅ Evento Google manuale creato:', result);
+            calendar.refetchEvents();
+        } catch (e) {
+            console.error('❌ Errore creazione evento manuale:', e);
+            alert('Errore nella creazione dell\'evento.');
         }
     });
 }
@@ -1151,14 +1162,6 @@ function addMessageToLog(answer, type, question) {
     log.insertBefore(item, log.firstChild);
 }
 
-// Helpers (TTS/clipboard/context – implementazioni minime)
-function getItalianVoices(){ try { return speechSynthesis.getVoices().filter(v=>v.lang.startsWith('it')); } catch(_) { return []; } }
-function copyToClipboard(msgId){ const el = document.querySelector(`[data-msgid="${msgId}"] .message-text`); if(!el) return; navigator.clipboard?.writeText(el.textContent || '').catch(()=>{}); }
-function speakText(msgId){ /* implementa TTS se serve */ }
-function stopSpeaking(msgId){ /* stop TTS */ }
-function useAsContext(msgId){ const el = document.querySelector(`[data-msgid="${msgId}"] .message-text`); if(!el) return; S.chatContext = el.textContent || ''; const box = document.getElementById('contextBox'); if(box){ box.classList.remove('hidden'); box.textContent = 'Contesto attivo: ' + (S.chatContext.slice(0,140)) + (S.chatContext.length>140?'…':''); } }
-function removeContext(){ const box = document.getElementById('contextBox'); if(box){ box.classList.add('hidden'); box.textContent = ''; } S.chatContext = null; }
-
 async function loadAccountInfo() {
     try {
         const r = await api('api/account.php?a=info');
@@ -1266,3 +1269,4 @@ window.addEventListener('load', () => {
         }
     });
 });
+

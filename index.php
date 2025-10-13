@@ -1,8 +1,7 @@
 <?php
 /**
- * index.php (shell minimale)
- * Spezzato in: assets/css/app.css, assets/js/core.js, assets/js/ui.js
- */
+ * index.php (shell minimale con moduli ES6)
+ */
 session_start();
 require_once __DIR__.'/_core/helpers.php';
 ?>
@@ -29,9 +28,9 @@ require_once __DIR__.'/_core/helpers.php';
 
 <div id="app"></div>
 
-<!-- Script dell'applicazione (caricati dopo) -->
-<script src="assets/js/core.js" defer></script>
-<script src="assets/js/ui.js" defer></script>
+<!-- Script dell'applicazione (moduli ES6) -->
+<script src="assets/js/core.js"></script>
+<script type="module" src="assets/js/ui.js"></script>
 
 <!-- Modulo per le notifiche push -->
 <script type="module">
@@ -41,4 +40,3 @@ require_once __DIR__.'/_core/helpers.php';
 
 </body>
 </html>
-

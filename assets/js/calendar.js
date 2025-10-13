@@ -16,7 +16,7 @@ function toLocalRFC3339(dtLocal) {
   if (/Z$/.test(dtLocal)) {
     const d = new Date(dtLocal);
     return toRFC3339WithOffset(d);
-    }
+  }
   const [d, t = '00:00'] = dtLocal.split('T');
   const [Y, M, D] = d.split('-').map(Number);
   const [h, m] = t.split(':').map(Number);
@@ -99,19 +99,19 @@ export async function renderCalendar() {
   });
 }
 
-/** Inizializza FullCalendar (responsive, senza loop resize) */
+/** Inizializza FullCalendar — responsive senza auto-switch (niente loop) */
 function initFullCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
 
-  const mq = window.matchMedia('(max-width: 700px)');
-  const isMobile = mq.matches;
+  const isMobile = window.matchMedia('(max-width: 700px)').matches;
 
   calendar = new FullCalendar.Calendar(calEl, {
+    // Scegli la vista iniziale solo all'avvio; poi l'utente cambia manualmente
     initialView: isMobile ? 'timeGridDay' : 'dayGridMonth',
     locale: 'it',
 
-    // Header responsive
+    // Header responsive (ma non cambiamo più vista automaticamente)
     headerToolbar: isMobile
       ? { left: 'prev,next today', center: 'title', right: 'timeGridDay,dayGridMonth' }
       : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
@@ -217,20 +217,6 @@ function initFullCalendar() {
   });
 
   calendar.render();
-
-  // 🔒 Evita loop: cambia vista solo quando cambia davvero il breakpoint
-  let lastIsMobile = mq.matches;
-  function onMediaChange(e) {
-    const isNowMobile = e.matches;
-    if (isNowMobile === lastIsMobile) return;
-    lastIsMobile = isNowMobile;
-    const targetView = isNowMobile ? 'timeGridDay' : 'dayGridMonth';
-    if (calendar.view?.type !== targetView) {
-      calendar.changeView(targetView);
-    }
-  }
-  if (mq.addEventListener) mq.addEventListener('change', onMediaChange);
-  else mq.addListener(onMediaChange);
 }
 
 /** Modal evento (crea/modifica) — logica invariata salvo markup */
@@ -255,7 +241,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
-      <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
+      <h2 style=\"margin-bottom:16px\">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
 
       <div class="form-group">
         <label>Titolo *</label>
@@ -335,7 +321,7 @@ function toggleAllDayInputs(isAllDay) {
 
   const pad = (n) => String(n).padStart(2, '0');
   const formatDateTimeLocal = (d) =>
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
   const formatDateLocal = (d) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
@@ -359,14 +345,14 @@ function addReminderField(minutes = 30, method = 'popup') {
   const list = document.getElementById('remindersList');
   const id = 'reminder_' + Date.now();
 
-  const html = `<div class="settings-row settings-row--compact" data-reminder="${id}">
-    <select class="reminder-method">
-      <option value="popup" ${method === 'popup' ? 'selected' : ''}>Notifica</option>
-      <option value="email" ${method === 'email' ? 'selected' : ''}>Email</option>
+  const html = `<div class=\"settings-row settings-row--compact\" data-reminder=\"${id}\">
+    <select class=\"reminder-method\">
+      <option value=\"popup\" ${method === 'popup' ? 'selected' : ''}>Notifica</option>
+      <option value=\"email\" ${method === 'email' ? 'selected' : ''}>Email</option>
     </select>
-    <input type="number" class="reminder-minutes" value="${minutes}" min="0" max="10080" style="width:80px" placeholder="Min"/>
-    <span style="font-size:12px;color:var(--muted)">min prima</span>
-    <button type="button" class="btn del small" onclick="this.parentElement.remove()">✕</button>
+    <input type=\"number\" class=\"reminder-minutes\" value=\"${minutes}\" min=\"0\" max=\"10080\" style=\"width:80px\" placeholder=\"Min\"/>
+    <span style=\"font-size:12px;color:var(--muted)\">min prima</span>
+    <button type=\"button\" class=\"btn del small\" onclick=\"this.parentElement.remove()\">✕</button>
   </div>`;
 
   list.insertAdjacentHTML('beforeend', html);

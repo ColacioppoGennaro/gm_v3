@@ -148,3 +148,47 @@ h1{margin-bottom:8px}
   /* tabelle scrollabili */
   table{display:block; max-width:100%; overflow-x:auto; white-space:nowrap}
 }
+
+/* ===== Calendar layout ===== */
+
+.calendar-card { padding: 0; overflow: hidden; }
+.calendar-card-warning { background: #1f2937; border-left: 4px solid var(--warn); }
+
+.calendar-toolbar {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 10px 12px; border-bottom: 1px solid #1f2937; background: #0b1220;
+}
+
+.calendar-root { padding: 10px; }
+
+/* Contenitore: evita overflow orizzontale, usa tutta la larghezza */
+#cal, .calendar-root, .calendar-card { width: 100%; }
+
+/* FullCalendar: alleggerisci su mobile, evita “schiacciamento” */
+.fc { --fc-border-color: #1f2937; --fc-page-bg-color: transparent; }
+.fc .fc-scrollgrid,
+.fc .fc-view-harness { border-color: #1f2937; }
+.fc .fc-toolbar.fc-header-toolbar { gap: 8px; flex-wrap: wrap; padding: 8px 10px; }
+.fc .fc-toolbar-title { font-size: 1.1rem; }
+
+/* Eventi più leggibili */
+.fc .fc-daygrid-day-number { padding: 4px; }
+.fc .fc-daygrid-event, .fc .fc-timegrid-event { font-size: 0.95rem; line-height: 1.2; }
+.fc .fc-daygrid-more-link { font-size: 0.85rem; }
+
+/* TimeGrid: righe ariose ma compatte */
+.fc .fc-timegrid-slot { height: 2.3em; }
+.fc .fc-timegrid-axis-cushion, .fc .fc-timegrid-slot-label-cushion { padding: 4px 6px; }
+
+/* ===== Responsive (≤ 700px) ===== */
+@media (max-width: 700px) {
+  .calendar-card { border-radius: 12px; }
+  .calendar-root { padding: 8px; }
+  .fc .fc-toolbar-title { font-size: 1rem; }
+  .fc .fc-button { padding: 6px 10px; font-size: 0.9rem; }
+  .fc .fc-col-header-cell-cushion { padding: 6px 0; font-size: 0.85rem; }
+  .fc .fc-daygrid-day-number { font-size: 0.85rem; }
+  .fc .fc-daygrid-event, .fc .fc-timegrid-event { font-size: 0.9rem; }
+  .fc .fc-timegrid-slot { height: 2.1em; }
+  body, html { overflow-x: hidden; }
+}

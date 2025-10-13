@@ -121,7 +121,7 @@ function initFullCalendar() {
     height: 'auto',
     contentHeight: 'auto',
     expandRows: true,
-    handleWindowResize: true, // lascia a FC la gestione dimensioni interne
+    handleWindowResize: false, // <-- ✅ CORREZIONE: Impostato a false per evitare il loop di rendering
     stickyHeaderDates: true,
     aspectRatio: isMobile ? 0.95 : 1.4,
 
@@ -241,7 +241,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
-      <h2 style=\"margin-bottom:16px\">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
+      <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
 
       <div class="form-group">
         <label>Titolo *</label>
@@ -345,14 +345,14 @@ function addReminderField(minutes = 30, method = 'popup') {
   const list = document.getElementById('remindersList');
   const id = 'reminder_' + Date.now();
 
-  const html = `<div class=\"settings-row settings-row--compact\" data-reminder=\"${id}\">
-    <select class=\"reminder-method\">
-      <option value=\"popup\" ${method === 'popup' ? 'selected' : ''}>Notifica</option>
-      <option value=\"email\" ${method === 'email' ? 'selected' : ''}>Email</option>
+  const html = `<div class="settings-row settings-row--compact" data-reminder="${id}">
+    <select class="reminder-method">
+      <option value="popup" ${method === 'popup' ? 'selected' : ''}>Notifica</option>
+      <option value="email" ${method === 'email' ? 'selected' : ''}>Email</option>
     </select>
-    <input type=\"number\" class=\"reminder-minutes\" value=\"${minutes}\" min=\"0\" max=\"10080\" style=\"width:80px\" placeholder=\"Min\"/>
-    <span style=\"font-size:12px;color:var(--muted)\">min prima</span>
-    <button type=\"button\" class=\"btn del small\" onclick=\"this.parentElement.remove()\">✕</button>
+    <input type="number" class="reminder-minutes" value="${minutes}" min="0" max="10080" style="width:80px" placeholder="Min"/>
+    <span style="font-size:12px;color:var(--muted)">min prima</span>
+    <button type="button" class="btn del small" onclick="this.parentElement.remove()">✕</button>
   </div>`;
 
   list.insertAdjacentHTML('beforeend', html);

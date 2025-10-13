@@ -231,7 +231,8 @@ function renderMiniMonthGrid() {
 }
 
 window.selectDate = function(dateStr) {
-  currentDate = new Date(dateStr + 'T12:00:00');
+  const [year, month, day] = dateStr.split('-').map(Number);
+  currentDate = new Date(year, month - 1, day);
   renderMiniMonthGrid();
   renderDayEvents(currentDate);
 };

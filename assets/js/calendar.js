@@ -50,6 +50,16 @@ function nextDate(yyyy_mm_dd) {
   return `${y}-${m}-${day}`;
 }
 
+// === Utility: restituisce la data locale in formato YYYY-MM-DD senza timezone ===
+function formatLocalYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+
+
 export async function renderCalendar() {
   const page = document.querySelector('[data-page="calendar"]');
   if (!page) return;
@@ -187,7 +197,7 @@ function renderMiniMonthGrid() {
   // Giorni del mese
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatLocalYMD(date);
     
     const isToday = date.toDateString() === today.toDateString();
     const isSelected = date.toDateString() === currentDate.toDateString();

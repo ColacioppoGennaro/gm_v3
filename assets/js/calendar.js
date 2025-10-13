@@ -9,7 +9,6 @@ let calendar = null;
 let currentDate = new Date();
 let allEvents = [];
 
-// === Time helpers (RFC3339 locale + end esclusivo per all-day)
 const TZ = 'Europe/Rome';
 
 function toLocalRFC3339(dtLocal) {
@@ -51,15 +50,16 @@ function nextDate(yyyy_mm_dd) {
   return `${y}-${m}-${day}`;
 }
 
-/** Renderizza vista calendario */
 export async function renderCalendar() {
   const page = document.querySelector('[data-page="calendar"]');
-  if (!page || page.querySelector('#cal')) return;
+  if (!page) return;
+  
+  // IMPORTANTE: non controllare se esiste già #cal, altrimenti non si re-renderizza
+  const existingCal = page.querySelector('#cal');
 
   const isPro = window.S.user && window.S.user.role === 'pro';
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
-  // Verifica connessione Google
   let isGoogleConnected = false;
   try {
     await API.listGoogleEvents('primary', new Date().toISOString(), new Date(Date.now() + 86400000).toISOString());
@@ -94,7 +94,6 @@ export async function renderCalendar() {
 
   if (!isGoogleConnected) return;
 
-  // Scegli rendering in base a dispositivo
   if (isMobile) {
     await renderMobileCalendar();
   } else {
@@ -106,17 +105,16 @@ export async function renderCalendar() {
   });
 }
 
-/**
- * MOBILE: Mini Grid + Lista Eventi
- */
 async function renderMobileCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
 
   calEl.innerHTML = `
     <div class="mobile-calendar">
+      <!-- Mini Grid Mese -->
       <div class="mini-month-grid" id="miniMonthGrid"></div>
       
+      <!-- Lista Eventi Giorno -->
       <div class="day-events-list" id="dayEventsList">
         <div class="day-events-header" id="dayEventsHeader">
           <h3>Oggi</h3>
@@ -133,9 +131,6 @@ async function renderMobileCalendar() {
   renderDayEvents(currentDate);
 }
 
-/**
- * Carica eventi del mese corrente
- */
 async function loadEventsForMonth() {
   const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
@@ -152,9 +147,6 @@ async function loadEventsForMonth() {
   }
 }
 
-/**
- * Renderizza mini griglia mese (stile Google Calendar mobile)
- */
 function renderMiniMonthGrid() {
   const gridEl = document.getElementById('miniMonthGrid');
   if (!gridEl) return;
@@ -165,7 +157,11 @@ function renderMiniMonthGrid() {
   
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-  const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // 0=Lun, 6=Dom
+  
+  // CORRETTO: calcola il giorno della settimana con Lunedì = 0
+  let startDay = firstDay.getDay(); // 0=Dom, 1=Lun, ..., 6=Sab
+  startDay = startDay === 0 ? 6 : startDay - 1; // Converti: 0=Lun, 6=Dom
+  
   const daysInMonth = lastDay.getDate();
 
   const monthNames = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -196,7 +192,6 @@ function renderMiniMonthGrid() {
     const isToday = date.toDateString() === today.toDateString();
     const isSelected = date.toDateString() === currentDate.toDateString();
     
-    // Conta eventi del giorno
     const dayEvents = allEvents.filter(e => {
       const eventDate = new Date(e.start);
       return eventDate.toDateString() === date.toDateString();
@@ -215,10 +210,9 @@ function renderMiniMonthGrid() {
     `;
   }
 
-  html += '</div></div>';
+  html += '</div>';
   gridEl.innerHTML = html;
 
-  // Event listeners navigazione mese
   document.getElementById('prevMonth')?.addEventListener('click', () => {
     currentDate = new Date(year, month - 1, 1);
     loadEventsForMonth().then(() => {
@@ -236,18 +230,12 @@ function renderMiniMonthGrid() {
   });
 }
 
-/**
- * Seleziona data e mostra eventi
- */
 window.selectDate = function(dateStr) {
   currentDate = new Date(dateStr + 'T12:00:00');
   renderMiniMonthGrid();
   renderDayEvents(currentDate);
 };
 
-/**
- * Renderizza lista eventi del giorno selezionato
- */
 function renderDayEvents(date) {
   const headerEl = document.getElementById('dayEventsHeader');
   const contentEl = document.getElementById('dayEventsContent');
@@ -264,7 +252,6 @@ function renderDayEvents(date) {
 
   headerEl.innerHTML = `<h3>${isToday ? 'Oggi' : dateStr}</h3>`;
 
-  // Filtra eventi del giorno
   const dayEvents = allEvents.filter(e => {
     const eventDate = new Date(e.start);
     return eventDate.toDateString() === date.toDateString();
@@ -305,14 +292,10 @@ function renderDayEvents(date) {
   }).join('');
 }
 
-/**
- * Apri dettaglio evento
- */
 window.openEventDetail = async function(eventId) {
   const event = allEvents.find(e => e.id === eventId);
   if (!event) return;
   
-  // Converti in formato FullCalendar event object
   const fcEvent = {
     id: event.id,
     title: event.title,
@@ -325,83 +308,47 @@ window.openEventDetail = async function(eventId) {
   showEventModal(fcEvent);
 };
 
-/** Inizializza FullCalendar con configurazione performante */
 function initFullCalendar() {
   const calEl = document.getElementById('cal');
   if (!calEl) return;
 
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
   calendar = new FullCalendar.Calendar(calEl, {
-    initialView: isMobile ? 'timeGridDay' : 'dayGridMonth',
+    initialView: 'dayGridMonth',
     locale: 'it',
-    
-    headerToolbar: isMobile
-      ? { left: 'prev,next', center: 'title', right: 'today' }
-      : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
-    
-    footerToolbar: isMobile
-      ? { center: 'dayGridMonth,timeGridWeek,timeGridDay' }
-      : false,
-    
-    buttonText: { 
-      today: 'Oggi', 
-      month: isMobile ? 'M' : 'Mese', 
-      week: isMobile ? 'S' : 'Settimana', 
-      day: isMobile ? 'G' : 'Giorno' 
+    headerToolbar: { 
+      left: 'prev,next today', 
+      center: 'title', 
+      right: 'dayGridMonth,timeGridWeek,timeGridDay' 
     },
-
-    // --- ✅ CONFIGURAZIONE PERFORMANTE ---
-    height: isMobile ? '75vh' : '80vh',
-    handleWindowResize: true,
-    
-    stickyHeaderDates: !isMobile,
-    dayMaxEventRows: isMobile ? 2 : true,
-    eventMaxStack: isMobile ? 2 : 3,
+    buttonText: { today: 'Oggi', month: 'Mese', week: 'Settimana', day: 'Giorno' },
+    height: '80vh',
     nowIndicator: true,
-
-    // timeGrid ottimizzato
-    slotMinTime: '07:00:00',
-    slotMaxTime: '20:00:00',
-    slotEventOverlap: false,
-    slotLabelInterval: isMobile ? '02:00' : '01:00',
-    eventTimeFormat: { hour: '2-digit', minute: '2-digit', meridiem: false },
-
     selectable: true,
     editable: true,
-    
-    // Gestione touch su mobile
-    longPressDelay: isMobile ? 300 : 1000,
-    eventLongPressDelay: isMobile ? 300 : 1000,
-    selectLongPressDelay: isMobile ? 300 : 1000,
-
     events: async (info, success, failure) => {
       try {
         const events = await API.listGoogleEvents('primary', info.startStr, info.endStr);
         success(events);
       } catch (e) {
         console.error('❌ Errore caricamento eventi:', e);
-        if (e.message !== 'AUTH_EXPIRED') alert('Errore nel caricamento degli eventi Google Calendar');
         failure(e);
       }
     },
-
     select: (info) => {
       showEventModal(null, info.start, info.end);
       calendar.unselect();
     },
-
+    eventClick: (info) => {
+      showEventModal(info.event);
+    },
     eventDrop: async (info) => {
       try {
         const allDay = info.event.allDay === true;
         const fd = new FormData();
-        fd.append('calendarId', 'primary');
         if (allDay) {
-          const startDate = info.event.startStr.slice(0, 10);
-          const endDate = info.event.endStr ? info.event.endStr.slice(0, 10) : startDate;
           fd.append('allDay', '1');
-          fd.append('startDate', startDate);
-          fd.append('endDate', endDate);
+          fd.append('startDate', info.event.startStr.slice(0, 10));
+          fd.append('endDate', info.event.endStr ? info.event.endStr.slice(0, 10) : info.event.startStr.slice(0, 10));
         } else {
           fd.append('allDay', '0');
           fd.append('startDateTime', toLocalRFC3339(info.event.start.toISOString()));
@@ -410,53 +357,14 @@ function initFullCalendar() {
         }
         await API.updateGoogleEvent('primary', info.event.id, fd);
       } catch (e) {
-        console.error('❌ Errore spostamento evento:', e);
         info.revert();
-        if (e.message !== 'AUTH_EXPIRED') alert('Errore nello spostamento dell\'evento');
       }
-    },
-
-    eventResize: async (info) => {
-      try {
-        const allDay = info.event.allDay === true;
-        const fd = new FormData();
-        fd.append('calendarId', 'primary');
-        if (allDay) {
-          const startDate = info.event.startStr.slice(0, 10);
-          const endDate = info.event.endStr ? info.event.endStr.slice(0, 10) : startDate;
-          fd.append('allDay', '1');
-          fd.append('startDate', startDate);
-          fd.append('endDate', endDate);
-        } else {
-          fd.append('allDay', '0');
-          fd.append('startDateTime', toLocalRFC3339(info.event.start.toISOString()));
-          fd.append('endDateTime', toLocalRFC3339(info.event.end.toISOString()));
-          fd.append('timeZone', TZ);
-        }
-        await API.updateGoogleEvent('primary', info.event.id, fd);
-      } catch (e) {
-        console.error('❌ Errore ridimensionamento evento:', e);
-        info.revert();
-        if (e.message !== 'AUTH_EXPIRED') alert('Errore nel ridimensionamento dell\'evento');
-      }
-    },
-
-    eventClick: (info) => {
-      showEventModal(info.event);
     }
   });
 
   calendar.render();
-  
-  // Re-render su cambio orientamento mobile
-  if (isMobile) {
-    window.addEventListener('resize', () => {
-      if (calendar) calendar.updateSize();
-    });
-  }
 }
 
-/** Modal evento (crea/modifica) */
 function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
@@ -467,8 +375,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const start = event?.start || startDate || new Date();
   const end = event?.end || endDate || new Date(start.getTime() + 3600000);
   const allDay = event?.allDay || false;
-  const rrule = event?.extendedProps?.rrule || '';
-  const reminders = event?.extendedProps?.reminders || [];
 
   const pad = (n) => String(n).padStart(2, '0');
   const formatDateTimeLocal = (d) =>
@@ -494,32 +400,15 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         </label>
       </div>
       <div class="grid-2">
-        <div class="form-group" id="eventStartGroup">
+        <div class="form-group">
           <label>Inizio *</label>
           <input type="${allDay ? 'date' : 'datetime-local'}" id="eventStart"
                  value="${allDay ? formatDateLocal(start) : formatDateTimeLocal(start)}" required/>
         </div>
-        <div class="form-group" id="eventEndGroup">
+        <div class="form-group">
           <label>Fine *</label>
           <input type="${allDay ? 'date' : 'datetime-local'}" id="eventEnd"
                  value="${allDay ? formatDateLocal(end) : formatDateTimeLocal(end)}" required/>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="form-group">
-          <label>Ricorrenza</label>
-          <select id="eventRecurrence">
-            <option value="">Non ripetere</option>
-            <option value="FREQ=DAILY">Ogni giorno</option>
-            <option value="FREQ=WEEKLY">Ogni settimana</option>
-            <option value="FREQ=MONTHLY">Ogni mese</option>
-            <option value="FREQ=YEARLY">Ogni anno</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Promemoria</label>
-          <div id="remindersList" style="margin-bottom:8px"></div>
-          <button type="button" class="btn small" id="addReminderBtn">+ Aggiungi Promemoria</button>
         </div>
       </div>
       <div id="eventError" class="error hidden"></div>
@@ -532,70 +421,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   </div>`;
 
   document.body.insertAdjacentHTML('beforeend', html);
-
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
-  document.getElementById('eventAllDay').onchange = (e) => toggleAllDayInputs(e.target.checked);
-  document.getElementById('addReminderBtn').onclick = addReminderField;
-  reminders.forEach(r => addReminderField(r.minutes, r.method));
-  if (reminders.length === 0) addReminderField(30, 'popup');
-
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
-
-  document.getElementById('eventRecurrence').value = rrule || '';
-}
-
-function toggleAllDayInputs(isAllDay) {
-  const startInput = document.getElementById('eventStart');
-  const endInput = document.getElementById('eventEnd');
-
-  const pad = (n) => String(n).padStart(2, '0');
-  const formatDateTimeLocal = (d) =>
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-  const formatDateLocal = (d) =>
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-  const start = new Date(startInput.value);
-  const end = new Date(endInput.value);
-
-  if (isAllDay) {
-    startInput.type = 'date';
-    endInput.type = 'date';
-    startInput.value = formatDateLocal(start);
-    endInput.value = formatDateLocal(end);
-  } else {
-    startInput.type = 'datetime-local';
-    endInput.type = 'datetime-local';
-    startInput.value = formatDateTimeLocal(start);
-    endInput.value = formatDateTimeLocal(end);
-  }
-}
-
-function addReminderField(minutes = 30, method = 'popup') {
-  const list = document.getElementById('remindersList');
-  const id = 'reminder_' + Date.now();
-
-  const html = `<div class="settings-row settings-row--compact" data-reminder="${id}">
-    <select class="reminder-method">
-      <option value="popup" ${method === 'popup' ? 'selected' : ''}>Notifica</option>
-      <option value="email" ${method === 'email' ? 'selected' : ''}>Email</option>
-    </select>
-    <input type="number" class="reminder-minutes" value="${minutes}" min="0" max="10080" style="width:80px" placeholder="Min"/>
-    <span style="font-size:12px;color:var(--muted)">min prima</span>
-    <button type="button" class="btn del small" onclick="this.parentElement.remove()">✕</button>
-  </div>`;
-
-  list.insertAdjacentHTML('beforeend', html);
-}
-
-function collectReminders() {
-  const reminders = [];
-  document.querySelectorAll('[data-reminder]').forEach(el => {
-    const method = el.querySelector('.reminder-method').value;
-    const minutes = parseInt(el.querySelector('.reminder-minutes').value) || 0;
-    reminders.push({ method, minutes });
-  });
-  return reminders;
 }
 
 async function createEvent() {
@@ -604,44 +432,32 @@ async function createEvent() {
   const allDay = document.getElementById('eventAllDay').checked;
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
-  const recurrence = document.getElementById('eventRecurrence').value;
-  const reminders = collectReminders();
-  const errEl = document.getElementById('eventError');
 
-  errEl.classList.add('hidden');
-  if (!title) { errEl.textContent = 'Inserisci un titolo'; errEl.classList.remove('hidden'); return; }
-  if (!start || !end) { errEl.textContent = 'Seleziona data inizio e fine'; errEl.classList.remove('hidden'); return; }
+  if (!title || !start || !end) return alert('Compila tutti i campi obbligatori');
 
-  const btn = document.getElementById('saveEventBtn');
-  btn.disabled = true; btn.innerHTML = 'Creazione... <span class="loader"></span>';
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('description', description || '');
+  if (allDay) {
+    fd.append('allDay', '1');
+    fd.append('startDate', start);
+    fd.append('endDate', nextDate(end));
+  } else {
+    fd.append('allDay', '0');
+    fd.append('startDateTime', toLocalRFC3339(start));
+    fd.append('endDateTime', toLocalRFC3339(end));
+    fd.append('timeZone', TZ);
+  }
 
   try {
-    const fd = new FormData();
-    fd.append('calendarId', 'primary');
-    fd.append('title', title);
-    fd.append('description', description || '');
-    if (allDay) {
-      fd.append('allDay', '1');
-      fd.append('startDate', start);
-      fd.append('endDate', nextDate(end)); // end esclusivo
-    } else {
-      fd.append('allDay', '0');
-      fd.append('startDateTime', toLocalRFC3339(start));
-      fd.append('endDateTime', toLocalRFC3339(end));
-      fd.append('timeZone', TZ);
-    }
-    if (recurrence) fd.append('rrule', recurrence);
-    if (reminders.length) fd.append('reminders', JSON.stringify(reminders));
-
     await API.createGoogleEvent('primary', fd);
-    calendar.refetchEvents();
+    if (calendar) calendar.refetchEvents();
+    await loadEventsForMonth();
+    renderMiniMonthGrid();
+    renderDayEvents(currentDate);
     document.getElementById('eventModal').remove();
   } catch (e) {
-    console.error('❌ Errore creazione evento:', e);
-    const errEl2 = document.getElementById('eventError');
-    errEl2.textContent = 'Errore nella creazione dell\'evento';
-    errEl2.classList.remove('hidden');
-    btn.disabled = false; btn.innerHTML = 'Crea';
+    alert('Errore nella creazione dell\'evento');
   }
 }
 
@@ -651,60 +467,48 @@ async function updateEvent(event) {
   const allDay = document.getElementById('eventAllDay').checked;
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
-  const reminders = collectReminders();
-  const errEl = document.getElementById('eventError');
 
-  errEl.classList.add('hidden');
-  if (!title) { errEl.textContent = 'Inserisci un titolo'; errEl.classList.remove('hidden'); return; }
+  if (!title) return alert('Inserisci un titolo');
 
-  const btn = document.getElementById('saveEventBtn');
-  btn.disabled = true; btn.innerHTML = 'Salvataggio... <span class="loader"></span>';
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('description', description || '');
+  if (allDay) {
+    fd.append('allDay', '1');
+    fd.append('startDate', start);
+    fd.append('endDate', nextDate(end));
+  } else {
+    fd.append('allDay', '0');
+    fd.append('startDateTime', toLocalRFC3339(start));
+    fd.append('endDateTime', toLocalRFC3339(end));
+    fd.append('timeZone', TZ);
+  }
 
   try {
-    const fd = new FormData();
-    fd.append('calendarId', 'primary');
-    fd.append('title', title);
-    fd.append('description', description || '');
-    if (allDay) {
-      fd.append('allDay', '1');
-      fd.append('startDate', start);
-      fd.append('endDate', nextDate(end));
-    } else {
-      fd.append('allDay', '0');
-      fd.append('startDateTime', toLocalRFC3339(start));
-      fd.append('endDateTime', toLocalRFC3339(end));
-      fd.append('timeZone', TZ);
-    }
-    if (reminders.length) fd.append('reminders', JSON.stringify(reminders));
-
     await API.updateGoogleEvent('primary', event.id, fd);
-    calendar.refetchEvents();
+    if (calendar) calendar.refetchEvents();
+    await loadEventsForMonth();
+    renderMiniMonthGrid();
+    renderDayEvents(currentDate);
     document.getElementById('eventModal').remove();
   } catch (e) {
-    console.error('❌ Errore aggiornamento evento:', e);
-    const errEl2 = document.getElementById('eventError');
-    errEl2.textContent = 'Errore nell\'aggiornamento dell\'evento';
-    errEl2.classList.remove('hidden');
-    btn.disabled = false; btn.innerHTML = 'Salva';
+    alert('Errore nell\'aggiornamento dell\'evento');
   }
 }
 
 async function deleteEvent(event) {
   if (!confirm(`Vuoi eliminare l'evento "${event.title}"?`)) return;
 
-  const btn = document.getElementById('deleteEventBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
-
   try {
     await API.deleteGoogleEvent('primary', event.id);
-    calendar.refetchEvents();
+    if (calendar) calendar.refetchEvents();
+    await loadEventsForMonth();
+    renderMiniMonthGrid();
+    renderDayEvents(currentDate);
     document.getElementById('eventModal').remove();
   } catch (e) {
-    console.error('❌ Errore eliminazione evento:', e);
     alert('Errore nell\'eliminazione dell\'evento');
-    btn.disabled = false; btn.innerHTML = '🗑️ Elimina';
   }
 }
 
-// Esporta globalmente (se serve)
 window.renderCalendar = renderCalendar;

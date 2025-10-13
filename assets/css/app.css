@@ -459,3 +459,383 @@ h1{margin-bottom:8px}
 /* ====================================================================== */
 /* FINE CALENDARIO MOBILE IBRIDO */
 /* ====================================================================== */
+
+/* ====================================================================== */
+/* CALENDARIO MOBILE IBRIDO V2 - FIX LAYOUT */
+/* Sostituisci completamente il blocco calendario in app.css */
+/* ====================================================================== */
+
+/* === Mobile Calendar Container === */
+.mobile-calendar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  padding: 8px !important;
+  width: 100% !important;
+}
+
+/* === Mini Month Grid === */
+.mini-month-grid {
+  background: var(--panel) !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  border: 1px solid #374151 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.mini-month-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 16px !important;
+  padding: 0 4px !important;
+  width: 100% !important;
+}
+
+.mini-month-header h3 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--fg) !important;
+  margin: 0 !important;
+  flex: 1 !important;
+  text-align: center !important;
+}
+
+.month-nav-btn {
+  background: #1f2937 !important;
+  border: 1px solid #374151 !important;
+  color: var(--fg) !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  font-size: 20px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Headers giorni settimana - GRID FORZATO */
+.mini-month-days-header {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  gap: 4px !important;
+  margin-bottom: 8px !important;
+  width: 100% !important;
+}
+
+.mini-month-days-header div {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--muted) !important;
+  text-transform: uppercase !important;
+  padding: 4px 0 !important;
+  text-align: center !important;
+  display: block !important;
+}
+
+/* Griglia giorni - GRID FORZATO */
+.mini-month-days {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  gap: 4px !important;
+  width: 100% !important;
+}
+
+.mini-day {
+  aspect-ratio: 1 / 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  position: relative !important;
+  cursor: pointer !important;
+  background: #0b1220 !important;
+  border: 1px solid #374151 !important;
+  min-height: 42px !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+}
+
+.mini-day.empty {
+  cursor: default !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.mini-day .day-number {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--fg) !important;
+  margin-bottom: 2px !important;
+  display: block !important;
+  line-height: 1 !important;
+}
+
+.mini-day.today {
+  background: rgba(124, 58, 237, 0.2) !important;
+  border-color: var(--accent) !important;
+}
+
+.mini-day.today .day-number {
+  background: var(--accent) !important;
+  color: white !important;
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  font-weight: 600 !important;
+}
+
+.mini-day.selected {
+  background: #1f2937 !important;
+  border: 2px solid var(--accent) !important;
+}
+
+.mini-day.has-events {
+  border-color: var(--accent) !important;
+}
+
+.mini-day:not(.empty):active {
+  transform: scale(0.95) !important;
+}
+
+/* Pallini eventi */
+.event-dots {
+  position: absolute !important;
+  bottom: 4px !important;
+  font-size: 6px !important;
+  color: var(--accent) !important;
+  letter-spacing: 2px !important;
+  line-height: 1 !important;
+  display: block !important;
+}
+
+/* === Lista Eventi Giorno === */
+.day-events-list {
+  background: var(--panel) !important;
+  border-radius: 12px !important;
+  border: 1px solid #374151 !important;
+  min-height: 300px !important;
+  max-height: 500px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.day-events-header {
+  padding: 16px !important;
+  border-bottom: 1px solid #374151 !important;
+  flex-shrink: 0 !important;
+}
+
+.day-events-header h3 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--fg) !important;
+  text-transform: capitalize !important;
+}
+
+.day-events-content {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 8px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Evento singolo nella lista */
+.event-item {
+  display: flex !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  margin-bottom: 8px !important;
+  background: #0b1220 !important;
+  border-left: 4px solid var(--accent) !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.event-item:active {
+  transform: scale(0.98) !important;
+  background: #1f2937 !important;
+}
+
+.event-time {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--accent) !important;
+  min-width: 65px !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+
+.event-details {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.event-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--fg) !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.event-description {
+  font-size: 12px !important;
+  color: var(--muted) !important;
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Nessun evento */
+.no-events {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 48px 24px !important;
+  color: var(--muted) !important;
+  font-size: 14px !important;
+  text-align: center !important;
+}
+
+/* Loading */
+.loading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 48px 24px !important;
+  color: var(--muted) !important;
+  font-size: 14px !important;
+}
+
+/* === RESPONSIVE === */
+
+/* Desktop: nascondi mobile, mostra FullCalendar */
+@media (min-width: 769px) {
+  .mobile-calendar {
+    display: none !important;
+  }
+}
+
+/* Mobile: mostra mobile, nascondi FullCalendar */
+@media (max-width: 768px) {
+  /* Forza nascondere FullCalendar */
+  .fc,
+  .fc *,
+  #cal > .fc {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Forza mostrare mobile calendar */
+  .mobile-calendar,
+  .mobile-calendar * {
+    display: initial !important;
+    visibility: visible !important;
+  }
+
+  .mobile-calendar {
+    display: flex !important;
+  }
+
+  .mini-month-days-header,
+  .mini-month-days {
+    display: grid !important;
+  }
+
+  .day-events-list {
+    display: flex !important;
+  }
+
+  .event-item {
+    display: flex !important;
+  }
+
+  .event-details {
+    display: flex !important;
+  }
+
+  .calendar-card {
+    padding: 8px !important;
+    margin: 0 0 16px 0 !important;
+  }
+
+  /* Ottimizza per schermi piccoli */
+  .mini-day {
+    min-height: 40px !important;
+  }
+
+  .mini-day .day-number {
+    font-size: 13px !important;
+  }
+
+  .event-item {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .event-time {
+    font-size: 11px !important;
+    min-width: 60px !important;
+  }
+
+  .event-title {
+    font-size: 13px !important;
+  }
+
+  .event-description {
+    font-size: 11px !important;
+  }
+}
+
+/* Extra small mobile */
+@media (max-width: 400px) {
+  .mini-month-header h3 {
+    font-size: 14px !important;
+  }
+
+  .month-nav-btn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 18px !important;
+  }
+
+  .mini-day {
+    min-height: 38px !important;
+  }
+
+  .mini-day .day-number {
+    font-size: 12px !important;
+  }
+
+  .event-dots {
+    font-size: 5px !important;
+    letter-spacing: 1px !important;
+  }
+}
+
+/* ====================================================================== */
+/* FINE CALENDARIO MOBILE IBRIDO V2 */
+/* ====================================================================== */

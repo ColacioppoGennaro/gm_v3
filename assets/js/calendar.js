@@ -276,7 +276,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
-  _reminders = [];
+  _reminders = []; // Azzera i promemoria ogni volta
 
   const title = event?.title || '';
   const description = event?.extendedProps?.description || '';
@@ -367,7 +367,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
   });
 
-  // ✅ FIX: LOGICA DI CARICAMENTO PROMEMORIA CORRETTA
+  // ✅ BUG FIX: Logica di caricamento promemoria resa più robusta.
   if (isEdit && event.extendedProps) {
     const recurSel = document.getElementById('eventRecurrence');
     const rrule = event.extendedProps.recurrence?.[0] || '';
@@ -376,20 +376,36 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     else if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
     else if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
     
-    // Il backend restituisce un array JSON, lo parsa e lo usa
-    let savedReminders = event.extendedProps.reminders;
-    if (typeof savedReminders === 'string') {
-        try { savedReminders = JSON.parse(savedReminders); }
-        catch (e) { savedReminders = []; }
+    const savedRemindersData = event.extendedProps.reminders;
+    let loadedReminders = [];
+
+    if (savedRemindersData) {
+        // Caso 1: I dati sono una stringa JSON (dal nostro backend)
+        if (typeof savedRemindersData === 'string') {
+            try {
+                loadedReminders = JSON.parse(savedRemindersData);
+            } catch (e) {
+                console.error("Errore nel parsing dei promemoria:", savedRemindersData);
+            }
+        }
+        // Caso 2: I dati sono già un array
+        else if (Array.isArray(savedRemindersData)) {
+            loadedReminders = savedRemindersData;
+        }
+        // Caso 3: I dati sono nel formato dell'API di Google
+        else if (savedRemindersData.overrides && Array.isArray(savedRemindersData.overrides)) {
+            loadedReminders = savedRemindersData.overrides.map(r => ({
+                method: r.method || 'popup',
+                minutes: Number(r.minutes || 30)
+            }));
+        }
     }
 
-    if (Array.isArray(savedReminders)) {
-        _reminders = savedReminders;
-    } 
-    // Fallback per la struttura di Google API se presente
-    else if (savedReminders?.overrides && Array.isArray(savedReminders.overrides)) {
-      _reminders = savedReminders.overrides.map(r => ({ method: r.method || 'popup', minutes: Number(r.minutes || 30) }));
+    // Controlla che il risultato sia un array prima di assegnarlo
+    if (Array.isArray(loadedReminders)) {
+        _reminders = loadedReminders;
     }
+    
     renderReminderChips();
   }
 
@@ -465,3 +481,4 @@ async function _refreshCalendar() {
 }
 
 window.renderCalendar = renderCalendar;
+

@@ -7,15 +7,10 @@
  * Funzione API unificata con gestione errori e auth
  * @param {string} url - URL endpoint API
  * @param {Object|FormData|null} body - Dati da inviare (null per GET)
- * @param {string|null} method - Metodo HTTP (se null viene dedotto: GET senza body, POST con body)
- * @returns {Promise<any>} - Risposta JSON o testo
+ * @param {string|null} method - Metodo HTTP
  */
 export async function api(url, body = null, method = null) {
-  const opts = {
-    method: method || (body ? 'POST' : 'GET'),
-    credentials: 'same-origin',
-    headers: {}
-  };
+  const opts = { method: method || (body ? 'POST' : 'GET'), credentials: 'same-origin', headers: {} };
 
   if (body) {
     if (body instanceof FormData) {
@@ -52,14 +47,12 @@ export async function api(url, body = null, method = null) {
           errMsg = errText || errMsg;
         }
       } catch (_e) { /* ignore parse errors */ }
-
       const err = new Error(errMsg);
       err.status = res.status;
       throw err;
     }
 
     return ct.includes('application/json') ? await res.json() : await res.text();
-
   } catch (e) {
     if (e.message !== 'AUTH_EXPIRED') {
       console.error('❌ API Error:', url, e);
@@ -96,40 +89,33 @@ export const API = {
     fd.append('password', password);
     return api('api/auth.php?a=login', fd);
   },
-
   register: (email, password) => {
     const fd = new FormData();
     fd.append('email', email);
     fd.append('password', password);
     return api('api/auth.php?a=register', fd);
   },
-
   logout: () => api('api/auth.php?a=logout', {}),
-
   checkSession: () => api('api/auth.php?a=status'),
 
   // ===== DOCUMENTS =====
   listDocs: () => api('api/documents.php?a=list'),
-
   uploadDoc: (file, category = null) => {
     const fd = new FormData();
     fd.append('file', file);
     if (category) fd.append('category', category);
     return api('api/documents.php?a=upload', fd);
   },
-
   deleteDoc: (docId) => {
     const fd = new FormData();
     fd.append('id', docId);
     return api('api/documents.php?a=delete', fd);
   },
-
   ocrDoc: (docId) => {
     const fd = new FormData();
     fd.append('id', docId);
     return api('api/documents.php?a=ocr', fd);
   },
-
   changeDocCategory: (docId, category) => {
     const fd = new FormData();
     fd.append('id', docId);
@@ -139,13 +125,11 @@ export const API = {
 
   // ===== CATEGORIES =====
   listCategories: () => api('api/categories.php?a=list'),
-
   createCategory: (name) => {
     const fd = new FormData();
     fd.append('name', name);
     return api('api/categories.php?a=create', fd);
   },
-
   deleteCategory: (id) => {
     const fd = new FormData();
     fd.append('id', id);
@@ -162,11 +146,8 @@ export const API = {
     fd.append('show_refs', showRefs ? '1' : '0');
     return api('api/chat.php', fd);
   },
-
   askAI: (question, context = null) => {
-    const finalQuestion = context
-      ? `Contesto: ${context}\n\nDomanda: ${question || 'Continua'}`
-      : question;
+    const finalQuestion = context ? `Contesto: ${context}\n\nDomanda: ${question || 'Continua'}` : question;
     const fd = new FormData();
     fd.append('q', finalQuestion);
     fd.append('mode', 'ai');
@@ -174,38 +155,23 @@ export const API = {
   },
 
   // ===== CALENDAR (locale) =====
-  listEvents: (start, end) =>
-    api(`api/calendar.php?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
-
-  createEvent: (eventData) =>
-    api('api/calendar.php', eventData, 'POST'),
-
-  updateEvent: (id, eventData) =>
-    api(`api/calendar.php?id=${encodeURIComponent(id)}`, eventData, 'PATCH'),
-
-  deleteEvent: (id) =>
-    api(`api/calendar.php?id=${encodeURIComponent(id)}`, null, 'DELETE'),
+  listEvents: (start, end) => api(`api/calendar.php?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
+  createEvent: (eventData) => api('api/calendar.php', eventData, 'POST'),
+  updateEvent: (id, eventData) => api(`api/calendar.php?id=${encodeURIComponent(id)}`, eventData, 'PATCH'),
+  deleteEvent: (id) => api(`api/calendar.php?id=${encodeURIComponent(id)}`, null, 'DELETE'),
 
   // ===== GOOGLE CALENDAR (bridge PHP) =====
-  // >>> Il backend vuole calendarId (e id) in QUERYSTRING, non nel body <<<
-  listGoogleEvents: (calendarId, start, end) =>
-    api(`api/google/events.php?calendarId=${encodeURIComponent(calendarId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
-
-  // CREATE: POST con FormData, calendarId in querystring
+  listGoogleEvents: (calendarId, start, end) => api(`api/google/events.php?calendarId=${encodeURIComponent(calendarId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
   createGoogleEvent: (calendarId, data) => {
     const fd = data instanceof FormData ? data : objToFormData(data);
     const url = `api/google/events.php?calendarId=${encodeURIComponent(calendarId)}`;
     return api(url, fd, 'POST');
   },
-
-  // UPDATE: usare POST (non PATCH) + id in querystring
   updateGoogleEvent: (calendarId, eventId, data) => {
     const fd = data instanceof FormData ? data : objToFormData(data);
     const url = `api/google/events.php?calendarId=${encodeURIComponent(calendarId)}&id=${encodeURIComponent(eventId)}`;
     return api(url, fd, 'POST');
   },
-
-  // DELETE: alcuni hosting non supportano DELETE -> usa POST con _method=DELETE
   deleteGoogleEvent: (calendarId, eventId) => {
     const fd = new FormData();
     fd.append('_method', 'DELETE');
@@ -215,22 +181,17 @@ export const API = {
 
   // ===== ACCOUNT =====
   loadStats: () => api('api/stats.php'),
-
   loadAccountInfo: () => api('api/account.php?a=info'),
-
   upgradePro: (code) => {
     const fd = new FormData();
     fd.append('code', code);
     return api('api/upgrade.php', fd);
   },
-
   downgrade: () => api('api/account.php?a=downgrade', {}),
-
   deleteAccount: () => api('api/account.php?a=delete', {}),
 
   // ===== DASHBOARD EVENTS =====
   getDashboardEvents: (filters = {}) => {
-    // ⬅️ FIX: costruisci query-string solo con valori utili
     const params = new URLSearchParams();
     Object.entries(filters || {}).forEach(([k, v]) => {
       if (v !== null && v !== undefined && v !== '' && v !== 'null' && v !== 'undefined') {
@@ -239,5 +200,18 @@ export const API = {
     });
     const qs = params.toString();
     return api(`api/dashboard/events.php${qs ? '?' + qs : ''}`);
+  },
+
+  // ✅ FEED PAGINATO CON SCROLL INFINITO
+  getDashboardFeed: ({ anchor, dir='up', rangeDays=30, include_done=false, type=null, category=null, limit=20 } = {}) => {
+    const params = new URLSearchParams();
+    if (anchor) params.append('anchor', anchor);
+    params.append('dir', dir);
+    params.append('rangeDays', String(rangeDays));
+    params.append('limit', String(limit));
+    if (include_done) params.append('include_done', '1');
+    if (type) params.append('type', type);
+    if (category) params.append('category', category);
+    return api(`api/dashboard/events.php?${params.toString()}`);
   }
 };

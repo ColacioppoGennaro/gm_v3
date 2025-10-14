@@ -15,7 +15,8 @@ export async function renderEventsWidget() {
   if (!container) return;
 
   try {
-    const data = await API.getDashboardEvents(currentFilters);
+    // ⬅️ FIX: non passare currentFilters direttamente (evita ?type=null&category=null)
+    const data = await loadDashboardEvents();
     renderWidget(container, data);
   } catch (error) {
     console.error('Errore caricamento eventi:', error);
@@ -34,20 +35,19 @@ async function loadDashboardEvents() {
   const params = { limit: 10 };
   if (currentFilters.type) params.type = currentFilters.type;
   if (currentFilters.category) params.category = currentFilters.category;
-  
   return API.getDashboardEvents(params);
 }
 
 function renderWidget(container, data) {
   const { events, count } = data;
-  
+
   // Estrai categorie uniche per filtro
   const categories = [...new Set(events.map(e => e.category).filter(Boolean))];
-  
+
   const categoryOptions = categories.length > 0
     ? categories.map(c => `<option value="${c}">${c}</option>`).join('')
     : '<option value="">Nessuna categoria</option>';
-  
+
   container.innerHTML = `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
@@ -56,7 +56,7 @@ function renderWidget(container, data) {
           Vedi Calendario
         </button>
       </div>
-      
+
       ${categories.length > 0 ? `
       <div class="filter-bar" style="margin-bottom:16px">
         <label>Tipo:</label>
@@ -67,7 +67,7 @@ function renderWidget(container, data) {
           <option value="document">📄 Documento</option>
           <option value="personal">👤 Personale</option>
         </select>
-        
+
         <label>Categoria:</label>
         <select id="filterCategory" onchange="window.filterEvents()">
           <option value="">Tutte</option>
@@ -75,13 +75,13 @@ function renderWidget(container, data) {
         </select>
       </div>
       ` : ''}
-      
+
       <div id="eventsList">
         ${events.length === 0 ? renderEmptyState() : events.map(renderEventRow).join('')}
       </div>
     </div>
   `;
-  
+
   // Ripristina valori filtri
   if (currentFilters.type) {
     const typeSelect = document.getElementById('filterType');
@@ -109,24 +109,24 @@ function renderEventRow(event) {
     document: '📄',
     personal: '👤'
   };
-  
+
   const emoji = typeEmoji[event.type] || '📌';
   const startDate = new Date(event.start);
-  const dateStr = startDate.toLocaleDateString('it-IT', { 
-    day: 'numeric', 
+  const dateStr = startDate.toLocaleDateString('it-IT', {
+    day: 'numeric',
     month: 'short',
     year: startDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
   });
-  
-  const timeStr = event.allDay 
+
+  const timeStr = event.allDay
     ? 'Tutto il giorno'
     : startDate.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  
+
   const isOverdue = startDate < new Date();
-  const categoryBadge = event.category 
+  const categoryBadge = event.category
     ? `<span class="category-tag" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#334155;color:#cbd5e1;border:1px solid #475569;margin-left:8px">${event.category}</span>`
     : '';
-  
+
   return `
     <div class="event-row" style="
       display:flex;
@@ -151,24 +151,24 @@ function renderEventRow(event) {
         </div>
         ${event.description ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">${event.description.substring(0, 80)}${event.description.length > 80 ? '...' : ''}</div>` : ''}
       </div>
-      
+
       <div class="event-actions" style="display:flex;gap:6px;flex-wrap:wrap">
-        <button 
-          class="btn success small" 
+        <button
+          class="btn success small"
           onclick="window.markEventDone('${event.id}')"
           title="Segna come completato"
         >
           ✓ Fatto
         </button>
-        <button 
-          class="btn secondary small" 
+        <button
+          class="btn secondary small"
           onclick="window.postponeEvent('${event.id}', '${event.title.replace(/'/g, "\\'")}')"
           title="Rimanda"
         >
           ⏸ Rimanda
         </button>
-        <button 
-          class="btn secondary small icon-only" 
+        <button
+          class="btn secondary small icon-only"
           onclick="window.viewEventDetails('${event.id}')"
           title="Dettagli"
         >
@@ -189,13 +189,13 @@ window.filterEvents = async function() {
 
 window.markEventDone = async function(eventId) {
   if (!confirm('Segnare questo evento come completato?')) return;
-  
+
   try {
     const fd = new FormData();
     fd.append('_method', 'PATCH');
     fd.append('status', 'done');
     fd.append('show_in_dashboard', 'false');
-    
+
     await API.updateGoogleEvent('primary', eventId, fd);
     await renderEventsWidget();
     showNotification('✅ Evento segnato come completato!', 'success');
@@ -215,13 +215,13 @@ window.viewEventDetails = async function(eventId) {
     const now = new Date();
     const future = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const allEvents = await API.listGoogleEvents('primary', now.toISOString(), future.toISOString());
-    
+
     const event = allEvents.find(e => e.id === eventId);
     if (!event) {
       alert('Evento non trovato');
       return;
     }
-    
+
     // Converti in formato per modal calendario
     const fcEvent = {
       id: event.id,
@@ -231,7 +231,7 @@ window.viewEventDetails = async function(eventId) {
       allDay: event.allDay || false,
       extendedProps: event.extendedProps || {}
     };
-    
+
     // Importa dinamicamente la funzione dal calendario
     const calendarModule = await import('./calendar.js');
     if (calendarModule.showEventModal) {
@@ -249,11 +249,11 @@ window.viewEventDetails = async function(eventId) {
 function showPostponeModal(eventId, eventTitle) {
   const modalId = 'postponeModal';
   document.getElementById(modalId)?.remove();
-  
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
-  
+
   const html = `
     <div class="modal" id="${modalId}">
       <div class="modal-content" style="max-width:500px">
@@ -261,12 +261,12 @@ function showPostponeModal(eventId, eventTitle) {
         <p style="color:var(--muted);margin-bottom:20px">
           Seleziona la nuova data per: <strong>${eventTitle}</strong>
         </p>
-        
+
         <div class="form-group">
           <label>Nuova data *</label>
           <input type="date" id="postponeDate" value="${tomorrowStr}" required/>
         </div>
-        
+
         <div class="form-group">
           <label>Suggerimenti rapidi:</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -281,7 +281,7 @@ function showPostponeModal(eventId, eventTitle) {
             </button>
           </div>
         </div>
-        
+
         <div class="btn-group" style="margin-top:24px">
           <button class="btn secondary" id="cancelPostpone">Annulla</button>
           <button class="btn" id="confirmPostpone">Conferma</button>
@@ -289,31 +289,31 @@ function showPostponeModal(eventId, eventTitle) {
       </div>
     </div>
   `;
-  
+
   document.body.insertAdjacentHTML('beforeend', html);
-  
+
   document.getElementById('cancelPostpone').onclick = () => {
     document.getElementById(modalId).remove();
   };
-  
+
   document.getElementById('confirmPostpone').onclick = async () => {
     const newDate = document.getElementById('postponeDate').value;
     if (!newDate) {
       alert('Seleziona una data');
       return;
     }
-    
+
     try {
       const fd = new FormData();
       fd.append('_method', 'PATCH');
       fd.append('allDay', '1');
       fd.append('startDate', newDate);
-      
+
       // Fine = giorno dopo
       const endDate = new Date(newDate);
       endDate.setDate(endDate.getDate() + 1);
       fd.append('endDate', endDate.toISOString().split('T')[0]);
-      
+
       await API.updateGoogleEvent('primary', eventId, fd);
       document.getElementById(modalId).remove();
       await renderEventsWidget();
@@ -347,7 +347,7 @@ function showNotification(message, type = 'success') {
   `;
   notif.textContent = message;
   document.body.appendChild(notif);
-  
+
   setTimeout(() => {
     notif.style.animation = 'slideOut 0.3s ease';
     setTimeout(() => notif.remove(), 300);

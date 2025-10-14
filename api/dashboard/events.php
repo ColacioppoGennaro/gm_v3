@@ -83,13 +83,21 @@ try {
         $extProps = $e->getExtendedProperties();
         $privateProps = $extProps ? $extProps->getPrivate() : null;
         
-        if (!$privateProps) continue;
+        // ✅ FIX: Se non ha privateProps, considera come evento esterno (personal)
+        if (!$privateProps) {
+            $privateProps = [];
+        }
         
         // Filtri obbligatori
         $status = $privateProps['status'] ?? 'pending';
-        $showInDashboard = isset($privateProps['show_in_dashboard']) 
-            ? ($privateProps['show_in_dashboard'] === 'true' || $privateProps['show_in_dashboard'] === true)
-            : true;
+        
+        // ✅ FIX: Gestione robusta boolean/string per show_in_dashboard
+        if (isset($privateProps['show_in_dashboard'])) {
+            $val = $privateProps['show_in_dashboard'];
+            $showInDashboard = ($val === 'true' || $val === true || $val === 1 || $val === '1');
+        } else {
+            $showInDashboard = true; // default
+        }
         
         if ($status !== 'pending') continue;
         if (!$showInDashboard) continue;

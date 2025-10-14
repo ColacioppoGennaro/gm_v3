@@ -528,3 +528,30 @@ h1{margin-bottom:8px}
 /* ====================================================================== */
 /* FINE CALENDARIO MOBILE IBRIDO V2 */
 /* ====================================================================== */
+
+/* Chips tipo evento e promemoria */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #334155;
+  color: white;
+}
+
+.chip-x {
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 0 0 4px;
+  font-size: 14px;
+}
+
+.chip-x:hover {
+  color: #ef4444;
+}

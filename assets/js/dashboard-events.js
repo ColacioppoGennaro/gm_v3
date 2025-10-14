@@ -129,6 +129,10 @@ async function applyFiltersAndReload() {
   anchorDown = new Date().toISOString();
   isInitialized = false;
   
+  // ✅ Rimuovi messaggi "fine eventi" se presenti
+  const endMsg = document.getElementById('endMessage');
+  if (endMsg) endMsg.remove();
+  
   document.getElementById('eventsList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">⏳ Caricamento...</div>';
   
   await initializeAndLoad();
@@ -143,9 +147,15 @@ async function primeLoad() {
   
   console.log('🔄 Caricamento iniziale eventi...', { currentFilters });
   
+  // ✅ Reset ancore a ADESSO
+  const now = new Date().toISOString();
+  anchorUp = now;
+  anchorDown = now;
+  
   try {
+    // ✅ Carica eventi FUTURI da oggi in avanti (dir=up)
     const data = await API.getDashboardFeed({
-      anchor: anchorUp,
+      anchor: now,
       dir: 'up',
       rangeDays: RANGE_DAYS,
       include_done: false,
@@ -156,8 +166,9 @@ async function primeLoad() {
     
     console.log('📊 Dati ricevuti:', data);
     
+    // ✅ Aggiorna ancore
     anchorUp = data?.meta?.nextAnchorUp || anchorUp;
-    anchorDown = data?.meta?.anchor || anchorDown; // ✅ anchor iniziale per scorrere giù
+    anchorDown = now; // Per scrollare giù partiamo da oggi
     
     // aggiorna categorie
     (data.events||[]).map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
@@ -167,7 +178,7 @@ async function primeLoad() {
     list.innerHTML = '';
     
     if (!data.events || data.events.length === 0) {
-      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento futuro trovato. Scorri in basso per vedere eventi passati.</div>';
     } else {
       const html = data.events.map(eventRowHtml).join('');
       list.innerHTML = html;
@@ -239,19 +250,24 @@ function setupScrollHandlers() {
   const list = document.getElementById('eventsList');
   if (!feed || !list) return;
   
-  const TOP_THR = 100;
-  const BOT_THR = 100;
+  const TOP_THR = 150;
+  const BOT_THR = 150;
+  
+  // ✅ Flag per evitare caricamenti quando non ci sono più eventi
+  let noMoreUp = false;
+  let noMoreDown = false;
+  
+  // ✅ Debounce per evitare troppi trigger
+  let scrollTimeout = null;
 
   // ✅ Spinner helper
   const showTopSpinner = () => {
-    let spinner = document.getElementById('topSpinner');
-    if (!spinner) {
-      spinner = document.createElement('div');
-      spinner.id = 'topSpinner';
-      spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
-      spinner.innerHTML = '🔄';
-      list.insertBefore(spinner, list.firstChild);
-    }
+    if (document.getElementById('topSpinner')) return;
+    const spinner = document.createElement('div');
+    spinner.id = 'topSpinner';
+    spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
+    spinner.innerHTML = '🔄';
+    list.insertBefore(spinner, list.firstChild);
   };
   
   const hideTopSpinner = () => {
@@ -260,14 +276,12 @@ function setupScrollHandlers() {
   };
   
   const showBottomSpinner = () => {
-    let spinner = document.getElementById('bottomSpinner');
-    if (!spinner) {
-      spinner = document.createElement('div');
-      spinner.id = 'bottomSpinner';
-      spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
-      spinner.innerHTML = '🔄';
-      list.appendChild(spinner);
-    }
+    if (document.getElementById('bottomSpinner')) return;
+    const spinner = document.createElement('div');
+    spinner.id = 'bottomSpinner';
+    spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
+    spinner.innerHTML = '🔄';
+    list.appendChild(spinner);
   };
   
   const hideBottomSpinner = () => {
@@ -275,12 +289,12 @@ function setupScrollHandlers() {
     if (spinner) spinner.remove();
   };
 
-  feed.addEventListener('scroll', async () => {
+  const handleScroll = async () => {
     const nearTop = feed.scrollTop < TOP_THR;
     const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < BOT_THR;
 
     // ✅ SCROLL SU: carica eventi FUTURI
-    if (nearTop && !loadingUp) {
+    if (nearTop && !loadingUp && !noMoreUp) {
       loadingUp = true;
       showTopSpinner();
       
@@ -298,15 +312,30 @@ function setupScrollHandlers() {
         
         console.log('📊 Eventi futuri ricevuti:', data?.events?.length || 0);
         
+        if (!data.events || data.events.length === 0) {
+          noMoreUp = true;
+          console.log('⚠️ Nessun altro evento futuro');
+          hideTopSpinner();
+          return;
+        }
+        
         if (data?.meta?.nextAnchorUp) {
           anchorUp = data.meta.nextAnchorUp;
         }
         
-        if (data.events && data.events.length > 0) {
-          // Rimuovi spinner prima di aggiungere contenuto
-          hideTopSpinner();
-          prependOrAppend(data.events, 'prepend');
-        }
+        // Salva posizione scroll prima di aggiungere
+        const oldScrollHeight = feed.scrollHeight;
+        const oldScrollTop = feed.scrollTop;
+        
+        hideTopSpinner();
+        prependOrAppend(data.events, 'prepend');
+        
+        // ✅ Mantieni posizione scroll (evita scatti)
+        requestAnimationFrame(() => {
+          const newScrollHeight = feed.scrollHeight;
+          feed.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+        });
+        
       } catch (error) {
         console.error('❌ Errore caricamento scroll up:', error);
       } finally {
@@ -316,7 +345,7 @@ function setupScrollHandlers() {
     }
 
     // ✅ SCROLL GIÙ: carica eventi PASSATI (inclusi completati)
-    if (nearBottom && !loadingDown) {
+    if (nearBottom && !loadingDown && !noMoreDown) {
       loadingDown = true;
       showBottomSpinner();
       
@@ -326,7 +355,7 @@ function setupScrollHandlers() {
           anchor: anchorDown,
           dir: 'down',
           rangeDays: RANGE_DAYS,
-          include_done: true, // 👈 Include eventi completati
+          include_done: true,
           type: currentFilters.type,
           category: currentFilters.category,
           limit: 20
@@ -334,15 +363,28 @@ function setupScrollHandlers() {
         
         console.log('📊 Eventi passati ricevuti:', data?.events?.length || 0);
         
+        if (!data.events || data.events.length === 0) {
+          noMoreDown = true;
+          console.log('⚠️ Nessun altro evento passato');
+          hideBottomSpinner();
+          // ✅ Mostra messaggio fine lista
+          if (!document.getElementById('endMessage')) {
+            const endMsg = document.createElement('div');
+            endMsg.id = 'endMessage';
+            endMsg.style.cssText = 'padding:20px;text-align:center;color:var(--muted);font-size:12px';
+            endMsg.innerHTML = '📭 Fine eventi';
+            list.appendChild(endMsg);
+          }
+          return;
+        }
+        
         if (data?.meta?.nextAnchorDown) {
           anchorDown = data.meta.nextAnchorDown;
         }
         
-        if (data.events && data.events.length > 0) {
-          // Rimuovi spinner prima di aggiungere contenuto
-          hideBottomSpinner();
-          prependOrAppend(data.events, 'append');
-        }
+        hideBottomSpinner();
+        prependOrAppend(data.events, 'append');
+        
       } catch (error) {
         console.error('❌ Errore caricamento scroll down:', error);
       } finally {
@@ -350,6 +392,12 @@ function setupScrollHandlers() {
         loadingDown = false;
       }
     }
+  };
+
+  // ✅ Scroll con debounce (evita troppi trigger)
+  feed.addEventListener('scroll', () => {
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(handleScroll, 150);
   });
   
   console.log('✅ Scroll handlers configurati');

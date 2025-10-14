@@ -25,6 +25,9 @@ try {
     $user = user();
     $userId = $user['id'];
     
+    // Inizializza database
+    $db = db();
+    
     // Leggi input
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);

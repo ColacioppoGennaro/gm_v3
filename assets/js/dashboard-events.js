@@ -38,24 +38,34 @@ export async function renderEventsWidget() {
     observer = null;
   }
 
-  // shell + filtri + area scrollabile
+  // shell + filtri + checkbox + area scrollabile
   container.innerHTML = `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap">
         <h3 style="margin:0">📅 Prossimi Eventi</h3>
         <button class="btn small" onclick="location.hash='#/calendar'">Vedi Calendario</button>
       </div>
-      <div class="filter-bar" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <label>Tipo:</label>
-        <select id="filterType">
-          <option value="">Tutti</option>
-          <option value="payment">💳 Pagamento</option>
-          <option value="maintenance">🔧 Manutenzione</option>
-          <option value="document">📄 Documento</option>
-          <option value="personal">👤 Personale</option>
-        </select>
-        <label>Categoria:</label>
-        <select id="filterCategory"><option value="">Tutte</option></select>
+      <div class="filter-bar" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center">
+          <label>Tipo:</label>
+          <select id="filterType">
+            <option value="">Tutti</option>
+            <option value="payment">💳 Pagamento</option>
+            <option value="maintenance">🔧 Manutenzione</option>
+            <option value="document">📄 Documento</option>
+            <option value="personal">👤 Personale</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label>Categoria:</label>
+          <select id="filterCategory"><option value="">Tutte</option></select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="showCompleted" style="cursor:pointer">
+            <span>Mostra completati</span>
+          </label>
+        </div>
       </div>
       <div id="feed" style="max-height:420px;overflow-y:auto;border-radius:8px;background:#0f172a1a;padding:8px">
         <div id="feedTopSentinel" style="height:1px"></div>
@@ -70,8 +80,9 @@ export async function renderEventsWidget() {
   // Verifica che gli elementi esistano ancora
   const filterType = document.getElementById('filterType');
   const filterCategory = document.getElementById('filterCategory');
+  const showCompleted = document.getElementById('showCompleted');
   
-  if (!filterType || !filterCategory) {
+  if (!filterType || !filterCategory || !showCompleted) {
     console.warn('⚠️ Elementi filtro non trovati, riprovo...');
     setTimeout(() => renderEventsWidget(), 100);
     return;
@@ -80,6 +91,7 @@ export async function renderEventsWidget() {
   // ✅ Eventi onChange immediati per filtri
   filterType.addEventListener('change', applyFiltersAndReload);
   filterCategory.addEventListener('change', applyFiltersAndReload);
+  showCompleted.addEventListener('change', applyFiltersAndReload);
 
   // ✅ Carica immediatamente
   await initializeAndLoad();
@@ -152,36 +164,70 @@ async function primeLoad() {
   anchorUp = now;
   anchorDown = now;
   
+  // ✅ Leggi checkbox completati
+  const showCompleted = document.getElementById('showCompleted')?.checked || false;
+  
   try {
-    // ✅ Carica eventi FUTURI da oggi in avanti (dir=up)
-    const data = await API.getDashboardFeed({
+    // ✅ Carica FUTURI (da oggi in avanti)
+    const futureData = await API.getDashboardFeed({
       anchor: now,
       dir: 'up',
       rangeDays: RANGE_DAYS,
-      include_done: false,
+      include_done: showCompleted,
       type: currentFilters.type,
       category: currentFilters.category,
-      limit: 20
+      limit: 10
     });
     
-    console.log('📊 Dati ricevuti:', data);
+    // ✅ Carica PASSATI/OGGI (ultimi 7 giorni)
+    const pastData = await API.getDashboardFeed({
+      anchor: now,
+      dir: 'down',
+      rangeDays: 7, // Solo ultimi 7 giorni
+      include_done: showCompleted,
+      type: currentFilters.type,
+      category: currentFilters.category,
+      limit: 10
+    });
+    
+    console.log('📊 Eventi futuri:', futureData?.events?.length || 0);
+    console.log('📊 Eventi passati:', pastData?.events?.length || 0);
     
     // ✅ Aggiorna ancore
-    anchorUp = data?.meta?.nextAnchorUp || anchorUp;
-    anchorDown = now; // Per scrollare giù partiamo da oggi
+    anchorUp = futureData?.meta?.nextAnchorUp || anchorUp;
+    anchorDown = pastData?.meta?.nextAnchorDown || anchorDown;
     
     // aggiorna categorie
-    (data.events||[]).map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
+    const allEvents = [...(pastData.events || []), ...(futureData.events || [])];
+    allEvents.map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
     renderCategories();
     
     // ✅ Pulisci e mostra eventi
     list.innerHTML = '';
     
-    if (!data.events || data.events.length === 0) {
-      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento futuro trovato. Scorri in basso per vedere eventi passati.</div>';
+    // Ordina: passati in ordine cronologico inverso (più recente prima)
+    const pastSorted = (pastData.events || []).sort((a, b) => 
+      new Date(b.start).getTime() - new Date(a.start).getTime()
+    );
+    
+    // Futuri già in ordine corretto
+    const futureEvents = futureData.events || [];
+    
+    const combinedEvents = [...pastSorted, ...futureEvents];
+    
+    if (combinedEvents.length === 0) {
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
     } else {
-      const html = data.events.map(eventRowHtml).join('');
+      const html = combinedEvents.map(eventRowHtml).join('');
       list.innerHTML = html;
+      
+      // ✅ Scroll al primo evento futuro o oggi
+      setTimeout(() => {
+        const firstFuture = list.querySelector('[data-future="true"]');
+        if (firstFuture) {
+          firstFuture.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     }
   } catch (error) {
     console.error('❌ Errore caricamento eventi:', error);
@@ -201,16 +247,22 @@ function eventRowHtml(event) {
   const typeEmoji = { payment:'💳', maintenance:'🔧', document:'📄', personal:'👤' };
   const emoji = typeEmoji[event.type] || '📌';
   const startDate = new Date(event.start);
-  const dateStr = startDate.toLocaleDateString('it-IT',{ day:'numeric', month:'short', year: startDate.getFullYear()!==new Date().getFullYear()? 'numeric': undefined });
+  const now = new Date();
+  const dateStr = startDate.toLocaleDateString('it-IT',{ day:'numeric', month:'short', year: startDate.getFullYear()!==now.getFullYear()? 'numeric': undefined });
   const timeStr = event.allDay ? 'Tutto il giorno' : startDate.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-  const isOverdue = startDate < new Date() && event.status !== 'done';
+  const isOverdue = startDate < now && event.status !== 'done';
   const isDone = event.status === 'done';
+  const isFuture = startDate >= now;
   
   const categoryBadge = event.category ? `<span class="category-tag" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#334155;color:#cbd5e1;border:1px solid #475569;margin-left:8px">${event.category}</span>` : '';
   
   const doneBadge = isDone ? '<span style="color:#10b981;font-size:11px;font-weight:600;margin-left:8px">✅ COMPLETATO</span>' : '';
   
   const overdueBadge = isOverdue ? '<span style="color:#ef4444;font-size:11px;font-weight:600">⚠️ SCADUTO</span>' : '';
+  
+  // ✅ Badge OGGI
+  const isToday = startDate.toDateString() === now.toDateString();
+  const todayBadge = isToday && !isDone ? '<span style="color:#3b82f6;font-size:11px;font-weight:600;margin-left:8px">📍 OGGI</span>' : '';
   
   // ✅ Nascondi azioni se completato
   const actions = isDone ? '' : `
@@ -221,12 +273,13 @@ function eventRowHtml(event) {
     </div>`;
   
   return `
-    <div class="event-row" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:${isDone ? 'rgba(16,185,129,0.1)' : isOverdue?'rgba(239,68,68,0.1)':'#1f2937'};border-left:4px solid ${event.color};border-radius:8px;flex-wrap:wrap;opacity:${isDone ? '0.7' : '1'}">
+    <div class="event-row" data-future="${isFuture}" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:${isDone ? 'rgba(16,185,129,0.1)' : isToday ? 'rgba(59,130,246,0.1)' : isOverdue?'rgba(239,68,68,0.1)':'#1f2937'};border-left:4px solid ${event.color};border-radius:8px;flex-wrap:wrap;opacity:${isDone ? '0.7' : '1'}">
       <div style="flex:1;min-width:240px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <span style="font-size:18px">${emoji}</span>
           <strong style="color:var(--fg);${isDone ? 'text-decoration:line-through' : ''}">${event.title}</strong>
           ${categoryBadge}
+          ${todayBadge}
           ${doneBadge}
           ${overdueBadge}
         </div>
@@ -292,6 +345,9 @@ function setupScrollHandlers() {
   const handleScroll = async () => {
     const nearTop = feed.scrollTop < TOP_THR;
     const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < BOT_THR;
+    
+    // ✅ Leggi checkbox
+    const showCompleted = document.getElementById('showCompleted')?.checked || false;
 
     // ✅ SCROLL SU: carica eventi FUTURI
     if (nearTop && !loadingUp && !noMoreUp) {
@@ -304,7 +360,7 @@ function setupScrollHandlers() {
           anchor: anchorUp,
           dir: 'up',
           rangeDays: RANGE_DAYS,
-          include_done: false,
+          include_done: showCompleted,
           type: currentFilters.type,
           category: currentFilters.category,
           limit: 20
@@ -344,7 +400,7 @@ function setupScrollHandlers() {
       }
     }
 
-    // ✅ SCROLL GIÙ: carica eventi PASSATI (inclusi completati)
+    // ✅ SCROLL GIÙ: carica eventi PASSATI
     if (nearBottom && !loadingDown && !noMoreDown) {
       loadingDown = true;
       showBottomSpinner();
@@ -355,7 +411,7 @@ function setupScrollHandlers() {
           anchor: anchorDown,
           dir: 'down',
           rangeDays: RANGE_DAYS,
-          include_done: true,
+          include_done: showCompleted,
           type: currentFilters.type,
           category: currentFilters.category,
           limit: 20

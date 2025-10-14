@@ -230,7 +230,14 @@ export const API = {
 
   // ===== DASHBOARD EVENTS =====
   getDashboardEvents: (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    return api(`api/dashboard/events.php?${params}`);
+    // ⬅️ FIX: costruisci query-string solo con valori utili
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([k, v]) => {
+      if (v !== null && v !== undefined && v !== '' && v !== 'null' && v !== 'undefined') {
+        params.append(k, v);
+      }
+    });
+    const qs = params.toString();
+    return api(`api/dashboard/events.php${qs ? '?' + qs : ''}`);
   }
 };

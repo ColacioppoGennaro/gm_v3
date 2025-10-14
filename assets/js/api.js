@@ -226,5 +226,11 @@ export const API = {
 
   downgrade: () => api('api/account.php?a=downgrade', {}),
 
-  deleteAccount: () => api('api/account.php?a=delete', {})
+  deleteAccount: () => api('api/account.php?a=delete', {}),
+
+  // ===== DASHBOARD EVENTS =====
+  getDashboardEvents: (filters = {}) => {
+    const params = new URLSearchParams(filters);
+    return api(`api/dashboard/events.php?${params}`);
+  }
 };

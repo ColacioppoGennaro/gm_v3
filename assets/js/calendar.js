@@ -422,6 +422,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const eventType = event?.extendedProps?.type || 'personal';
   const eventStatus = event?.extendedProps?.status || 'pending';
   const entityId = event?.extendedProps?.entity_id || '';
+  const eventCategory = event?.extendedProps?.category || '';
   const showInDashboard = event?.extendedProps?.show_in_dashboard !== false;
 
   const pad = (n) => String(n).padStart(2, '0');
@@ -443,151 +444,151 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   ).join('');
 
   const html = `<div class="modal" id="${modalId}">
-    <div class="modal-content" style="max-height:90vh;overflow-y:auto">
-      <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
-      
-      <div class="form-group">
-        <label>Titolo *</label>
-        <input type="text" id="eventTitle" value="${title}" placeholder="Titolo evento" required/>
-      </div>
-      
-      <div class="form-group">
-        <label>Descrizione</label>
-        <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
-      </div>
-      
-      <div class="form-group">
-        <label>🏷️ Tipo evento *</label>
-        <select id="eventType" required>
-          ${typeOptions}
-        </select>
-        <small style="color:var(--muted);display:block;margin-top:4px">
-          Seleziona il tipo di evento (campo obbligatorio)
-        </small>
-      </div>
-      
-      <div class="form-group" id="entityGroup" style="display:none">
-        <label>🔗 Collega a entità</label>
-        <select id="eventEntity">
-          <option value="">Nessuno</option>
-          ${entityOptions}
-        </select>
-        <small style="color:var(--muted);display:block;margin-top:4px">
-          Opzionale: collega questo evento a una macchina, cliente o regolamento
-        </small>
-      </div>
-      
-      <div class="form-group">
-        <label>🏷️ Categoria (opzionale)</label>
-        <input type="text" id="eventCategory" value="${event?.extendedProps?.category || ''}"
-               placeholder="es: bolletta, multa, tagliando, assicurazione"
-               list="categoryDatalist"/>
-        <datalist id="categoryDatalist">
-          <option value="bolletta">
-          <option value="multa">
-          <option value="tagliando">
-          <option value="assicurazione">
-          <option value="scadenza">
-          <option value="rinnovo">
-        </datalist>
-        <small style="color:var(--muted);display:block;margin-top:4px">
-          Etichetta libera per filtrare eventi simili
-        </small>
-      </div>
+    <div class="modal-content" style="max-height:90vh;overflow-y:auto">
+      <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
+      
+      <div class="form-group">
+        <label>Titolo *</label>
+        <input type="text" id="eventTitle" value="${title}" placeholder="Titolo evento" required/>
+      </div>
+      
+      <div class="form-group">
+        <label>Descrizione</label>
+        <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>🏷️ Tipo evento *</label>
+        <select id="eventType" required>
+          ${typeOptions}
+        </select>
+        <small style="color:var(--muted);display:block;margin-top:4px">
+          Seleziona il tipo di evento (campo obbligatorio)
+        </small>
+      </div>
+      
+      <div class="form-group" id="entityGroup" style="display:none">
+        <label>🔗 Collega a entità</label>
+        <select id="eventEntity">
+          <option value="">Nessuno</option>
+          ${entityOptions}
+        </select>
+        <small style="color:var(--muted);display:block;margin-top:4px">
+          Opzionale: collega questo evento a una macchina, cliente o regolamento
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label>🏷️ Categoria (opzionale)</label>
+        <input type="text" id="eventCategory" value="${eventCategory}"
+                placeholder="es: bolletta, multa, tagliando, assicurazione"
+                list="categoryDatalist"/>
+        <datalist id="categoryDatalist">
+          <option value="bolletta">
+          <option value="multa">
+          <option value="tagliando">
+          <option value="assicurazione">
+          <option value="scadenza">
+          <option value="rinnovo">
+        </datalist>
+        <small style="color:var(--muted);display:block;margin-top:4px">
+          Etichetta libera per filtrare eventi simili
+        </small>
+      </div>
+      
+      ${isEdit ? `
+      <div class="form-group">
+        <label>Stato</label>
+        <select id="eventStatus">
+          <option value="pending" ${eventStatus === 'pending' ? 'selected' : ''}>⏳ Da fare</option>
+          <option value="done" ${eventStatus === 'done' ? 'selected' : ''}>✅ Completato</option>
+        </select>
+      </div>
+      ` : ''}
+      
+      <div class="settings-row settings-row--compact">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="showInDashboard" ${showInDashboard ? 'checked' : ''} style="width:auto;margin:0"/>
+          <span>📊 Mostra nella Dashboard</span>
+        </label>
+      </div>
+      
+      <div class="settings-row settings-row--compact">
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="eventAllDay" ${allDay ? 'checked' : ''} style="width:auto;margin:0"/>
+          <span>Tutto il giorno</span>
+        </label>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Inizio *</label>
+          <input type="${allDay ? 'date' : 'datetime-local'}" id="eventStart"
+                 value="${allDay ? formatDateLocal(start) : formatDateTimeLocal(start)}" required/>
+        </div>
+        <div class="form-group">
+          <label>Fine *</label>
+          <input type="${allDay ? 'date' : 'datetime-local'}" id="eventEnd"
+                 value="${allDay ? formatDateLocal(end) : formatDateTimeLocal(end)}" required/>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🎨 Colore evento</label>
+        <select id="eventColor">
+          <option value="">Predefinito</option>
+          ${colorOptions}
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Ricorrenza</label>
+        <select id="eventRecurrence">
+          <option value="none">Non ripetere</option>
+          <option value="DAILY">Ogni giorno</option>
+          <option value="WEEKLY">Ogni settimana</option>
+          <option value="MONTHLY">Ogni mese</option>
+          <option value="YEARLY">Ogni anno</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>👥 Invita persone</label>
+        <div id="attendeesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="email" id="attendeeEmail" placeholder="email@esempio.com" style="flex:1"/>
+          <button class="btn secondary" id="addAttendeeBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🔔 Promemoria</label>
+        <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="number" id="reminderValue" min="1" value="30" style="width:70px;" placeholder="30"/>
+          <select id="reminderUnit" style="flex:1;min-width:120px;">
+            <option value="minutes">Minuti prima</option>
+            <option value="hours">Ore prima</option>
+            <option value="days">Giorni prima</option>
+            <option value="weeks">Settimane prima</option>
+            <option value="months">Mesi prima</option>
+          </select>
+          <select id="reminderMethod" style="flex:1;min-width:100px;">
+            <option value="popup">Notifica</option>
+            <option value="email">Email</option>
+          </select>
+          <button class="btn secondary" id="addReminderBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
+        </div>
+      </div>
 
-      ${isEdit ? `
-      <div class="form-group">
-        <label>Stato</label>
-        <select id="eventStatus">
-          <option value="pending" ${eventStatus === 'pending' ? 'selected' : ''}>⏳ Da fare</option>
-          <option value="done" ${eventStatus === 'done' ? 'selected' : ''}>✅ Completato</option>
-        </select>
-      </div>
-      
-      <div class="settings-row settings-row--compact">
-        <label style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" id="showInDashboard" ${showInDashboard ? 'checked' : ''} style="width:auto;margin:0"/>
-          <span>📊 Mostra nella Dashboard</span>
-        </label>
-      </div>
-      ` : ''}
-      
-      <div class="settings-row settings-row--compact">
-        <label style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" id="eventAllDay" ${allDay ? 'checked' : ''} style="width:auto;margin:0"/>
-          <span>Tutto il giorno</span>
-        </label>
-      </div>
-      
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group">
-          <label>Inizio *</label>
-          <input type="${allDay ? 'date' : 'datetime-local'}" id="eventStart"
-                 value="${allDay ? formatDateLocal(start) : formatDateTimeLocal(start)}" required/>
-        </div>
-        <div class="form-group">
-          <label>Fine *</label>
-          <input type="${allDay ? 'date' : 'datetime-local'}" id="eventEnd"
-                 value="${allDay ? formatDateLocal(end) : formatDateTimeLocal(end)}" required/>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label>🎨 Colore evento</label>
-        <select id="eventColor">
-          <option value="">Predefinito</option>
-          ${colorOptions}
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label>Ricorrenza</label>
-        <select id="eventRecurrence">
-          <option value="none">Non ripetere</option>
-          <option value="DAILY">Ogni giorno</option>
-          <option value="WEEKLY">Ogni settimana</option>
-          <option value="MONTHLY">Ogni mese</option>
-          <option value="YEARLY">Ogni anno</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label>👥 Invita persone</label>
-        <div id="attendeesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="email" id="attendeeEmail" placeholder="email@esempio.com" style="flex:1"/>
-          <button class="btn secondary" id="addAttendeeBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label>🔔 Promemoria</label>
-        <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="number" id="reminderValue" min="1" value="30" style="width:70px;" placeholder="30"/>
-          <select id="reminderUnit" style="flex:1;min-width:120px;">
-            <option value="minutes">Minuti prima</option>
-            <option value="hours">Ore prima</option>
-            <option value="days">Giorni prima</option>
-            <option value="weeks">Settimane prima</option>
-            <option value="months">Mesi prima</option>
-          </select>
-          <select id="reminderMethod" style="flex:1;min-width:100px;">
-            <option value="popup">Notifica</option>
-            <option value="email">Email</option>
-          </select>
-          <button class="btn secondary" id="addReminderBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
-        </div>
-      </div>
-
-      <div id="eventError" class="error hidden"></div>
-      <div class="btn-group" style="margin-top:20px">
-        <button class="btn secondary" id="closeEventModal">Annulla</button>
-        ${isEdit ? '<button class="btn del" id="deleteEventBtn">🗑️ Elimina</button>' : ''}
-        <button class="btn" id="saveEventBtn">${isEdit ? 'Salva' : 'Crea'}</button>
-      </div>
-    </div>
-  </div>`;
+      <div id="eventError" class="error hidden"></div>
+      <div class="btn-group" style="margin-top:20px">
+        <button class="btn secondary" id="closeEventModal">Annulla</button>
+        ${isEdit ? '<button class="btn del" id="deleteEventBtn">🗑️ Elimina</button>' : ''}
+        <button class="btn" id="saveEventBtn">${isEdit ? 'Salva' : 'Crea'}</button>
+      </div>
+    </div>
+  </div>`;
 
   document.body.insertAdjacentHTML('beforeend', html);
   
@@ -748,6 +749,7 @@ async function createEvent() {
   const eventType = document.getElementById('eventType').value;
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
+  const showInDashboard = document.getElementById('showInDashboard')?.checked !== false;
 
   if (!title || !start || !end || !eventType) {
     return alert('Compila tutti i campi obbligatori (titolo, date e tipo)');
@@ -761,7 +763,7 @@ async function createEvent() {
   fd.append('trigger', 'manual');
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
-  fd.append('show_in_dashboard', 'true');
+  fd.append('show_in_dashboard', showInDashboard ? 'true' : 'false');
   
   if (allDay) {
     fd.append('allDay', '1');

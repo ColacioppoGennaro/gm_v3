@@ -1,5 +1,7 @@
 /**
  * assets/js/dashboard-events.js — lista scorrevole con infinite scroll up/down
+ * ✅ Filtri attivi immediatamente (senza bottone Applica)
+ * ✅ Bottone "Fatto" con checkmark
  */
 import { API } from './api.js';
 
@@ -34,7 +36,6 @@ export async function renderEventsWidget() {
         </select>
         <label>Categoria:</label>
         <select id="filterCategory"><option value="">Tutte</option></select>
-        <button class="btn secondary small" id="applyFilters">Applica</button>
       </div>
       <div id="feed" style="max-height:420px;overflow-y:auto;border-radius:8px;background:#0f172a1a;padding:8px">
         <div id="feedTopSentinel" style="height:1px"></div>
@@ -43,18 +44,23 @@ export async function renderEventsWidget() {
       </div>
     </div>`;
 
-  document.getElementById('applyFilters').addEventListener('click', async () => {
-    currentFilters.type = document.getElementById('filterType').value || null;
-    currentFilters.category = document.getElementById('filterCategory').value || null;
-    // reset ancore
-    anchorUp = new Date().toISOString();
-    anchorDown = new Date().toISOString();
-    document.getElementById('eventsList').innerHTML = '';
-    await primeLoad();
-  });
+  // ✅ Eventi onChange immediati per filtri
+  document.getElementById('filterType').addEventListener('change', applyFiltersAndReload);
+  document.getElementById('filterCategory').addEventListener('change', applyFiltersAndReload);
 
   await primeLoad();
   setupScrollHandlers();
+}
+
+// ✅ Funzione per applicare filtri e ricaricare
+async function applyFiltersAndReload() {
+  currentFilters.type = document.getElementById('filterType').value || null;
+  currentFilters.category = document.getElementById('filterCategory').value || null;
+  // reset ancore
+  anchorUp = new Date().toISOString();
+  anchorDown = new Date().toISOString();
+  document.getElementById('eventsList').innerHTML = '';
+  await primeLoad();
 }
 
 async function primeLoad() {
@@ -169,7 +175,7 @@ window.markEventDone = async function(eventId){
   try {
     const fd = new FormData(); fd.append('_method','PATCH'); fd.append('status','done'); fd.append('show_in_dashboard','false');
     await API.updateGoogleEvent('primary', eventId, fd);
-    // refresh solo parziale: reset down per farlo “sparire” e comparire in feed sotto al prossimo scroll
+    // refresh solo parziale: reset down per farlo "sparire" e comparire in feed sotto al prossimo scroll
     anchorUp = new Date().toISOString(); anchorDown = new Date().toISOString();
     document.getElementById('eventsList').innerHTML = '';
     await primeLoad();

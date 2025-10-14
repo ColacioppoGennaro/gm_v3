@@ -159,11 +159,16 @@ try {
                 $trigger = null;
                 $showInDashboard = true; // default
 
+                $category = null;
+
                 if ($privateProps) {
                     $eventType = $privateProps['type'] ?? 'personal';
                     $eventStatus = $privateProps['status'] ?? 'pending';
                     $entityId = $privateProps['entity_id'] ?? null;
                     $trigger = $privateProps['trigger'] ?? null;
+                    $category = $privateProps['category'] ?? null;
+
+                    
                     $showInDashboard = isset($privateProps['show_in_dashboard']) 
                         ? ($privateProps['show_in_dashboard'] === 'true' || $privateProps['show_in_dashboard'] === true)
                         : true;
@@ -188,6 +193,7 @@ try {
                         'status'      => $eventStatus,
                         'entity_id'   => $entityId,
                         'trigger'     => $trigger,
+                    'category'    => $category,
                         'show_in_dashboard' => $showInDashboard,
                     ]
                 ];
@@ -226,6 +232,7 @@ try {
 
             $eventStatus = $in['status'] ?? 'pending';
             $entityId = $in['entity_id'] ?? null;
+            $category = $in['category'] ?? null;
             $trigger = $in['trigger'] ?? 'manual';
             $showInDashboard = isset($in['show_in_dashboard']) ? ($in['show_in_dashboard'] === 'true') : true;
 
@@ -321,6 +328,7 @@ try {
                 'show_in_dashboard' => $showInDashboard ? 'true' : 'false',
             ];
             if ($entityId) $privateData['entity_id'] = $entityId;
+            if ($category) $privateData['category'] = $category;
             if ($trigger) $privateData['trigger'] = $trigger;
             
             $extProps->setPrivate($privateData);
@@ -448,6 +456,11 @@ try {
                 if (isset($in['entity_id'])) {
                     $existingPrivate['entity_id'] = $in['entity_id'];
                 }
+
+                if (isset($in['category'])) {
+    $existingPrivate['category'] = $in['category'];
+}
+                
                 if (isset($in['trigger'])) {
                     $existingPrivate['trigger'] = $in['trigger'];
                 }

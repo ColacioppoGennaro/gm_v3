@@ -463,5 +463,3 @@ if (!('assistantTTS' in window.S)) {
 
 // Esporta funzione globalmente
 window.openAssistantModal = openAssistantModal;
-
-export { openAssistantModal, closeAssistantModal };

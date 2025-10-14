@@ -70,6 +70,11 @@ try {
     exit;
 }
 
+/**
+ * ✅ SOSTITUISCI la funzione read_input() alla riga 69 circa
+ * con questa versione che rimuove i campi metadata
+ */
+
 function read_input(): array {
     $raw = file_get_contents('php://input') ?: '';
     $ct  = $_SERVER['CONTENT_TYPE'] ?? '';
@@ -77,11 +82,18 @@ function read_input(): array {
 
     if ($isJSON && $raw !== '') {
         $data = json_decode($raw, true);
-        if (is_array($data)) return $data;
+        if (is_array($data)) {
+            // ✅ FIX: rimuovi metadata non validi per Google API
+            unset($data['_method'], $data['calendarId']);
+            return $data;
+        }
     }
-    return $_POST;
+    
+    $data = $_POST;
+    // ✅ FIX: rimuovi metadata anche da POST
+    unset($data['_method'], $data['calendarId']);
+    return $data;
 }
-
 function buildEventDateTime($isAllDay, $dateOrDateTime, $timeZone = null) {
     if ($isAllDay) {
         return new Google_Service_Calendar_EventDateTime(['date' => $dateOrDateTime]);

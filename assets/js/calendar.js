@@ -1,6 +1,7 @@
 /**
  * assets/js/calendar.js
  * Calendario ibrido: Desktop = FullCalendar, Mobile = Mini Grid + Lista
+ * ✅ CORRETTO: Update eventi, caricamento promemoria e ricorrenza
  */
 
 import { API } from './api.js';
@@ -65,9 +66,6 @@ export async function renderCalendar() {
   const page = document.querySelector('[data-page="calendar"]');
   if (!page) return;
   
-  // IMPORTANTE: non controllare se esiste già #cal, altrimenti non si re-renderizza
-  const existingCal = page.querySelector('#cal');
-
   const isPro = window.S.user && window.S.user.role === 'pro';
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
@@ -112,12 +110,10 @@ export async function renderCalendar() {
   }
 
   document.getElementById('btnNewEvent')?.addEventListener('click', () => {
-  // Usa l’ultimo giorno selezionato nella mini-griglia
-  const start = new Date(currentDate);
-  // opzionale: imposta un orario di default (es. 09:00 locali)
-  start.setHours(9, 0, 0, 0);
-  const end = new Date(start.getTime() + 60 * 60 * 1000); // +1h
-  showEventModal(null, start, end);
+    const start = new Date(currentDate);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    showEventModal(null, start, end);
   });
 }
 
@@ -172,9 +168,8 @@ function renderMiniMonthGrid() {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   
-  // CORRETTO: calcola il giorno della settimana con Lunedì = 0
-  let startDay = firstDay.getDay(); // 0=Dom, 1=Lun, ..., 6=Sab
-  startDay = startDay === 0 ? 6 : startDay - 1; // Converti: 0=Lun, 6=Dom
+  let startDay = firstDay.getDay();
+  startDay = startDay === 0 ? 6 : startDay - 1;
   
   const daysInMonth = lastDay.getDate();
 
@@ -193,12 +188,10 @@ function renderMiniMonthGrid() {
     <div class="mini-month-days">
   `;
 
-  // Celle vuote prima del 1° giorno
   for (let i = 0; i < startDay; i++) {
     html += '<div class="mini-day empty"></div>';
   }
 
-  // Giorni del mese
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     const dateStr = formatLocalYMD(date);
@@ -398,7 +391,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const formatDateLocal = (d) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  // ✅ AGGIUNTO HTML PER RICORRENZA E PROMEMORIA
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
@@ -416,7 +408,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           <span>Tutto il giorno</span>
         </label>
       </div>
-      <div class="grid-2">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label>Inizio *</label>
           <input type="${allDay ? 'date' : 'datetime-local'}" id="eventStart"
@@ -429,16 +421,28 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         </div>
       </div>
       
-      <div class="form-group"><label>Ricorrenza</label><select id="eventRecurrence"><option value="none">Non ripetere</option><option value="DAILY">Ogni giorno</option><option value="WEEKLY">Ogni settimana</option><option value="MONTHLY">Ogni mese</option><option value="YEARLY">Ogni anno</option></select></div>
+      <div class="form-group">
+        <label>Ricorrenza</label>
+        <select id="eventRecurrence">
+          <option value="none">Non ripetere</option>
+          <option value="DAILY">Ogni giorno</option>
+          <option value="WEEKLY">Ogni settimana</option>
+          <option value="MONTHLY">Ogni mese</option>
+          <option value="YEARLY">Ogni anno</option>
+        </select>
+      </div>
       
       <div class="form-group">
         <label>Promemoria</label>
         <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <select id="reminderMethod" style="flex-grow:1;"><option value="popup">Notifica</option><option value="email">Email</option></select>
-          <input type="number" id="reminderMinutes" min="0" step="5" value="30" style="width:80px;" />
-          <span>min prima</span>
-          <button class="btn secondary" id="addReminderBtn" type="button" style="padding: 8px 12px;">+</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="reminderMethod" style="flex:1;min-width:120px;">
+            <option value="popup">Notifica</option>
+            <option value="email">Email</option>
+          </select>
+          <input type="number" id="reminderMinutes" min="0" step="5" value="30" style="width:80px;" placeholder="30"/>
+          <span style="white-space:nowrap">min prima</span>
+          <button class="btn secondary" id="addReminderBtn" type="button" style="padding:8px 12px">+</button>
         </div>
       </div>
 
@@ -453,7 +457,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
   document.body.insertAdjacentHTML('beforeend', html);
   
-  // ✅ AGGIUNTA LOGICA PER GESTIRE I NUOVI CAMPI
   const reminderListEl = document.getElementById('reminderList');
   
   function renderReminderChips() {
@@ -476,34 +479,61 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   document.getElementById('addReminderBtn').addEventListener('click', () => {
     const method = document.getElementById('reminderMethod').value;
     const minutes = Math.max(0, Number(document.getElementById('reminderMinutes').value || 0));
-    if (_reminders.length < 5) { // Limita a 5 promemoria per evento
+    if (_reminders.length < 5) {
         _reminders.push({ method, minutes });
         renderReminderChips();
     } else {
-        alert('Puoi aggiungere un massimo di 5 promemoria.');
+        alert('Massimo 5 promemoria per evento');
     }
   });
 
-  // Pre-compila i campi se stiamo modificando un evento
+  // ✅ FIX: Carica promemoria e ricorrenza esistenti quando si modifica
   if (isEdit && event.extendedProps) {
     const recurSel = document.getElementById('eventRecurrence');
-    const rrule = event.extendedProps.recurrence?.[0] || '';
-    if (rrule.includes('FREQ=DAILY')) recurSel.value = 'DAILY';
-    if (rrule.includes('FREQ=WEEKLY')) recurSel.value = 'WEEKLY';
-    if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
-    if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
+    const recurrence = event.extendedProps.recurrence;
+    if (recurrence && recurrence.length > 0) {
+      const rrule = recurrence[0];
+      if (rrule.includes('FREQ=DAILY')) recurSel.value = 'DAILY';
+      else if (rrule.includes('FREQ=WEEKLY')) recurSel.value = 'WEEKLY';
+      else if (rrule.includes('FREQ=MONTHLY')) recurSel.value = 'MONTHLY';
+      else if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
+    }
     
     const rem = event.extendedProps.reminders;
     if (rem?.overrides && Array.isArray(rem.overrides)) {
-      _reminders = rem.overrides.map(r => ({ method: r.method || 'popup', minutes: Number(r.minutes || 30) }));
+      _reminders = rem.overrides.map(r => ({ 
+        method: r.method || 'popup', 
+        minutes: Number(r.minutes || 30) 
+      }));
       renderReminderChips();
     }
   }
 
-  // Listener dei bottoni principali
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
+  
+  // ✅ Aggiorna tipo input quando cambia allDay
+  document.getElementById('eventAllDay').addEventListener('change', (e) => {
+    const isAllDay = e.target.checked;
+    const startInput = document.getElementById('eventStart');
+    const endInput = document.getElementById('eventEnd');
+    
+    if (isAllDay) {
+      const startVal = startInput.value.split('T')[0];
+      const endVal = endInput.value.split('T')[0];
+      startInput.type = 'date';
+      endInput.type = 'date';
+      startInput.value = startVal;
+      endInput.value = endVal;
+    } else {
+      startInput.type = 'datetime-local';
+      endInput.type = 'datetime-local';
+      const now = new Date();
+      startInput.value = formatDateTimeLocal(now);
+      endInput.value = formatDateTimeLocal(new Date(now.getTime() + 3600000));
+    }
+  });
 }
 
 async function createEvent() {
@@ -529,10 +559,10 @@ async function createEvent() {
     fd.append('timeZone', TZ);
   }
   
-  // ✅ AGGIUNGI I DATI DI RICORRENZA E PROMEMORIA
+  // ✅ Aggiungi ricorrenza e promemoria
   const recur = document.getElementById('eventRecurrence')?.value;
   if (recur && recur !== 'none') {
-    fd.append('recurrence', `RRULE:FREQ=${recur}`);
+    fd.append('recurrence', `FREQ=${recur}`);
   }
   if (_reminders.length > 0) {
     fd.append('reminders', JSON.stringify(_reminders));
@@ -573,10 +603,10 @@ async function updateEvent(event) {
     fd.append('timeZone', TZ);
   }
   
-  // ✅ AGGIUNGI I DATI DI RICORRENZA E PROMEMORIA
+  // ✅ Aggiungi ricorrenza e promemoria
   const recur = document.getElementById('eventRecurrence')?.value;
   if (recur && recur !== 'none') {
-    fd.append('recurrence', `RRULE:FREQ=${recur}`);
+    fd.append('recurrence', `FREQ=${recur}`);
   }
   if (_reminders.length > 0) {
     fd.append('reminders', JSON.stringify(_reminders));

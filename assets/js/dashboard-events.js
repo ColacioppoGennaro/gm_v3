@@ -1,6 +1,6 @@
 /**
  * assets/js/dashboard-events.js
- * ✅ Widget eventi dashboard con azioni rapide
+ * ✅ Widget eventi dashboard con azioni rapide (fix: filtri sempre visibili + bottoni chiari)
  */
 
 import { API } from './api.js';
@@ -10,13 +10,21 @@ let currentFilters = {
   category: null
 };
 
+// 🔒 Mantieni l'elenco categorie cumulativo per non far "sparire" il filtro
+const _allCategories = new Set();
+
 export async function renderEventsWidget() {
   const container = document.getElementById('eventsWidget');
   if (!container) return;
 
   try {
-    // ⬅️ FIX: non passare currentFilters direttamente (evita ?type=null&category=null)
     const data = await loadDashboardEvents();
+    // Aggiorna il modello categorie
+    data.events
+      .map(e => e.category)
+      .filter(Boolean)
+      .forEach(c => _allCategories.add(c));
+
     renderWidget(container, data);
   } catch (error) {
     console.error('Errore caricamento eventi:', error);
@@ -41,24 +49,21 @@ async function loadDashboardEvents() {
 function renderWidget(container, data) {
   const { events, count } = data;
 
-  // Estrai categorie uniche per filtro
-  const categories = [...new Set(events.map(e => e.category).filter(Boolean))];
+  // Costruisci opzioni categorie partendo dal modello cumulativo
+  const categories = Array.from(_allCategories);
+  const categoryOptions = ['<option value="">Tutte</option>']
+    .concat(categories.map(c => `<option value="${c}">${c}</option>`))
+    .join('');
 
-  const categoryOptions = categories.length > 0
-    ? categories.map(c => `<option value="${c}">${c}</option>`).join('')
-    : '<option value="">Nessuna categoria</option>';
-
+  // ⬅️ FIX: i filtri sono sempre visibili (niente condizione su categories.length)
   container.innerHTML = `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
         <h3 style="margin:0">📅 Prossimi Eventi (${count})</h3>
-        <button class="btn small" onclick="location.hash='#/calendar'">
-          Vedi Calendario
-        </button>
+        <button class="btn small" onclick="location.hash='#/calendar'">Vedi Calendario</button>
       </div>
 
-      ${categories.length > 0 ? `
-      <div class="filter-bar" style="margin-bottom:16px">
+      <div class="filter-bar" style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <label>Tipo:</label>
         <select id="filterType" onchange="window.filterEvents()">
           <option value="">Tutti</option>
@@ -70,11 +75,9 @@ function renderWidget(container, data) {
 
         <label>Categoria:</label>
         <select id="filterCategory" onchange="window.filterEvents()">
-          <option value="">Tutte</option>
           ${categoryOptions}
         </select>
       </div>
-      ` : ''}
 
       <div id="eventsList">
         ${events.length === 0 ? renderEmptyState() : events.map(renderEventRow).join('')}
@@ -83,13 +86,13 @@ function renderWidget(container, data) {
   `;
 
   // Ripristina valori filtri
-  if (currentFilters.type) {
+  if (currentFilters.type !== null) {
     const typeSelect = document.getElementById('filterType');
-    if (typeSelect) typeSelect.value = currentFilters.type;
+    if (typeSelect) typeSelect.value = currentFilters.type || '';
   }
-  if (currentFilters.category) {
+  if (currentFilters.category !== null) {
     const catSelect = document.getElementById('filterCategory');
-    if (catSelect) catSelect.value = currentFilters.category;
+    if (catSelect) catSelect.value = currentFilters.category || '';
   }
 }
 
@@ -139,38 +142,42 @@ function renderEventRow(event) {
       border-radius:8px;
       flex-wrap:wrap
     ">
-      <div style="flex:1;min-width:200px">
+      <div style="flex:1;min-width:240px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
           <span style="font-size:18px">${emoji}</span>
           <strong style="color:var(--fg)">${event.title}</strong>
           ${categoryBadge}
           ${isOverdue ? '<span style="color:#ef4444;font-size:11px;font-weight:600">⚠️ SCADUTO</span>' : ''}
         </div>
-        <div style="font-size:12px;color:var(--muted)">
-          📅 ${dateStr} ${!event.allDay ? `• 🕐 ${timeStr}` : ''}
-        </div>
-        ${event.description ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">${event.description.substring(0, 80)}${event.description.length > 80 ? '...' : ''}</div>` : ''}
+        <div style="font-size:12px;color:var(--muted)">📅 ${dateStr} ${!event.allDay ? `• 🕐 ${timeStr}` : ''}</div>
+        ${event.description ? `<div style=\"font-size:12px;color:var(--muted);margin-top:4px\">${event.description.substring(0, 80)}${event.description.length > 80 ? '...' : ''}</div>` : ''}
       </div>
 
-      <div class="event-actions" style="display:flex;gap:6px;flex-wrap:wrap">
+      <div class="event-actions" style="display:flex;gap:8px;flex-wrap:wrap">
         <button
           class="btn success small"
+          style="min-width:96px;white-space:nowrap" 
           onclick="window.markEventDone('${event.id}')"
+          aria-label="Segna come completato"
           title="Segna come completato"
         >
           ✓ Fatto
         </button>
         <button
           class="btn secondary small"
-          onclick="window.postponeEvent('${event.id}', '${event.title.replace(/'/g, "\\'")}')"
-          title="Rimanda"
+          style="min-width:96px;white-space:nowrap"
+          onclick="window.postponeEvent('${event.id}', '${event.title.replace(/'/g, "\'")}')"
+          aria-label="Rimanda evento"
+          title="Rimanda evento"
         >
           ⏸ Rimanda
         </button>
         <button
           class="btn secondary small icon-only"
+          style="min-width:44px"
           onclick="window.viewEventDetails('${event.id}')"
-          title="Dettagli"
+          aria-label="Vedi dettagli"
+          title="Vedi dettagli"
         >
           👁
         </button>
@@ -211,7 +218,6 @@ window.postponeEvent = async function(eventId, eventTitle) {
 
 window.viewEventDetails = async function(eventId) {
   try {
-    // Carica tutti gli eventi per trovare quello richiesto
     const now = new Date();
     const future = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const allEvents = await API.listGoogleEvents('primary', now.toISOString(), future.toISOString());
@@ -222,7 +228,6 @@ window.viewEventDetails = async function(eventId) {
       return;
     }
 
-    // Converti in formato per modal calendario
     const fcEvent = {
       id: event.id,
       title: event.title,
@@ -232,12 +237,10 @@ window.viewEventDetails = async function(eventId) {
       extendedProps: event.extendedProps || {}
     };
 
-    // Importa dinamicamente la funzione dal calendario
     const calendarModule = await import('./calendar.js');
     if (calendarModule.showEventModal) {
       calendarModule.showEventModal(fcEvent);
     } else {
-      // Fallback: apri calendario
       location.hash = '#/calendar';
     }
   } catch (error) {
@@ -255,36 +258,25 @@ function showPostponeModal(eventId, eventTitle) {
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
   const html = `
-    <div class="modal" id="${modalId}">
-      <div class="modal-content" style="max-width:500px">
-        <h2 style="margin-bottom:16px">⏸ Rimanda Evento</h2>
-        <p style="color:var(--muted);margin-bottom:20px">
-          Seleziona la nuova data per: <strong>${eventTitle}</strong>
-        </p>
-
-        <div class="form-group">
+    <div class=\"modal\" id=\"${modalId}\">
+      <div class=\"modal-content\" style=\"max-width:500px\">
+        <h2 style=\"margin-bottom:16px\">⏸ Rimanda Evento</h2>
+        <p style=\"color:var(--muted);margin-bottom:20px\">Seleziona la nuova data per: <strong>${eventTitle}</strong></p>
+        <div class=\"form-group\">
           <label>Nuova data *</label>
-          <input type="date" id="postponeDate" value="${tomorrowStr}" required/>
+          <input type=\"date\" id=\"postponeDate\" value=\"${tomorrowStr}\" required/>
         </div>
-
-        <div class="form-group">
+        <div class=\"form-group\">
           <label>Suggerimenti rapidi:</label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn secondary small" onclick="window.setPostponeDate(1)">
-              Domani
-            </button>
-            <button class="btn secondary small" onclick="window.setPostponeDate(7)">
-              +1 settimana
-            </button>
-            <button class="btn secondary small" onclick="window.setPostponeDate(30)">
-              +1 mese
-            </button>
+          <div style=\"display:flex;gap:8px;flex-wrap:wrap\">
+            <button class=\"btn secondary small\" onclick=\"window.setPostponeDate(1)\">Domani</button>
+            <button class=\"btn secondary small\" onclick=\"window.setPostponeDate(7)\">+1 settimana</button>
+            <button class=\"btn secondary small\" onclick=\"window.setPostponeDate(30)\">+1 mese</button>
           </div>
         </div>
-
-        <div class="btn-group" style="margin-top:24px">
-          <button class="btn secondary" id="cancelPostpone">Annulla</button>
-          <button class="btn" id="confirmPostpone">Conferma</button>
+        <div class=\"btn-group\" style=\"margin-top:24px\">
+          <button class=\"btn secondary\" id=\"cancelPostpone\">Annulla</button>
+          <button class=\"btn\" id=\"confirmPostpone\">Conferma</button>
         </div>
       </div>
     </div>
@@ -308,8 +300,6 @@ function showPostponeModal(eventId, eventTitle) {
       fd.append('_method', 'PATCH');
       fd.append('allDay', '1');
       fd.append('startDate', newDate);
-
-      // Fine = giorno dopo
       const endDate = new Date(newDate);
       endDate.setDate(endDate.getDate() + 1);
       fd.append('endDate', endDate.toISOString().split('T')[0]);

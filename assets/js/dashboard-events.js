@@ -213,19 +213,43 @@ async function primeLoad() {
     // Futuri già in ordine corretto
     const futureEvents = futureData.events || [];
     
-    const combinedEvents = [...pastSorted, ...futureEvents];
-    
-    if (combinedEvents.length === 0) {
+    if (pastSorted.length === 0 && futureEvents.length === 0) {
       list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
     } else {
-      const html = combinedEvents.map(eventRowHtml).join('');
+      let html = '';
+      
+      // ✅ Eventi passati
+      if (pastSorted.length > 0) {
+        html += pastSorted.map(eventRowHtml).join('');
+      }
+      
+      // ✅ SEPARATORE tra passato e futuro/oggi
+      if (pastSorted.length > 0 && futureEvents.length > 0) {
+        html += `
+          <div id="todaySeparator" style="display:flex;align-items:center;gap:12px;margin:16px 0;padding:0 8px">
+            <div style="flex:1;height:2px;background:linear-gradient(to right, transparent, #fff, transparent);opacity:0.3"></div>
+            <span style="color:#fff;font-size:12px;font-weight:600;white-space:nowrap;opacity:0.6">ORA</span>
+            <div style="flex:1;height:2px;background:linear-gradient(to left, transparent, #fff, transparent);opacity:0.3"></div>
+          </div>`;
+      }
+      
+      // ✅ Eventi futuri/oggi
+      if (futureEvents.length > 0) {
+        html += futureEvents.map(eventRowHtml).join('');
+      }
+      
       list.innerHTML = html;
       
-      // ✅ Scroll al primo evento futuro o oggi
+      // ✅ Scroll al separatore "ORA" se presente, altrimenti al primo evento futuro
       setTimeout(() => {
-        const firstFuture = list.querySelector('[data-future="true"]');
-        if (firstFuture) {
-          firstFuture.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const separator = document.getElementById('todaySeparator');
+        if (separator) {
+          separator.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          const firstFuture = list.querySelector('[data-future="true"]');
+          if (firstFuture) {
+            firstFuture.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         }
       }, 100);
     }

@@ -153,16 +153,20 @@ try {
                 $extProps = $e->getExtendedProperties();
                 $privateProps = $extProps ? $extProps->getPrivate() : null;
                 
-                $eventType = 'generic'; // default
+                $eventType = 'personal'; // default se manca
                 $eventStatus = 'pending'; // default
                 $entityId = null;
                 $trigger = null;
+                $showInDashboard = true; // default
 
                 if ($privateProps) {
-                    $eventType = $privateProps['type'] ?? 'generic';
+                    $eventType = $privateProps['type'] ?? 'personal';
                     $eventStatus = $privateProps['status'] ?? 'pending';
                     $entityId = $privateProps['entity_id'] ?? null;
                     $trigger = $privateProps['trigger'] ?? null;
+                    $showInDashboard = isset($privateProps['show_in_dashboard']) 
+                        ? ($privateProps['show_in_dashboard'] === 'true' || $privateProps['show_in_dashboard'] === true)
+                        : true;
                 }
 
                 $out[] = [
@@ -184,6 +188,7 @@ try {
                         'status'      => $eventStatus,
                         'entity_id'   => $entityId,
                         'trigger'     => $trigger,
+                        'show_in_dashboard' => $showInDashboard,
                     ]
                 ];
             }
@@ -212,16 +217,17 @@ try {
             $description = $in['description'] ?? '';
             $allDayFlag  = isset($in['allDay']) ? (int)$in['allDay'] : null;
 
-            // ✅ TIPO OBBLIGATORIO (default: generic)
-            $eventType = $in['type'] ?? 'generic';
-            $validTypes = ['payment', 'maintenance', 'document', 'personal', 'generic'];
+            // ✅ TIPO OBBLIGATORIO (default: personal se manca)
+            $eventType = $in['type'] ?? 'personal';
+            $validTypes = ['payment', 'maintenance', 'document', 'personal'];
             if (!in_array($eventType, $validTypes)) {
-                $eventType = 'generic';
+                $eventType = 'personal';
             }
 
             $eventStatus = $in['status'] ?? 'pending';
             $entityId = $in['entity_id'] ?? null;
             $trigger = $in['trigger'] ?? 'manual';
+            $showInDashboard = isset($in['show_in_dashboard']) ? ($in['show_in_dashboard'] === 'true') : true;
 
             // Promemoria
             $remOverrides = [];
@@ -312,6 +318,7 @@ try {
             $privateData = [
                 'type' => $eventType,
                 'status' => $eventStatus,
+                'show_in_dashboard' => $showInDashboard ? 'true' : 'false',
             ];
             if ($entityId) $privateData['entity_id'] = $entityId;
             if ($trigger) $privateData['trigger'] = $trigger;
@@ -425,15 +432,15 @@ try {
             }
 
             // ✅ AGGIORNA TIPIZZAZIONE
-            if (isset($in['type']) || isset($in['status']) || isset($in['entity_id']) || isset($in['trigger'])) {
+            if (isset($in['type']) || isset($in['status']) || isset($in['entity_id']) || isset($in['trigger']) || isset($in['show_in_dashboard'])) {
                 $existingExtProps = $ev->getExtendedProperties();
                 $existingPrivate = $existingExtProps ? $existingExtProps->getPrivate() : [];
                 
                 if (!is_array($existingPrivate)) $existingPrivate = [];
                 
                 if (isset($in['type'])) {
-                    $validTypes = ['payment', 'maintenance', 'document', 'personal', 'generic'];
-                    $existingPrivate['type'] = in_array($in['type'], $validTypes) ? $in['type'] : 'generic';
+                    $validTypes = ['payment', 'maintenance', 'document', 'personal'];
+                    $existingPrivate['type'] = in_array($in['type'], $validTypes) ? $in['type'] : 'personal';
                 }
                 if (isset($in['status'])) {
                     $existingPrivate['status'] = $in['status'];
@@ -443,6 +450,9 @@ try {
                 }
                 if (isset($in['trigger'])) {
                     $existingPrivate['trigger'] = $in['trigger'];
+                }
+                if (isset($in['show_in_dashboard'])) {
+                    $existingPrivate['show_in_dashboard'] = ($in['show_in_dashboard'] === 'true') ? 'true' : 'false';
                 }
                 
                 $extProps = new Google_Service_Calendar_EventExtendedProperties();
@@ -504,7 +514,6 @@ function getTypeColor($type) {
         'maintenance' => '#ffb878',  // Arancione (Mandarino)
         'document' => '#5484ed',     // Blu (Mirtillo)
         'personal' => '#51b749',     // Verde (Basilico)
-        'generic' => '#e1e1e1'       // Grigio (Grafite)
     ];
-    return $colors[$type] ?? '#7c3aed';
+    return $colors[$type] ?? '#51b749'; // default personal
 }

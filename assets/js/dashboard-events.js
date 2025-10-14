@@ -2,6 +2,7 @@
  * assets/js/dashboard-events.js — lista scorrevole con infinite scroll up/down
  * ✅ Filtri attivi immediatamente (senza bottone Applica)
  * ✅ Bottone "Fatto" con checkmark
+ * ✅ Ricarica automatica quando si torna alla dashboard
  */
 import { API } from './api.js';
 
@@ -9,20 +10,33 @@ let currentFilters = { type: null, category: null };
 const _allCategories = new Set();
 
 // ancore per lo scroll
-let anchorUp = new Date().toISOString();     // per caricare FUTURI quando si scorre in alto
-let anchorDown = new Date().toISOString();   // per caricare PASSATI quando si scorre in basso
+let anchorUp = new Date().toISOString();
+let anchorDown = new Date().toISOString();
 let loadingUp = false, loadingDown = false;
-const RANGE_DAYS = 30; // finestra logica per batch
+const RANGE_DAYS = 30;
+
+// ✅ Flag per evitare caricamenti multipli
+let isInitialized = false;
+let observer = null;
 
 export async function renderEventsWidget() {
   const container = document.getElementById('eventsWidget');
   if (!container) return;
 
-  // ✅ Reset completo ancore e filtri ad ogni render
+  console.log('🎯 renderEventsWidget chiamato');
+
+  // ✅ Reset stato
   anchorUp = new Date().toISOString();
   anchorDown = new Date().toISOString();
   loadingUp = false;
   loadingDown = false;
+  isInitialized = false;
+
+  // Disconnetti observer precedente se esiste
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
 
   // shell + filtri + area scrollabile
   container.innerHTML = `
@@ -45,16 +59,57 @@ export async function renderEventsWidget() {
       </div>
       <div id="feed" style="max-height:420px;overflow-y:auto;border-radius:8px;background:#0f172a1a;padding:8px">
         <div id="feedTopSentinel" style="height:1px"></div>
-        <div id="eventsList"></div>
+        <div id="eventsList"><div style="padding:20px;text-align:center;color:var(--muted)">⏳ Caricamento...</div></div>
         <div id="feedBottomSentinel" style="height:1px"></div>
       </div>
     </div>`;
 
-  // ✅ Eventi onChange immediati per filtri
-  document.getElementById('filterType').addEventListener('change', applyFiltersAndReload);
-  document.getElementById('filterCategory').addEventListener('change', applyFiltersAndReload);
+  // ✅ Aspetta che il DOM sia effettivamente renderizzato
+  await new Promise(resolve => setTimeout(resolve, 50));
 
-  // ✅ Caricamento iniziale automatico
+  // Verifica che gli elementi esistano ancora
+  const filterType = document.getElementById('filterType');
+  const filterCategory = document.getElementById('filterCategory');
+  
+  if (!filterType || !filterCategory) {
+    console.warn('⚠️ Elementi filtro non trovati, riprovo...');
+    setTimeout(() => renderEventsWidget(), 100);
+    return;
+  }
+
+  // ✅ Eventi onChange immediati per filtri
+  filterType.addEventListener('change', applyFiltersAndReload);
+  filterCategory.addEventListener('change', applyFiltersAndReload);
+
+  // ✅ Carica immediatamente
+  await initializeAndLoad();
+
+  // ✅ Observer per ricaricare se il widget diventa visibile dopo essere stato nascosto
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !isInitialized) {
+        console.log('👁️ Widget tornato visibile, ricarico...');
+        initializeAndLoad();
+      }
+    });
+  }, { threshold: 0.1 });
+
+  const feed = document.getElementById('feed');
+  if (feed) {
+    observer.observe(feed);
+  }
+}
+
+// ✅ Funzione di inizializzazione centralizzata
+async function initializeAndLoad() {
+  if (isInitialized) {
+    console.log('⏭️ Già inizializzato, skip');
+    return;
+  }
+  
+  console.log('🚀 Inizializzazione widget eventi...');
+  isInitialized = true;
+  
   await primeLoad();
   setupScrollHandlers();
 }
@@ -69,11 +124,14 @@ async function applyFiltersAndReload() {
   
   console.log('🔍 Filtri applicati:', currentFilters);
   
-  // reset ancore
+  // reset ancore e flag
   anchorUp = new Date().toISOString();
   anchorDown = new Date().toISOString();
-  document.getElementById('eventsList').innerHTML = '';
-  await primeLoad();
+  isInitialized = false;
+  
+  document.getElementById('eventsList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">⏳ Caricamento...</div>';
+  
+  await initializeAndLoad();
 }
 
 async function primeLoad() {
@@ -201,11 +259,17 @@ window.markEventDone = async function(eventId){
   try {
     const fd = new FormData(); fd.append('_method','PATCH'); fd.append('status','done'); fd.append('show_in_dashboard','false');
     await API.updateGoogleEvent('primary', eventId, fd);
-    // refresh solo parziale: reset down per farlo "sparire" e comparire in feed sotto al prossimo scroll
-    anchorUp = new Date().toISOString(); anchorDown = new Date().toISOString();
-    document.getElementById('eventsList').innerHTML = '';
-    await primeLoad();
-  } catch(e) { alert('Errore durante l\'aggiornamento'); }
+    
+    // ✅ Reset e ricarica usando la funzione centralizzata
+    anchorUp = new Date().toISOString(); 
+    anchorDown = new Date().toISOString();
+    isInitialized = false;
+    document.getElementById('eventsList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">⏳ Caricamento...</div>';
+    await initializeAndLoad();
+  } catch(e) { 
+    alert('Errore durante l\'aggiornamento'); 
+    console.error(e);
+  }
 };
 
 window.postponeEvent = function(eventId, title){

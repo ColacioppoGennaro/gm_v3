@@ -1,6 +1,6 @@
 /**
  * assets/js/calendar.js
- * ✅ ENHANCED: Colori, inviti, promemoria avanzati (min/ore/giorni/settimane/mesi)
+ * ✅ ENHANCED: Colori, inviti, promemoria + TIPIZZAZIONE EVENTI
  */
 
 import { API } from './api.js';
@@ -12,6 +12,15 @@ let _reminders = [];
 let _attendees = [];
 
 const TZ = 'Europe/Rome';
+
+// Tipi evento
+const EVENT_TYPES = {
+  payment: { label: '💳 Pagamento', color: '#dc2127' },
+  maintenance: { label: '🔧 Manutenzione', color: '#ffb878' },
+  document: { label: '📄 Documento', color: '#5484ed' },
+  personal: { label: '👤 Personale', color: '#51b749' },
+  generic: { label: '📌 Generico', color: '#e1e1e1' }
+};
 
 // Mappa colori Google Calendar
 const GOOGLE_COLORS = [
@@ -300,12 +309,17 @@ function renderDayEvents(date) {
 
     const timeStr = event.allDay ? 'Tutto il giorno' : `${startTime}${endTime ? ' - ' + endTime : ''}`;
     const bgColor = event.backgroundColor || 'var(--accent)';
+    
+    // ✅ Tipo evento
+    const eventType = event.extendedProps?.type || 'generic';
+    const typeInfo = EVENT_TYPES[eventType] || EVENT_TYPES.generic;
+    const typeChip = `<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;background:${typeInfo.color};color:white;margin-left:8px">${typeInfo.label}</span>`;
 
     return `
       <div class="event-item" onclick="window.openEventDetail('${event.id}')" style="border-left-color:${bgColor}">
         <div class="event-time">${timeStr}</div>
         <div class="event-details">
-          <div class="event-title">${event.title}</div>
+          <div class="event-title">${event.title} ${typeChip}</div>
           ${event.extendedProps?.description ? `<div class="event-description">${event.extendedProps.description}</div>` : ''}
         </div>
       </div>
@@ -398,6 +412,10 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const start = event?.start || startDate || new Date();
   const end = event?.end || endDate || new Date(start.getTime() + 3600000);
   const allDay = event?.allDay || false;
+  
+  // ✅ Tipo e status
+  const eventType = event?.extendedProps?.type || 'generic';
+  const eventStatus = event?.extendedProps?.status || 'pending';
 
   const pad = (n) => String(n).padStart(2, '0');
   const formatDateTimeLocal = (d) =>
@@ -408,6 +426,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   // Opzioni colori
   const colorOptions = GOOGLE_COLORS.map(c => 
     `<option value="${c.id}" style="background:${c.hex}">${c.name}</option>`
+  ).join('');
+  
+  // ✅ Opzioni tipo evento
+  const typeOptions = Object.entries(EVENT_TYPES).map(([key, val]) =>
+    `<option value="${key}" ${key === eventType ? 'selected' : ''}>${val.label}</option>`
   ).join('');
 
   const html = `<div class="modal" id="${modalId}">
@@ -423,6 +446,26 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         <label>Descrizione</label>
         <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
       </div>
+      
+      <div class="form-group">
+        <label>🏷️ Tipo evento *</label>
+        <select id="eventType" required>
+          ${typeOptions}
+        </select>
+        <small style="color:var(--muted);display:block;margin-top:4px">
+          Il tipo è obbligatorio. Eventi creati da Google Calendar saranno "Generico".
+        </small>
+      </div>
+      
+      ${isEdit ? `
+      <div class="form-group">
+        <label>Stato</label>
+        <select id="eventStatus">
+          <option value="pending" ${eventStatus === 'pending' ? 'selected' : ''}>⏳ Da fare</option>
+          <option value="done" ${eventStatus === 'done' ? 'selected' : ''}>✅ Completato</option>
+        </select>
+      </div>
+      ` : ''}
       
       <div class="settings-row settings-row--compact">
         <label style="display:flex;align-items:center;gap:8px">
@@ -654,12 +697,19 @@ async function createEvent() {
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
+  const eventType = document.getElementById('eventType').value;
 
-  if (!title || !start || !end) return alert('Compila tutti i campi obbligatori');
+  if (!title || !start || !end || !eventType) {
+    return alert('Compila tutti i campi obbligatori (titolo, date e tipo)');
+  }
 
   const fd = new FormData();
   fd.append('title', title);
   fd.append('description', description || '');
+  fd.append('type', eventType);
+  fd.append('status', 'pending');
+  fd.append('trigger', 'manual');
+  
   if (allDay) {
     fd.append('allDay', '1');
     fd.append('startDate', start);
@@ -709,12 +759,19 @@ async function updateEvent(event) {
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
+  const eventType = document.getElementById('eventType').value;
+  const eventStatus = document.getElementById('eventStatus')?.value || 'pending';
 
-  if (!title) return alert('Inserisci un titolo');
+  if (!title || !eventType) {
+    return alert('Inserisci un titolo e seleziona un tipo');
+  }
 
   const fd = new FormData();
   fd.append('title', title);
   fd.append('description', description || '');
+  fd.append('type', eventType);
+  fd.append('status', eventStatus);
+  
   if (allDay) {
     fd.append('allDay', '1');
     fd.append('startDate', start);

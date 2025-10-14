@@ -1,7 +1,7 @@
 <?php
 /**
  * api/google/events.php
- * ✅ ENHANCED: Colori, inviti, promemoria avanzati
+ * ✅ ENHANCED: Colori, inviti, promemoria + TIPIZZAZIONE EVENTI
  */
 
 ini_set('display_errors', 1);
@@ -95,7 +95,7 @@ function buildEventDateTime($isAllDay, $dateOrDateTime, $timeZone = null) {
 try {
     switch ($method) {
         // =========================
-        // LISTA EVENTI (GET) - ✅ Con colori e inviti
+        // LISTA EVENTI (GET) - ✅ Con tipizzazione
         // =========================
         case 'GET': {
             $timeMin = $_GET['start'] ?? null;
@@ -149,20 +149,41 @@ try {
                     }
                 }
 
+                // ✅ TIPIZZAZIONE: leggi extendedProperties.private
+                $extProps = $e->getExtendedProperties();
+                $privateProps = $extProps ? $extProps->getPrivate() : null;
+                
+                $eventType = 'generic'; // default
+                $eventStatus = 'pending'; // default
+                $entityId = null;
+                $trigger = null;
+
+                if ($privateProps) {
+                    $eventType = $privateProps['type'] ?? 'generic';
+                    $eventStatus = $privateProps['status'] ?? 'pending';
+                    $entityId = $privateProps['entity_id'] ?? null;
+                    $trigger = $privateProps['trigger'] ?? null;
+                }
+
                 $out[] = [
                     'id'     => $e->getId(),
                     'title'  => $e->getSummary() ?: '(senza titolo)',
                     'start'  => $isAllDay ? $startObj->getDate() : $startObj->getDateTime(),
                     'end'    => $isAllDay ? $endObj->getDate()   : $endObj->getDateTime(),
                     'allDay' => $isAllDay,
-                    'backgroundColor' => $colorId ? getColorHex($colorId) : null,
-                    'borderColor' => $colorId ? getColorHex($colorId) : null,
+                    'backgroundColor' => $colorId ? getColorHex($colorId) : getTypeColor($eventType),
+                    'borderColor' => $colorId ? getColorHex($colorId) : getTypeColor($eventType),
                     'extendedProps' => [
                         'description' => $e->getDescription() ?: '',
                         'reminders'   => ['overrides' => $reminders],
                         'recurrence'  => $rrule ? [$rrule] : null,
                         'colorId'     => $colorId,
                         'attendees'   => $attendees,
+                        // ✅ Tipizzazione
+                        'type'        => $eventType,
+                        'status'      => $eventStatus,
+                        'entity_id'   => $entityId,
+                        'trigger'     => $trigger,
                     ]
                 ];
             }
@@ -171,7 +192,7 @@ try {
         }
 
         // =========================
-        // CREA EVENTO (POST)
+        // CREA EVENTO (POST) - ✅ Con tipizzazione obbligatoria
         // =========================
         case 'POST': {
             $eventId = $_GET['id'] ?? null;
@@ -190,6 +211,17 @@ try {
             $title       = $in['title'] ?? ($in['summary'] ?? '');
             $description = $in['description'] ?? '';
             $allDayFlag  = isset($in['allDay']) ? (int)$in['allDay'] : null;
+
+            // ✅ TIPO OBBLIGATORIO (default: generic)
+            $eventType = $in['type'] ?? 'generic';
+            $validTypes = ['payment', 'maintenance', 'document', 'personal', 'generic'];
+            if (!in_array($eventType, $validTypes)) {
+                $eventType = 'generic';
+            }
+
+            $eventStatus = $in['status'] ?? 'pending';
+            $entityId = $in['entity_id'] ?? null;
+            $trigger = $in['trigger'] ?? 'manual';
 
             // Promemoria
             $remOverrides = [];
@@ -275,13 +307,25 @@ try {
                 }
             }
 
+            // ✅ SALVA TIPIZZAZIONE in extendedProperties.private
+            $extProps = new Google_Service_Calendar_EventExtendedProperties();
+            $privateData = [
+                'type' => $eventType,
+                'status' => $eventStatus,
+            ];
+            if ($entityId) $privateData['entity_id'] = $entityId;
+            if ($trigger) $privateData['trigger'] = $trigger;
+            
+            $extProps->setPrivate($privateData);
+            $ev->setExtendedProperties($extProps);
+
             $created = $service->events->insert($calendarId, $ev);
             echo json_encode(['id' => $created->getId()]);
             break;
         }
 
         // =========================
-        // AGGIORNA EVENTO
+        // AGGIORNA EVENTO - ✅ Con tipizzazione
         // =========================
         case 'PUT':
         case 'PATCH':
@@ -380,6 +424,32 @@ try {
                 $ev->setAttendees($att);
             }
 
+            // ✅ AGGIORNA TIPIZZAZIONE
+            if (isset($in['type']) || isset($in['status']) || isset($in['entity_id']) || isset($in['trigger'])) {
+                $existingExtProps = $ev->getExtendedProperties();
+                $existingPrivate = $existingExtProps ? $existingExtProps->getPrivate() : [];
+                
+                if (!is_array($existingPrivate)) $existingPrivate = [];
+                
+                if (isset($in['type'])) {
+                    $validTypes = ['payment', 'maintenance', 'document', 'personal', 'generic'];
+                    $existingPrivate['type'] = in_array($in['type'], $validTypes) ? $in['type'] : 'generic';
+                }
+                if (isset($in['status'])) {
+                    $existingPrivate['status'] = $in['status'];
+                }
+                if (isset($in['entity_id'])) {
+                    $existingPrivate['entity_id'] = $in['entity_id'];
+                }
+                if (isset($in['trigger'])) {
+                    $existingPrivate['trigger'] = $in['trigger'];
+                }
+                
+                $extProps = new Google_Service_Calendar_EventExtendedProperties();
+                $extProps->setPrivate($existingPrivate);
+                $ev->setExtendedProperties($extProps);
+            }
+
             $service->events->update($calendarId, $id, $ev);
             echo json_encode(['ok' => true]);
             break;
@@ -409,7 +479,7 @@ try {
     echo json_encode(['error' => $e->getMessage()]);
 }
 
-// Helper: mappa colorId Google -> hex
+// ✅ Helper: mappa colorId Google -> hex
 function getColorHex($colorId) {
     $colors = [
         '1' => '#a4bdfc', // Lavanda
@@ -425,4 +495,16 @@ function getColorHex($colorId) {
         '11' => '#dc2127'  // Pomodoro
     ];
     return $colors[$colorId] ?? '#7c3aed';
+}
+
+// ✅ Helper: colore per tipo evento
+function getTypeColor($type) {
+    $colors = [
+        'payment' => '#dc2127',      // Rosso (Pomodoro)
+        'maintenance' => '#ffb878',  // Arancione (Mandarino)
+        'document' => '#5484ed',     // Blu (Mirtillo)
+        'personal' => '#51b749',     // Verde (Basilico)
+        'generic' => '#e1e1e1'       // Grigio (Grafite)
+    ];
+    return $colors[$type] ?? '#7c3aed';
 }

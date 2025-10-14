@@ -1,7 +1,6 @@
 /**
  * assets/js/calendar.js
- * Calendario ibrido: Desktop = FullCalendar, Mobile = Mini Grid + Lista
- * ✅ CORRETTO: Update eventi, caricamento promemoria e ricorrenza
+ * ✅ ENHANCED: Colori, inviti, promemoria avanzati (min/ore/giorni/settimane/mesi)
  */
 
 import { API } from './api.js';
@@ -9,9 +8,25 @@ import { API } from './api.js';
 let calendar = null;
 let currentDate = new Date();
 let allEvents = [];
-let _reminders = []; // Stato per i promemoria del modal
+let _reminders = [];
+let _attendees = [];
 
 const TZ = 'Europe/Rome';
+
+// Mappa colori Google Calendar
+const GOOGLE_COLORS = [
+  { id: '1', name: 'Lavanda', hex: '#a4bdfc' },
+  { id: '2', name: 'Salvia', hex: '#7ae7bf' },
+  { id: '3', name: 'Uva', hex: '#dbadff' },
+  { id: '4', name: 'Fenicottero', hex: '#ff887c' },
+  { id: '5', name: 'Banana', hex: '#fbd75b' },
+  { id: '6', name: 'Mandarino', hex: '#ffb878' },
+  { id: '7', name: 'Pavone', hex: '#46d6db' },
+  { id: '8', name: 'Grafite', hex: '#e1e1e1' },
+  { id: '9', name: 'Mirtillo', hex: '#5484ed' },
+  { id: '10', name: 'Basilico', hex: '#51b749' },
+  { id: '11', name: 'Pomodoro', hex: '#dc2127' }
+];
 
 function toLocalRFC3339(dtLocal) {
   if (!dtLocal) return null;
@@ -52,15 +67,12 @@ function nextDate(yyyy_mm_dd) {
   return `${y}-${m}-${day}`;
 }
 
-// === Utility: restituisce la data locale in formato YYYY-MM-DD senza timezone ===
 function formatLocalYMD(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-
-
 
 export async function renderCalendar() {
   const page = document.querySelector('[data-page="calendar"]');
@@ -287,9 +299,10 @@ function renderDayEvents(date) {
     }) : '';
 
     const timeStr = event.allDay ? 'Tutto il giorno' : `${startTime}${endTime ? ' - ' + endTime : ''}`;
+    const bgColor = event.backgroundColor || 'var(--accent)';
 
     return `
-      <div class="event-item" onclick="window.openEventDetail('${event.id}')">
+      <div class="event-item" onclick="window.openEventDetail('${event.id}')" style="border-left-color:${bgColor}">
         <div class="event-time">${timeStr}</div>
         <div class="event-details">
           <div class="event-title">${event.title}</div>
@@ -377,7 +390,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
-  _reminders = []; // Azzera i promemoria all'apertura del modal
+  _reminders = [];
+  _attendees = [];
 
   const title = event?.title || '';
   const description = event?.extendedProps?.description || '';
@@ -391,23 +405,32 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const formatDateLocal = (d) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+  // Opzioni colori
+  const colorOptions = GOOGLE_COLORS.map(c => 
+    `<option value="${c.id}" style="background:${c.hex}">${c.name}</option>`
+  ).join('');
+
   const html = `<div class="modal" id="${modalId}">
     <div class="modal-content">
       <h2 style="margin-bottom:16px">${isEdit ? '✏️ Modifica Evento' : '➕ Nuovo Evento'}</h2>
+      
       <div class="form-group">
         <label>Titolo *</label>
         <input type="text" id="eventTitle" value="${title}" placeholder="Titolo evento" required/>
       </div>
+      
       <div class="form-group">
         <label>Descrizione</label>
         <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
       </div>
+      
       <div class="settings-row settings-row--compact">
         <label style="display:flex;align-items:center;gap:8px">
           <input type="checkbox" id="eventAllDay" ${allDay ? 'checked' : ''} style="width:auto;margin:0"/>
           <span>Tutto il giorno</span>
         </label>
       </div>
+      
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group">
           <label>Inizio *</label>
@@ -422,6 +445,14 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       </div>
       
       <div class="form-group">
+        <label>🎨 Colore evento</label>
+        <select id="eventColor">
+          <option value="">Predefinito</option>
+          ${colorOptions}
+        </select>
+      </div>
+      
+      <div class="form-group">
         <label>Ricorrenza</label>
         <select id="eventRecurrence">
           <option value="none">Non ripetere</option>
@@ -433,16 +464,31 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       </div>
       
       <div class="form-group">
-        <label>Promemoria</label>
+        <label>👥 Invita persone</label>
+        <div id="attendeesList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="email" id="attendeeEmail" placeholder="email@esempio.com" style="flex:1"/>
+          <button class="btn secondary" id="addAttendeeBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🔔 Promemoria</label>
         <div id="reminderList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="reminderMethod" style="flex:1;min-width:120px;">
+          <input type="number" id="reminderValue" min="1" value="30" style="width:70px;" placeholder="30"/>
+          <select id="reminderUnit" style="flex:1;min-width:120px;">
+            <option value="minutes">Minuti prima</option>
+            <option value="hours">Ore prima</option>
+            <option value="days">Giorni prima</option>
+            <option value="weeks">Settimane prima</option>
+            <option value="months">Mesi prima</option>
+          </select>
+          <select id="reminderMethod" style="flex:1;min-width:100px;">
             <option value="popup">Notifica</option>
             <option value="email">Email</option>
           </select>
-          <input type="number" id="reminderMinutes" min="0" step="5" value="30" style="width:80px;" placeholder="30"/>
-          <span style="white-space:nowrap">min prima</span>
-          <button class="btn secondary" id="addReminderBtn" type="button" style="padding:8px 12px">+</button>
+          <button class="btn secondary" id="addReminderBtn" type="button" style="padding:8px 12px">+ Aggiungi</button>
         </div>
       </div>
 
@@ -457,15 +503,58 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
   document.body.insertAdjacentHTML('beforeend', html);
   
-  const reminderListEl = document.getElementById('reminderList');
+  // === GESTIONE INVITATI ===
+  const attendeesListEl = document.getElementById('attendeesList');
   
-  function renderReminderChips() {
-    reminderListEl.innerHTML = _reminders.map((r, i) =>
-      `<span class="chip" data-idx="${i}" style="display:inline-flex;align-items:center;gap:6px;background:#334155;color:white;padding:5px 10px;border-radius:16px;font-size:14px;">
-         ${r.method === 'email' ? '📧' : '🔔'} ${r.minutes} min
+  function renderAttendeeChips() {
+    attendeesListEl.innerHTML = _attendees.map((email, i) =>
+      `<span class="chip" data-idx="${i}" style="display:inline-flex;align-items:center;gap:6px;background:#1e40af;color:white;padding:5px 10px;border-radius:16px;font-size:13px;">
+         👤 ${email}
          <button type="button" class="chip-x" style="border:none;background:transparent;color:#cbd5e1;cursor:pointer;font-weight:700;padding:0 0 0 4px;">✕</button>
        </span>`
     ).join('');
+  }
+  
+  attendeesListEl.addEventListener('click', (e) => {
+    if (e.target.classList.contains('chip-x')) {
+      const idx = e.target.closest('.chip').dataset.idx;
+      _attendees.splice(idx, 1);
+      renderAttendeeChips();
+    }
+  });
+
+  document.getElementById('addAttendeeBtn').addEventListener('click', () => {
+    const emailInput = document.getElementById('attendeeEmail');
+    const email = emailInput.value.trim();
+    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!_attendees.includes(email)) {
+        _attendees.push(email);
+        renderAttendeeChips();
+        emailInput.value = '';
+      }
+    } else {
+      alert('Inserisci un\'email valida');
+    }
+  });
+
+  // === GESTIONE PROMEMORIA ===
+  const reminderListEl = document.getElementById('reminderList');
+  
+  function renderReminderChips() {
+    reminderListEl.innerHTML = _reminders.map((r, i) => {
+      const minutes = r.minutes;
+      let label = '';
+      if (minutes < 60) label = `${minutes} min`;
+      else if (minutes < 1440) label = `${minutes/60} ore`;
+      else if (minutes < 10080) label = `${minutes/1440} giorni`;
+      else if (minutes < 43200) label = `${minutes/10080} settimane`;
+      else label = `${Math.round(minutes/43200)} mesi`;
+      
+      return `<span class="chip" data-idx="${i}" style="display:inline-flex;align-items:center;gap:6px;background:#334155;color:white;padding:5px 10px;border-radius:16px;font-size:14px;">
+         ${r.method === 'email' ? '📧' : '🔔'} ${label}
+         <button type="button" class="chip-x" style="border:none;background:transparent;color:#cbd5e1;cursor:pointer;font-weight:700;padding:0 0 0 4px;">✕</button>
+       </span>`;
+    }).join('');
   }
   
   reminderListEl.addEventListener('click', (e) => {
@@ -477,18 +566,32 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   });
 
   document.getElementById('addReminderBtn').addEventListener('click', () => {
+    const value = Math.max(1, Number(document.getElementById('reminderValue').value || 1));
+    const unit = document.getElementById('reminderUnit').value;
     const method = document.getElementById('reminderMethod').value;
-    const minutes = Math.max(0, Number(document.getElementById('reminderMinutes').value || 0));
+    
+    // Converti tutto in minuti
+    let minutes = value;
+    if (unit === 'hours') minutes = value * 60;
+    else if (unit === 'days') minutes = value * 1440;
+    else if (unit === 'weeks') minutes = value * 10080;
+    else if (unit === 'months') minutes = value * 43200; // ~30 giorni
+    
     if (_reminders.length < 5) {
-        _reminders.push({ method, minutes });
-        renderReminderChips();
+      _reminders.push({ method, minutes });
+      renderReminderChips();
     } else {
-        alert('Massimo 5 promemoria per evento');
+      alert('Massimo 5 promemoria per evento');
     }
   });
 
-  // ✅ FIX: Carica promemoria e ricorrenza esistenti quando si modifica
+  // === CARICA DATI ESISTENTI ===
   if (isEdit && event.extendedProps) {
+    // Colore
+    const colorId = event.extendedProps.colorId;
+    if (colorId) document.getElementById('eventColor').value = colorId;
+    
+    // Ricorrenza
     const recurSel = document.getElementById('eventRecurrence');
     const recurrence = event.extendedProps.recurrence;
     if (recurrence && recurrence.length > 0) {
@@ -499,6 +602,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       else if (rrule.includes('FREQ=YEARLY')) recurSel.value = 'YEARLY';
     }
     
+    // Promemoria
     const rem = event.extendedProps.reminders;
     if (rem?.overrides && Array.isArray(rem.overrides)) {
       _reminders = rem.overrides.map(r => ({ 
@@ -507,13 +611,20 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       }));
       renderReminderChips();
     }
+    
+    // Invitati
+    const attendees = event.extendedProps.attendees;
+    if (attendees && Array.isArray(attendees)) {
+      _attendees = attendees.map(a => a.email);
+      renderAttendeeChips();
+    }
   }
 
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
   
-  // ✅ Aggiorna tipo input quando cambia allDay
+  // Toggle allDay
   document.getElementById('eventAllDay').addEventListener('change', (e) => {
     const isAllDay = e.target.checked;
     const startInput = document.getElementById('eventStart');
@@ -542,6 +653,7 @@ async function createEvent() {
   const allDay = document.getElementById('eventAllDay').checked;
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
+  const colorId = document.getElementById('eventColor').value;
 
   if (!title || !start || !end) return alert('Compila tutti i campi obbligatori');
 
@@ -559,13 +671,23 @@ async function createEvent() {
     fd.append('timeZone', TZ);
   }
   
-  // ✅ Aggiungi ricorrenza e promemoria
+  // Colore
+  if (colorId) fd.append('colorId', colorId);
+  
+  // Ricorrenza
   const recur = document.getElementById('eventRecurrence')?.value;
   if (recur && recur !== 'none') {
     fd.append('recurrence', `FREQ=${recur}`);
   }
+  
+  // Promemoria
   if (_reminders.length > 0) {
     fd.append('reminders', JSON.stringify(_reminders));
+  }
+  
+  // Invitati
+  if (_attendees.length > 0) {
+    fd.append('attendees', _attendees.join(','));
   }
 
   try {
@@ -586,6 +708,7 @@ async function updateEvent(event) {
   const allDay = document.getElementById('eventAllDay').checked;
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
+  const colorId = document.getElementById('eventColor').value;
 
   if (!title) return alert('Inserisci un titolo');
 
@@ -603,13 +726,23 @@ async function updateEvent(event) {
     fd.append('timeZone', TZ);
   }
   
-  // ✅ Aggiungi ricorrenza e promemoria
+  // Colore
+  fd.append('colorId', colorId || '');
+  
+  // Ricorrenza
   const recur = document.getElementById('eventRecurrence')?.value;
   if (recur && recur !== 'none') {
     fd.append('recurrence', `FREQ=${recur}`);
   }
+  
+  // Promemoria
   if (_reminders.length > 0) {
     fd.append('reminders', JSON.stringify(_reminders));
+  }
+  
+  // Invitati
+  if (_attendees.length > 0) {
+    fd.append('attendees', _attendees.join(','));
   }
 
   try {

@@ -1,8 +1,9 @@
 <?php
 /**
  * api/dashboard/events.php
- * ✅ Endpoint per widget eventi dashboard
- * Restituisce solo eventi pending con show_in_dashboard=true
+ * ✅ Endpoint per widget eventi dashboard — supporto feed a finestra con anchor e direzione
+ * - dir=up   => futuri rispetto ad anchor
+ * - dir=down => passati rispetto ad anchor (con include_done=1 per includere completati)
  */
 
 ini_set('display_errors', 1);
@@ -20,10 +21,7 @@ if (!$user_id) {
     exit;
 }
 
-$method = $_SERVER['REQUEST_METHOD'];
-
-// Solo GET supportato per ora
-if ($method !== 'GET') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     http_response_code(405);
     echo json_encode(['error' => 'Metodo non supportato']);
     exit;
@@ -52,78 +50,77 @@ try {
     $client  = makeGoogleClientForUser($oauthFormatted);
     $service = new Google_Service_Calendar($client);
 } catch (Exception $e) {
-    error_log("Google Client Error: " . $e->getMessage());
+    error_log('Google Client Error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Errore Google Client']);
     exit;
 }
 
 try {
-    // Parametri query
-    $limit = isset($_GET['limit']) ? max(1, min(50, (int)$_GET['limit'])) : 10;
+    // ---- input ----
+    $limit = isset($_GET['limit']) ? max(1, min(50, (int)$_GET['limit'])) : 20;
     $filterType = $_GET['type'] ?? null;
     $filterCategory = $_GET['category'] ?? null;
-
-    // ⬅️ HARDENING: normalizza input "vuoti" passati come stringhe
     foreach (['filterType', 'filterCategory'] as $k) {
-        if (isset($$k) && ($$k === '' || $$k === 'null' || $$k === 'undefined')) {
-            $$k = null;
-        }
+        if (isset($$k) && ($$k === '' || $$k === 'null' || $$k === 'undefined')) $$k = null;
     }
 
-    // Carica eventi futuri (prossimi 3 mesi)
-    $timeMin = (new DateTime())->format('c');
-    $timeMax = (new DateTime('+3 months'))->format('c');
+    $dir = strtolower($_GET['dir'] ?? 'up'); // up|down
+    if ($dir !== 'up' && $dir !== 'down') $dir = 'up';
+
+    $rangeDays = (int)($_GET['rangeDays'] ?? 30);
+    if ($rangeDays < 1) $rangeDays = 1; if ($rangeDays > 180) $rangeDays = 180;
+
+    $anchorStr = $_GET['anchor'] ?? null; // ISO 8601
+    $tz = new DateTimeZone('Europe/Rome');
+    $anchor = $anchorStr ? new DateTime($anchorStr) : new DateTime('now', $tz);
+
+    $includeDone = isset($_GET['include_done']) && in_array((string)$_GET['include_done'], ['1','true','yes','y','on'], true);
+
+    // ---- finestra temporale in base alla direzione ----
+    $timeMinDt = clone $anchor; $timeMaxDt = clone $anchor;
+    if ($dir === 'up') {
+        $timeMaxDt->modify('+' . $rangeDays . ' days');
+    } else { // down
+        $timeMinDt->modify('-' . $rangeDays . ' days');
+    }
 
     $params = [
         'singleEvents' => true,
         'orderBy' => 'startTime',
-        'timeMin' => $timeMin,
-        'timeMax' => $timeMax,
-        'maxResults' => 500 // Prendiamo molti eventi, poi filtriamo
+        'timeMin' => $timeMinDt->format('c'),
+        'timeMax' => $timeMaxDt->format('c'),
+        'maxResults' => 500
     ];
 
     $events = $service->events->listEvents('primary', $params);
-    $filtered = [];
 
+    $filtered = [];
     foreach ($events->getItems() as $e) {
         $extProps = $e->getExtendedProperties();
-        $privateProps = $extProps ? $extProps->getPrivate() : null;
+        $private = $extProps ? $extProps->getPrivate() : [];
 
-        // ✅ Se non ha privateProps, considera come evento esterno (personal)
-        if (!$privateProps) {
-            $privateProps = [];
+        // status / show_in_dashboard (snake+camel)
+        $status = $private['status'] ?? 'pending';
+        $showRaw = $private['show_in_dashboard'] ?? ($private['showInDashboard'] ?? null);
+        $show = true; // default per compatibilità
+        if ($showRaw !== null) {
+            $s = strtolower((string)$showRaw);
+            $show = in_array($s, ['true','1','yes','y','on'], true);
         }
 
-        // Filtri obbligatori
-        $status = $privateProps['status'] ?? 'pending';
+        // filtri core: pending solo se non include_done
+        if (!$includeDone && $status !== 'pending') continue;
+        if (!$show) continue;
 
-        // ✅ Gestione robusta boolean/string per show_in_dashboard
-        if (isset($privateProps['show_in_dashboard'])) {
-            $val = $privateProps['show_in_dashboard'];
-            $showInDashboard = ($val === 'true' || $val === true || $val === 1 || $val === '1');
-        } else {
-            $showInDashboard = true; // default attuale del tuo codice
-        }
-
-        if ($status !== 'pending') continue;
-        if (!$showInDashboard) continue;
-
-        // Filtro tipo (opzionale)
-        $eventType = $privateProps['type'] ?? 'personal';
-        if ($filterType && $eventType !== $filterType) continue;
-
-        // Filtro categoria (opzionale)
-        $category = $privateProps['category'] ?? null;
+        $type = $private['type'] ?? 'personal';
+        $category = $private['category'] ?? null;
+        if ($filterType && $type !== $filterType) continue;
         if ($filterCategory && $category !== $filterCategory) continue;
 
-        // Costruisci oggetto evento
         $startObj = $e->getStart();
-        $endObj = $e->getEnd();
+        $endObj   = $e->getEnd();
         $isAllDay = (bool)$startObj->getDate();
-
-        $entityId = $privateProps['entity_id'] ?? null;
-        $trigger = $privateProps['trigger'] ?? null;
 
         $filtered[] = [
             'id' => $e->getId(),
@@ -132,25 +129,37 @@ try {
             'start' => $isAllDay ? $startObj->getDate() : $startObj->getDateTime(),
             'end' => $isAllDay ? $endObj->getDate() : $endObj->getDateTime(),
             'allDay' => $isAllDay,
-            'type' => $eventType,
+            'type' => $type,
             'category' => $category,
             'status' => $status,
-            'entity_id' => $entityId,
-            'trigger' => $trigger,
-            'show_in_dashboard' => $showInDashboard,
-            'color' => getTypeColor($eventType)
+            'entity_id' => $private['entity_id'] ?? null,
+            'trigger' => $private['trigger'] ?? null,
+            'show_in_dashboard' => $show,
+            'color' => getTypeColor($type)
         ];
 
         if (count($filtered) >= $limit) break;
     }
 
+    // next anchors per scrolling
+    $nextAnchorUp = ($dir === 'up'  ? $timeMaxDt : $anchor)->format('c');
+    $nextAnchorDown = ($dir === 'down' ? $timeMinDt : $anchor)->format('c');
+
     echo json_encode([
         'events' => $filtered,
-        'count' => count($filtered)
+        'count' => count($filtered),
+        'meta' => [
+            'dir' => $dir,
+            'anchor' => $anchor->format('c'),
+            'timeMin' => $timeMinDt->format('c'),
+            'timeMax' => $timeMaxDt->format('c'),
+            'nextAnchorUp' => $nextAnchorUp,
+            'nextAnchorDown' => $nextAnchorDown
+        ]
     ]);
 
 } catch (Exception $e) {
-    error_log("Dashboard Events Error: " . $e->getMessage());
+    error_log('Dashboard Events Error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }

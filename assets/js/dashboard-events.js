@@ -135,33 +135,46 @@ async function applyFiltersAndReload() {
 }
 
 async function primeLoad() {
-  // carica un primo blocco FUTURO (pending only)
+  const list = document.getElementById('eventsList');
+  if (!list) return;
+  
+  // ✅ Mostra loading
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">⏳ Caricamento...</div>';
+  
   console.log('🔄 Caricamento iniziale eventi...', { currentFilters });
   
-  const data = await API.getDashboardFeed({
-    anchor: anchorUp,
-    dir: 'up',
-    rangeDays: RANGE_DAYS,
-    include_done: false,
-    type: currentFilters.type,
-    category: currentFilters.category,
-    limit: 20
-  });
-  
-  console.log('📊 Dati ricevuti:', data);
-  
-  anchorUp = data?.meta?.nextAnchorUp || anchorUp;
-  // aggiorna categorie e render
-  (data.events||[]).map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
-  renderCategories();
-  prependOrAppend(data.events||[], 'append');
-  
-  // ✅ Messaggio se nessun evento
-  if (!data.events || data.events.length === 0) {
-    const list = document.getElementById('eventsList');
-    if (list && list.children.length === 0) {
+  try {
+    const data = await API.getDashboardFeed({
+      anchor: anchorUp,
+      dir: 'up',
+      rangeDays: RANGE_DAYS,
+      include_done: false,
+      type: currentFilters.type,
+      category: currentFilters.category,
+      limit: 20
+    });
+    
+    console.log('📊 Dati ricevuti:', data);
+    
+    anchorUp = data?.meta?.nextAnchorUp || anchorUp;
+    anchorDown = data?.meta?.anchor || anchorDown; // ✅ anchor iniziale per scorrere giù
+    
+    // aggiorna categorie
+    (data.events||[]).map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
+    renderCategories();
+    
+    // ✅ Pulisci e mostra eventi
+    list.innerHTML = '';
+    
+    if (!data.events || data.events.length === 0) {
       list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
+    } else {
+      const html = data.events.map(eventRowHtml).join('');
+      list.innerHTML = html;
     }
+  } catch (error) {
+    console.error('❌ Errore caricamento eventi:', error);
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444">❌ Errore nel caricamento</div>';
   }
 }
 
@@ -179,25 +192,37 @@ function eventRowHtml(event) {
   const startDate = new Date(event.start);
   const dateStr = startDate.toLocaleDateString('it-IT',{ day:'numeric', month:'short', year: startDate.getFullYear()!==new Date().getFullYear()? 'numeric': undefined });
   const timeStr = event.allDay ? 'Tutto il giorno' : startDate.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-  const isOverdue = startDate < new Date();
+  const isOverdue = startDate < new Date() && event.status !== 'done';
+  const isDone = event.status === 'done';
+  
   const categoryBadge = event.category ? `<span class="category-tag" style="font-size:11px;padding:2px 8px;border-radius:12px;background:#334155;color:#cbd5e1;border:1px solid #475569;margin-left:8px">${event.category}</span>` : '';
+  
+  const doneBadge = isDone ? '<span style="color:#10b981;font-size:11px;font-weight:600;margin-left:8px">✅ COMPLETATO</span>' : '';
+  
+  const overdueBadge = isOverdue ? '<span style="color:#ef4444;font-size:11px;font-weight:600">⚠️ SCADUTO</span>' : '';
+  
+  // ✅ Nascondi azioni se completato
+  const actions = isDone ? '' : `
+    <div class="event-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn success small" style="min-width:96px;white-space:nowrap;font-weight:600" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✅ Fatto</button>
+      <button class="btn secondary small" style="min-width:96px;white-space:nowrap" onclick="window.postponeEvent('${event.id}', '${(event.title||'').replace(/'/g, "\'")}')" title="Rimanda evento">⏸ Rimanda</button>
+      <button class="btn secondary small icon-only" style="min-width:44px" onclick="window.viewEventDetails('${event.id}')" title="Vedi dettagli">👁</button>
+    </div>`;
+  
   return `
-    <div class="event-row" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:${isOverdue?'rgba(239,68,68,0.1)':'#1f2937'};border-left:4px solid ${event.color};border-radius:8px;flex-wrap:wrap">
+    <div class="event-row" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:${isDone ? 'rgba(16,185,129,0.1)' : isOverdue?'rgba(239,68,68,0.1)':'#1f2937'};border-left:4px solid ${event.color};border-radius:8px;flex-wrap:wrap;opacity:${isDone ? '0.7' : '1'}">
       <div style="flex:1;min-width:240px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
           <span style="font-size:18px">${emoji}</span>
-          <strong style="color:var(--fg)">${event.title}</strong>
+          <strong style="color:var(--fg);${isDone ? 'text-decoration:line-through' : ''}">${event.title}</strong>
           ${categoryBadge}
-          ${isOverdue ? '<span style="color:#ef4444;font-size:11px;font-weight:600">⚠️ SCADUTO</span>' : ''}
+          ${doneBadge}
+          ${overdueBadge}
         </div>
         <div style="font-size:12px;color:var(--muted)">📅 ${dateStr} ${!event.allDay ? `• 🕐 ${timeStr}` : ''}</div>
         ${event.description ? `<div style=\"font-size:12px;color:var(--muted);margin-top:4px\">${event.description.substring(0,80)}${event.description.length>80?'...':''}</div>` : ''}
       </div>
-      <div class="event-actions" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn success small" style="min-width:96px;white-space:nowrap;font-weight:600" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✅ Fatto</button>
-        <button class="btn secondary small" style="min-width:96px;white-space:nowrap" onclick="window.postponeEvent('${event.id}', '${(event.title||'').replace(/'/g, "\'")}')" title="Rimanda evento">⏸ Rimanda</button>
-        <button class="btn secondary small icon-only" style="min-width:44px" onclick="window.viewEventDetails('${event.id}')" title="Vedi dettagli">👁</button>
-      </div>
+      ${actions}
     </div>`;
 }
 
@@ -211,15 +236,56 @@ function prependOrAppend(items, mode) {
 
 function setupScrollHandlers() {
   const feed = document.getElementById('feed');
-  const TOP_THR = 60, BOT_THR = 60;
+  const list = document.getElementById('eventsList');
+  if (!feed || !list) return;
+  
+  const TOP_THR = 100;
+  const BOT_THR = 100;
+
+  // ✅ Spinner helper
+  const showTopSpinner = () => {
+    let spinner = document.getElementById('topSpinner');
+    if (!spinner) {
+      spinner = document.createElement('div');
+      spinner.id = 'topSpinner';
+      spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
+      spinner.innerHTML = '🔄';
+      list.insertBefore(spinner, list.firstChild);
+    }
+  };
+  
+  const hideTopSpinner = () => {
+    const spinner = document.getElementById('topSpinner');
+    if (spinner) spinner.remove();
+  };
+  
+  const showBottomSpinner = () => {
+    let spinner = document.getElementById('bottomSpinner');
+    if (!spinner) {
+      spinner = document.createElement('div');
+      spinner.id = 'bottomSpinner';
+      spinner.style.cssText = 'padding:12px;text-align:center;color:var(--muted);font-size:20px';
+      spinner.innerHTML = '🔄';
+      list.appendChild(spinner);
+    }
+  };
+  
+  const hideBottomSpinner = () => {
+    const spinner = document.getElementById('bottomSpinner');
+    if (spinner) spinner.remove();
+  };
 
   feed.addEventListener('scroll', async () => {
     const nearTop = feed.scrollTop < TOP_THR;
     const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < BOT_THR;
 
+    // ✅ SCROLL SU: carica eventi FUTURI
     if (nearTop && !loadingUp) {
       loadingUp = true;
+      showTopSpinner();
+      
       try {
+        console.log('⬆️ Caricamento eventi futuri...');
         const data = await API.getDashboardFeed({
           anchor: anchorUp,
           dir: 'up',
@@ -229,28 +295,64 @@ function setupScrollHandlers() {
           category: currentFilters.category,
           limit: 20
         });
-        anchorUp = data?.meta?.nextAnchorUp || anchorUp;
-        prependOrAppend(data.events||[], 'prepend');
-      } finally { loadingUp = false; }
+        
+        console.log('📊 Eventi futuri ricevuti:', data?.events?.length || 0);
+        
+        if (data?.meta?.nextAnchorUp) {
+          anchorUp = data.meta.nextAnchorUp;
+        }
+        
+        if (data.events && data.events.length > 0) {
+          // Rimuovi spinner prima di aggiungere contenuto
+          hideTopSpinner();
+          prependOrAppend(data.events, 'prepend');
+        }
+      } catch (error) {
+        console.error('❌ Errore caricamento scroll up:', error);
+      } finally {
+        hideTopSpinner();
+        loadingUp = false;
+      }
     }
 
+    // ✅ SCROLL GIÙ: carica eventi PASSATI (inclusi completati)
     if (nearBottom && !loadingDown) {
       loadingDown = true;
+      showBottomSpinner();
+      
       try {
+        console.log('⬇️ Caricamento eventi passati...');
         const data = await API.getDashboardFeed({
           anchor: anchorDown,
           dir: 'down',
           rangeDays: RANGE_DAYS,
-          include_done: true, // 👈 giù = includi completati
+          include_done: true, // 👈 Include eventi completati
           type: currentFilters.type,
           category: currentFilters.category,
           limit: 20
         });
-        anchorDown = data?.meta?.nextAnchorDown || anchorDown;
-        prependOrAppend(data.events||[], 'append');
-      } finally { loadingDown = false; }
+        
+        console.log('📊 Eventi passati ricevuti:', data?.events?.length || 0);
+        
+        if (data?.meta?.nextAnchorDown) {
+          anchorDown = data.meta.nextAnchorDown;
+        }
+        
+        if (data.events && data.events.length > 0) {
+          // Rimuovi spinner prima di aggiungere contenuto
+          hideBottomSpinner();
+          prependOrAppend(data.events, 'append');
+        }
+      } catch (error) {
+        console.error('❌ Errore caricamento scroll down:', error);
+      } finally {
+        hideBottomSpinner();
+        loadingDown = false;
+      }
     }
   });
+  
+  console.log('✅ Scroll handlers configurati');
 }
 
 // Azioni rapide già definite altrove (riuso da versione precedente)

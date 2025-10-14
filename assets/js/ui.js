@@ -9,6 +9,7 @@ import { askDocs, askAI, updateChatCounter } from './chat.js';
 import { renderCalendar } from './calendar.js';
 import { loadAccountInfo, showUpgradeModal, activateProFromPage, doDowngrade, doDeleteAccount } from './account.js';
 import { renderEventsWidget } from './dashboard-events.js';
+import { openAssistantModal } from './assistant.js';
 
 const LS_ROUTE_KEY = 'gmv3_route';
 
@@ -114,6 +115,21 @@ function dashboardSection(isPro, maxDocs, maxChat, maxSize) {
   return `<section data-page="dashboard">
     <h1>Dashboard</h1>
     ${!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+    
+    <div class="card" style="background:linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);color:white;margin-bottom:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+          <h3 style="color:white;margin:0 0 8px 0">🤖 Assistente AI</h3>
+          <p style="margin:0;opacity:0.9;font-size:14px">
+            Crea eventi calendario tramite dialogo naturale
+          </p>
+        </div>
+        <button class="btn" id="btnOpenAssistant" style="background:white;color:#7c3aed;font-weight:600">
+          ✨ Avvia Assistente
+        </button>
+      </div>
+    </div>
+    
     <div id="eventsWidget"></div>
     <div class="cards stats">
       <div class="card"><div class="stat-label">Documenti Archiviati</div><div class="stat-number"><span id="docCount">0</span> / ${maxDocs}</div></div>
@@ -325,6 +341,11 @@ function bindEvents() {
       renderDocsTable();
     });
 
+    // ✅ AGGIUNTO: Event listener per il nuovo assistente
+    document.getElementById('btnOpenAssistant')?.addEventListener('click', () => {
+      openAssistantModal();
+    });
+
     // Chat
     document.getElementById('askDocsBtn')?.addEventListener('click', askDocs);
     document.getElementById('askAIBtn')?.addEventListener('click', askAI);
@@ -394,6 +415,9 @@ export function showPage(pageName) {
 
   // Carica dati specifici pagina
   if (pageName === 'dashboard') {
+    // La renderDashboard non esiste, la logica di rendering è nella showPage
+    // Ho spostato la logica di rendering della card dell'assistente nella dashboardSection
+    // e il listener è stato aggiunto in bindEvents()
     loadDocs();
     if (window.S.user && window.S.user.role === 'pro') loadCategories();
     renderEventsWidget(); // ✨ AGGIUNTO: carica widget eventi

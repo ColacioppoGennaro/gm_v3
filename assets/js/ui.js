@@ -8,6 +8,7 @@ import { loadDocs, renderDocsTable, uploadFile, loadCategories, createCategoryFr
 import { askDocs, askAI, updateChatCounter } from './chat.js';
 import { renderCalendar } from './calendar.js';
 import { loadAccountInfo, showUpgradeModal, activateProFromPage, doDowngrade, doDeleteAccount } from './account.js';
+import { renderEventsWidget } from './dashboard-events.js';
 
 const LS_ROUTE_KEY = 'gmv3_route';
 
@@ -113,6 +114,7 @@ function dashboardSection(isPro, maxDocs, maxChat, maxSize) {
   return `<section data-page="dashboard">
     <h1>Dashboard</h1>
     ${!isPro ? '<div class="banner" id="upgradeBtn">⚡ Stai usando il piano <b>Free</b>. Clicca qui per upgrade a Pro!</div>' : ''}
+    <div id="eventsWidget"></div>
     <div class="cards stats">
       <div class="card"><div class="stat-label">Documenti Archiviati</div><div class="stat-number"><span id="docCount">0</span> / ${maxDocs}</div></div>
       <div class="card"><div class="stat-label">Domande AI Oggi</div><div class="stat-number"><span id="qCount">0</span> / ${maxChat}</div></div>
@@ -394,6 +396,7 @@ export function showPage(pageName) {
   if (pageName === 'dashboard') {
     loadDocs();
     if (window.S.user && window.S.user.role === 'pro') loadCategories();
+    renderEventsWidget(); // ✨ AGGIUNTO: carica widget eventi
   } else if (pageName === 'calendar') {
     renderCalendar();
   } else if (pageName === 'chat') {

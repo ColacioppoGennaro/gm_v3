@@ -88,7 +88,7 @@ export async function uploadFile() {
     const r = await API.uploadDoc(f, uploadCategory?.value);
     if (r.success) {
       loadDocs();
-      fileInput.value = '';
+      clearFileSelection(); // Ripristina dropzone
       if (uploadCategory) uploadCategory.value = '';
     }
   } catch (e) {
@@ -292,6 +292,13 @@ export function setupUploadDropzone() {
   
   drop.onclick = () => fileInput.click();
   
+  // Mostra preview quando file selezionato
+  fileInput.onchange = () => {
+    if (fileInput.files.length > 0) {
+      showFilePreview(fileInput.files[0]);
+    }
+  };
+  
   drop.ondragover = (e) => {
     e.preventDefault();
     drop.style.borderColor = 'var(--accent)';
@@ -305,8 +312,76 @@ export function setupUploadDropzone() {
     e.preventDefault();
     drop.style.borderColor = '#374151';
     fileInput.files = e.dataTransfer.files;
-    uploadFile();
+    if (fileInput.files.length > 0) {
+      showFilePreview(fileInput.files[0]);
+    }
   };
+}
+
+/**
+ * Mostra preview del file selezionato
+ */
+function showFilePreview(file) {
+  const drop = document.getElementById('drop');
+  if (!drop) return;
+  
+  const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+  const fileIcon = getFileIcon(file.type);
+  
+  drop.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:48px;margin-bottom:8px">${fileIcon}</div>
+      <div style="font-weight:600;color:var(--accent);margin-bottom:4px">${file.name}</div>
+      <div style="font-size:13px;color:var(--muted)">${sizeInMB} MB</div>
+      <div style="font-size:12px;color:var(--ok);margin-top:8px">✓ File selezionato - Clicca "Carica File" per procedere</div>
+      <button type="button" id="clearFile" class="btn secondary" style="margin-top:12px;padding:6px 16px;font-size:13px">✕ Rimuovi</button>
+    </div>
+  `;
+  
+  drop.style.borderColor = 'var(--ok)';
+  drop.style.background = 'rgba(16, 185, 129, 0.05)';
+  
+  // Bind rimuovi file
+  document.getElementById('clearFile')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    clearFileSelection();
+  });
+}
+
+/**
+ * Ottieni icona in base al tipo di file
+ */
+function getFileIcon(mimeType) {
+  if (mimeType.includes('pdf')) return '📕';
+  if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
+  if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📗';
+  if (mimeType.includes('image')) return '🖼️';
+  if (mimeType.includes('text')) return '📄';
+  return '📎';
+}
+
+/**
+ * Pulisci selezione file
+ */
+function clearFileSelection() {
+  const fileInput = document.getElementById('file');
+  const drop = document.getElementById('drop');
+  
+  if (fileInput) fileInput.value = '';
+  if (drop) {
+    const isPro = window.S.user?.role === 'pro';
+    const maxSize = isPro ? 150 : 50;
+    
+    drop.innerHTML = `
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:8px">📁</div>
+        <div>Trascina qui un file o clicca per selezionare</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px">PDF, DOC, DOCX, TXT, CSV, XLSX, JPG, PNG (Max ${maxSize}MB)</div>
+      </div>
+    `;
+    drop.style.borderColor = '#374151';
+    drop.style.background = 'transparent';
+  }
 }
 
 /**

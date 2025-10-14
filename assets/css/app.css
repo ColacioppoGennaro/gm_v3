@@ -555,3 +555,5 @@ h1{margin-bottom:8px}
 .chip-x:hover {
   color: #ef4444;
 }
+
+@import 'assistant.css';

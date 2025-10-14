@@ -18,6 +18,12 @@ export async function renderEventsWidget() {
   const container = document.getElementById('eventsWidget');
   if (!container) return;
 
+  // ✅ Reset completo ancore e filtri ad ogni render
+  anchorUp = new Date().toISOString();
+  anchorDown = new Date().toISOString();
+  loadingUp = false;
+  loadingDown = false;
+
   // shell + filtri + area scrollabile
   container.innerHTML = `
     <div class="card">
@@ -130,7 +136,7 @@ function eventRowHtml(event) {
         ${event.description ? `<div style=\"font-size:12px;color:var(--muted);margin-top:4px\">${event.description.substring(0,80)}${event.description.length>80?'...':''}</div>` : ''}
       </div>
       <div class="event-actions" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn success small" style="min-width:96px;white-space:nowrap" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✔ Fatto</button>
+        <button class="btn success small" style="min-width:96px;white-space:nowrap;font-weight:600" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✅ Fatto</button>
         <button class="btn secondary small" style="min-width:96px;white-space:nowrap" onclick="window.postponeEvent('${event.id}', '${(event.title||'').replace(/'/g, "\'")}')" title="Rimanda evento">⏸ Rimanda</button>
         <button class="btn secondary small icon-only" style="min-width:44px" onclick="window.viewEventDetails('${event.id}')" title="Vedi dettagli">👁</button>
       </div>

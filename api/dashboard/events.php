@@ -63,11 +63,18 @@ try {
     $limit = isset($_GET['limit']) ? max(1, min(50, (int)$_GET['limit'])) : 10;
     $filterType = $_GET['type'] ?? null;
     $filterCategory = $_GET['category'] ?? null;
-    
+
+    // ⬅️ HARDENING: normalizza input "vuoti" passati come stringhe
+    foreach (['filterType', 'filterCategory'] as $k) {
+        if (isset($$k) && ($$k === '' || $$k === 'null' || $$k === 'undefined')) {
+            $$k = null;
+        }
+    }
+
     // Carica eventi futuri (prossimi 3 mesi)
     $timeMin = (new DateTime())->format('c');
     $timeMax = (new DateTime('+3 months'))->format('c');
-    
+
     $params = [
         'singleEvents' => true,
         'orderBy' => 'startTime',
@@ -75,49 +82,49 @@ try {
         'timeMax' => $timeMax,
         'maxResults' => 500 // Prendiamo molti eventi, poi filtriamo
     ];
-    
+
     $events = $service->events->listEvents('primary', $params);
     $filtered = [];
-    
+
     foreach ($events->getItems() as $e) {
         $extProps = $e->getExtendedProperties();
         $privateProps = $extProps ? $extProps->getPrivate() : null;
-        
-        // ✅ FIX: Se non ha privateProps, considera come evento esterno (personal)
+
+        // ✅ Se non ha privateProps, considera come evento esterno (personal)
         if (!$privateProps) {
             $privateProps = [];
         }
-        
+
         // Filtri obbligatori
         $status = $privateProps['status'] ?? 'pending';
-        
-        // ✅ FIX: Gestione robusta boolean/string per show_in_dashboard
+
+        // ✅ Gestione robusta boolean/string per show_in_dashboard
         if (isset($privateProps['show_in_dashboard'])) {
             $val = $privateProps['show_in_dashboard'];
             $showInDashboard = ($val === 'true' || $val === true || $val === 1 || $val === '1');
         } else {
-            $showInDashboard = true; // default
+            $showInDashboard = true; // default attuale del tuo codice
         }
-        
+
         if ($status !== 'pending') continue;
         if (!$showInDashboard) continue;
-        
+
         // Filtro tipo (opzionale)
         $eventType = $privateProps['type'] ?? 'personal';
         if ($filterType && $eventType !== $filterType) continue;
-        
+
         // Filtro categoria (opzionale)
         $category = $privateProps['category'] ?? null;
         if ($filterCategory && $category !== $filterCategory) continue;
-        
+
         // Costruisci oggetto evento
         $startObj = $e->getStart();
         $endObj = $e->getEnd();
         $isAllDay = (bool)$startObj->getDate();
-        
+
         $entityId = $privateProps['entity_id'] ?? null;
         $trigger = $privateProps['trigger'] ?? null;
-        
+
         $filtered[] = [
             'id' => $e->getId(),
             'title' => $e->getSummary() ?: '(senza titolo)',
@@ -133,15 +140,15 @@ try {
             'show_in_dashboard' => $showInDashboard,
             'color' => getTypeColor($eventType)
         ];
-        
+
         if (count($filtered) >= $limit) break;
     }
-    
+
     echo json_encode([
         'events' => $filtered,
         'count' => count($filtered)
     ]);
-    
+
 } catch (Exception $e) {
     error_log("Dashboard Events Error: " . $e->getMessage());
     http_response_code(500);

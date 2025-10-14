@@ -48,14 +48,21 @@ export async function renderEventsWidget() {
   document.getElementById('filterType').addEventListener('change', applyFiltersAndReload);
   document.getElementById('filterCategory').addEventListener('change', applyFiltersAndReload);
 
+  // ✅ Caricamento iniziale automatico
   await primeLoad();
   setupScrollHandlers();
 }
 
 // ✅ Funzione per applicare filtri e ricaricare
 async function applyFiltersAndReload() {
-  currentFilters.type = document.getElementById('filterType').value || null;
-  currentFilters.category = document.getElementById('filterCategory').value || null;
+  const typeVal = document.getElementById('filterType')?.value || '';
+  const catVal = document.getElementById('filterCategory')?.value || '';
+  
+  currentFilters.type = typeVal === '' ? null : typeVal;
+  currentFilters.category = catVal === '' ? null : catVal;
+  
+  console.log('🔍 Filtri applicati:', currentFilters);
+  
   // reset ancore
   anchorUp = new Date().toISOString();
   anchorDown = new Date().toISOString();
@@ -65,6 +72,8 @@ async function applyFiltersAndReload() {
 
 async function primeLoad() {
   // carica un primo blocco FUTURO (pending only)
+  console.log('🔄 Caricamento iniziale eventi...', { currentFilters });
+  
   const data = await API.getDashboardFeed({
     anchor: anchorUp,
     dir: 'up',
@@ -74,11 +83,22 @@ async function primeLoad() {
     category: currentFilters.category,
     limit: 20
   });
+  
+  console.log('📊 Dati ricevuti:', data);
+  
   anchorUp = data?.meta?.nextAnchorUp || anchorUp;
   // aggiorna categorie e render
   (data.events||[]).map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
   renderCategories();
   prependOrAppend(data.events||[], 'append');
+  
+  // ✅ Messaggio se nessun evento
+  if (!data.events || data.events.length === 0) {
+    const list = document.getElementById('eventsList');
+    if (list && list.children.length === 0) {
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
+    }
+  }
 }
 
 function renderCategories() {
@@ -110,7 +130,7 @@ function eventRowHtml(event) {
         ${event.description ? `<div style=\"font-size:12px;color:var(--muted);margin-top:4px\">${event.description.substring(0,80)}${event.description.length>80?'...':''}</div>` : ''}
       </div>
       <div class="event-actions" style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn success small" style="min-width:96px;white-space:nowrap" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✓ Fatto</button>
+        <button class="btn success small" style="min-width:96px;white-space:nowrap" onclick="window.markEventDone('${event.id}')" title="Segna come completato">✔ Fatto</button>
         <button class="btn secondary small" style="min-width:96px;white-space:nowrap" onclick="window.postponeEvent('${event.id}', '${(event.title||'').replace(/'/g, "\'")}')" title="Rimanda evento">⏸ Rimanda</button>
         <button class="btn secondary small icon-only" style="min-width:44px" onclick="window.viewEventDetails('${event.id}')" title="Vedi dettagli">👁</button>
       </div>

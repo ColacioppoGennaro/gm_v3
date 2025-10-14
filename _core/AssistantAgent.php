@@ -406,89 +406,106 @@ PROMPT;
      * @throws Exception se creazione fallisce
      */
     private function createCalendarEvent($eventData) {
-        // Prepara dati per API Google Calendar
-        $isAllDay = empty($eventData['time']);
+        // Verifica che l'utente abbia Google Calendar connesso
+        $stmt = $this->db->prepare("SELECT google_oauth_token, google_oauth_refresh, google_oauth_expiry FROM users WHERE id = ?");
+        $stmt->bind_param("i", $this->userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $oauth = $result->fetch_assoc();
         
-        $postData = [
-            'title' => $eventData['title'],
-            'description' => $eventData['description'] ?? '',
-            'type' => $eventData['type'],
-            'status' => 'pending',
-            'category' => $eventData['category'] ?? '',
-            'trigger' => 'assistant',
-            'show_in_dashboard' => true
+        if (!$oauth || empty($oauth['google_oauth_token'])) {
+            throw new Exception("Google Calendar non connesso. Collegalo prima di creare eventi.");
+        }
+        
+        // Carica Google Client
+        require_once __DIR__ . '/google_client.php';
+        
+        $oauthFormatted = [
+            'access_token' => $oauth['google_oauth_token'],
+            'refresh_token' => $oauth['google_oauth_refresh'] ?? null,
+            'access_expires_at' => $oauth['google_oauth_expiry'] ?? null,
         ];
         
+        try {
+            $client = makeGoogleClientForUser($oauthFormatted);
+            $service = new Google_Service_Calendar($client);
+        } catch (Exception $e) {
+            throw new Exception("Errore inizializzazione Google Calendar: " . $e->getMessage());
+        }
+        
+        // Prepara evento
+        $isAllDay = empty($eventData['time']);
+        
+        $event = new Google_Service_Calendar_Event([
+            'summary' => $eventData['title'],
+            'description' => $eventData['description'] ?? ''
+        ]);
+        
+        // Date/Time
         if ($isAllDay) {
-            $postData['allDay'] = '1';
-            $postData['startDate'] = $eventData['date'];
-            $postData['endDate'] = $eventData['date']; // Stesso giorno
+            $event->setStart(new Google_Service_Calendar_EventDateTime([
+                'date' => $eventData['date']
+            ]));
+            $event->setEnd(new Google_Service_Calendar_EventDateTime([
+                'date' => $eventData['date']
+            ]));
         } else {
-            $postData['allDay'] = '0';
             $dateTime = $eventData['date'] . 'T' . $eventData['time'] . ':00';
-            $postData['startDateTime'] = $dateTime;
-            // Fine: 1 ora dopo
             $endTime = date('Y-m-d\TH:i:s', strtotime($dateTime . ' +1 hour'));
-            $postData['endDateTime'] = $endTime;
-            $postData['timeZone'] = 'Europe/Rome';
+            
+            $event->setStart(new Google_Service_Calendar_EventDateTime([
+                'dateTime' => $dateTime,
+                'timeZone' => 'Europe/Rome'
+            ]));
+            $event->setEnd(new Google_Service_Calendar_EventDateTime([
+                'dateTime' => $endTime,
+                'timeZone' => 'Europe/Rome'
+            ]));
         }
         
         // Ricorrenza
         if (!empty($eventData['recurrence'])) {
-            $postData['recurrence'] = 'FREQ=' . $eventData['recurrence'];
+            $event->setRecurrence(['RRULE:FREQ=' . $eventData['recurrence']]);
         }
         
         // Promemoria
         if (!empty($eventData['reminder_days_before'])) {
-            $minutes = intval($eventData['reminder_days_before']) * 1440; // giorni -> minuti
-            $postData['reminders'] = json_encode([
-                ['method' => 'popup', 'minutes' => $minutes]
+            $minutes = intval($eventData['reminder_days_before']) * 1440;
+            $reminder = new Google_Service_Calendar_EventReminder([
+                'method' => 'popup',
+                'minutes' => $minutes
             ]);
+            $reminders = new Google_Service_Calendar_EventReminders([
+                'useDefault' => false,
+                'overrides' => [$reminder]
+            ]);
+            $event->setReminders($reminders);
         }
         
-        // Chiamata API interna (simula richiesta HTTP interna)
-        $result = $this->callInternalAPI('google/events.php', $postData);
+        // Extended Properties (tipizzazione)
+        $extProps = new Google_Service_Calendar_EventExtendedProperties();
+        $privateData = [
+            'type' => $eventData['type'],
+            'status' => 'pending',
+            'trigger' => 'assistant',
+            'show_in_dashboard' => 'true'
+        ];
         
-        if (!isset($result['id'])) {
-            throw new Exception("API non ha ritornato event ID");
+        if (!empty($eventData['category'])) {
+            $privateData['category'] = $eventData['category'];
         }
         
-        return $result['id'];
-    }
-    
-    /**
-     * Chiamata API interna (wrapper per api/google/events.php)
-     * 
-     * @param string $endpoint Endpoint relativo (es: google/events.php)
-     * @param array $postData Dati POST
-     * @return array Response decoded
-     * @throws Exception se chiamata fallisce
-     */
-    private function callInternalAPI($endpoint, $postData) {
-        // Simula POST request interno
-        $_POST = $postData;
-        $_GET['calendarId'] = 'primary';
-        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $extProps->setPrivate($privateData);
+        $event->setExtendedProperties($extProps);
         
-        // Buffer output
-        ob_start();
+        // Crea evento
+        $createdEvent = $service->events->insert('primary', $event);
         
-        try {
-            require __DIR__ . '/../api/' . $endpoint;
-            $output = ob_get_clean();
-            
-            $result = json_decode($output, true);
-            
-            if (!$result) {
-                throw new Exception("Invalid API response: {$output}");
-            }
-            
-            return $result;
-            
-        } catch (Exception $e) {
-            ob_end_clean();
-            throw $e;
+        if (!$createdEvent || !$createdEvent->getId()) {
+            throw new Exception("Errore creazione evento su Google Calendar");
         }
+        
+        return $createdEvent->getId();
     }
     
     /**

@@ -2,7 +2,7 @@
 /**
  * api/google/events.php
  * Bridge Google Calendar (GET list, POST create/update, DELETE)
- * Compatibile con FormData e JSON, Netsons-safe (no PATCH/DELETE reali).
+ * ✅ CORRETTO: Gestione UPDATE, promemoria e ricorrenza
  */
 
 ini_set('display_errors', 1);
@@ -110,7 +110,7 @@ function buildEventDateTime($isAllDay, $dateOrDateTime, $timeZone = null) {
 try {
     switch ($method) {
         // =========================
-        // LISTA EVENTI (GET)
+        // LISTA EVENTI (GET) - ✅ FIX: Recupera promemoria e ricorrenza
         // =========================
         case 'GET': {
             $timeMin = $_GET['start'] ?? null;
@@ -126,13 +126,39 @@ try {
                 $endObj   = $e->getEnd();
                 $isAllDay = (bool)$startObj->getDate(); // se c'è 'date' è all-day
 
+                // ✅ FIX: Recupera promemoria
+                $reminders = [];
+                $remObj = $e->getReminders();
+                if ($remObj && !$remObj->getUseDefault()) {
+                    $overrides = $remObj->getOverrides();
+                    if ($overrides) {
+                        foreach ($overrides as $o) {
+                            $reminders[] = [
+                                'method' => $o->getMethod(),
+                                'minutes' => $o->getMinutes()
+                            ];
+                        }
+                    }
+                }
+
+                // ✅ FIX: Recupera ricorrenza
+                $recurrence = $e->getRecurrence();
+                $rrule = null;
+                if ($recurrence && is_array($recurrence) && count($recurrence) > 0) {
+                    $rrule = $recurrence[0]; // Es: "RRULE:FREQ=DAILY;COUNT=5"
+                }
+
                 $out[] = [
                     'id'     => $e->getId(),
                     'title'  => $e->getSummary() ?: '(senza titolo)',
                     'start'  => $isAllDay ? $startObj->getDate() : $startObj->getDateTime(),
                     'end'    => $isAllDay ? $endObj->getDate()   : $endObj->getDateTime(),
                     'allDay' => $isAllDay,
-                    // opzionale: estendere extendedProps se serve
+                    'extendedProps' => [
+                        'description' => $e->getDescription() ?: '',
+                        'reminders'   => ['overrides' => $reminders],
+                        'recurrence'  => $rrule ? [$rrule] : null,
+                    ]
                 ];
             }
             echo json_encode($out);
@@ -140,11 +166,25 @@ try {
         }
 
         // =========================
-        // CREA EVENTO (POST)
+        // CREA EVENTO (POST senza id)
         // =========================
         case 'POST': {
+            // ✅ FIX: Se c'è 'id' in query o body, è un UPDATE
+            $eventId = $_GET['id'] ?? null;
+            if (!$eventId) {
+                $in = read_input();
+                $eventId = $in['id'] ?? null;
+            }
+            
+            if ($eventId) {
+                // È un UPDATE mascherato da POST
+                $_GET['id'] = $eventId;
+                goto update_event;
+            }
+
+            // --- CREAZIONE NUOVO EVENTO ---
             $in = read_input();
-            // Se arriva JSON stile vecchio (start/end flat), normalizza a campi nuovi
+            
             $title       = $in['title'] ?? ($in['summary'] ?? '');
             $description = $in['description'] ?? '';
             $allDayFlag  = isset($in['allDay']) ? (int)$in['allDay'] : null;
@@ -166,8 +206,8 @@ try {
                 }
             }
 
-            // Ricorrenza
-            $rrule = $in['rrule'] ?? null;
+            // Ricorrenza (accetta sia 'rrule' che 'recurrence')
+            $rrule = $in['rrule'] ?? $in['recurrence'] ?? null;
             if ($rrule) {
                 // Accetta sia "FREQ=DAILY" sia "RRULE:FREQ=DAILY"
                 if (stripos($rrule, 'RRULE:') !== 0) {
@@ -240,21 +280,29 @@ try {
         }
 
         // =========================
-        // AGGIORNA EVENTO (POST/PUT/PATCH)
+        // AGGIORNA EVENTO (POST/PUT/PATCH con id)
         // =========================
         case 'PUT':
         case 'PATCH':
-        case 'POST': { // usato per UPDATE quando c'è ?id=...
+        update_event: // ✅ Label per POST con id
+            
             $id = $_GET['id'] ?? null;
             if (!$id) {
                 http_response_code(400);
-                echo json_encode(['error' => 'id required']);
+                echo json_encode(['error' => 'id required for update']);
                 exit;
             }
 
             $in = read_input();
 
-            $ev = $service->events->get($calendarId, $id);
+            // Recupera evento esistente
+            try {
+                $ev = $service->events->get($calendarId, $id);
+            } catch (Exception $e) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Evento non trovato: ' . $e->getMessage()]);
+                exit;
+            }
 
             // Titolo / descrizione
             if (isset($in['title']))       $ev->setSummary($in['title']);
@@ -281,24 +329,32 @@ try {
                 if ($endDT)   $ev->setEnd(buildEventDateTime(false, $endDT,   $timeZone));
             }
 
-            // Promemoria
+            // ✅ FIX: Promemoria - gestione corretta con oggetto Google
             if (isset($in['reminders'])) {
                 $rem = $in['reminders'];
                 if (is_string($rem)) $rem = json_decode($rem, true);
                 $overrides = [];
+                
                 if (is_array($rem)) {
                     $raw = $rem['overrides'] ?? $rem;
                     foreach ($raw as $r) {
                         if (!isset($r['method']) || !isset($r['minutes'])) continue;
-                        $overrides[] = ['method' => $r['method'], 'minutes' => (int)$r['minutes']];
+                        $overrides[] = new Google_Service_Calendar_EventReminder([
+                            'method'  => $r['method'], 
+                            'minutes' => (int)$r['minutes']
+                        ]);
                     }
                 }
-                $ev->setReminders(['useDefault' => false, 'overrides' => $overrides]);
+                
+                $reminderObj = new Google_Service_Calendar_EventReminders();
+                $reminderObj->setUseDefault(false);
+                $reminderObj->setOverrides($overrides);
+                $ev->setReminders($reminderObj);
             }
 
-            // Ricorrenza
-            if (isset($in['rrule'])) {
-                $rr = $in['rrule'];
+            // Ricorrenza (accetta sia 'rrule' che 'recurrence')
+            if (isset($in['rrule']) || isset($in['recurrence'])) {
+                $rr = $in['rrule'] ?? $in['recurrence'];
                 if ($rr && stripos($rr, 'RRULE:') !== 0) $rr = 'RRULE:' . $rr;
                 $ev->setRecurrence($rr ? [$rr] : []);
             }
@@ -306,7 +362,6 @@ try {
             $service->events->update($calendarId, $id, $ev);
             echo json_encode(['ok' => true]);
             break;
-        }
 
         // =========================
         // ELIMINA EVENTO (DELETE o POST _method=DELETE)

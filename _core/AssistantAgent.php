@@ -253,35 +253,38 @@ ESTRAI dal messaggio dell'utente e ritorna SOLO un oggetto JSON valido:
   "title": "titolo evento (breve)",
   "date": "YYYY-MM-DD (solo se menzionata, altrimenti null)",
   "time": "HH:MM formato 24h (solo se specifica, altrimenti null)",
-  "settore_id": "ID settore più appropriato (numero, non nome)",
-  "tipo_attivita_id": "ID tipo attività più appropriato (numero, non nome)",
+  "settore_id": ID_NUMERICO (usa la lista sopra),
+  "tipo_attivita_id": ID_NUMERICO (usa la lista sopra),
   "category": "etichetta libera opzionale",
   "recurrence": "DAILY | WEEKLY | MONTHLY | YEARLY (solo se ricorrente, altrimenti null)",
-  "reminder_days_before": "numero intero giorni prima per promemoria (null se non specificato)",
+  "reminder_days_before": numero intero giorni prima (null se non specificato),
   "description": "note aggiuntive (null se non presenti)"
 }
 
-REGOLE MATCHING:
-- "bolletta luce" → Settore: Casa, Tipo: Bollette Utenze
-- "stipendi" → Settore: Lavoro, Tipo: Stipendi da Pagare
-- "tagliando auto" → Settore: Lavoro, Tipo: Manutenzione Mezzi
-- "gatto veterinario" → Settore: Persone, Tipo: Veterinario
-- "palestra" → Settore: Persone, Tipo: Sport
+REGOLE MATCHING AUTOMATICO (IMPORTANTISSIMO):
+1. "bolletta" + ("luce" | "gas" | "acqua" | "telefono" | "internet") → settore_id per Casa, tipo_attivita_id per Bollette Utenze
+2. "fattura" | "stipendi" | "tfr" → settore_id per Lavoro
+3. "manutenzione" + ("auto" | "mezzo" | "macchina" | "camion") → settore_id per Lavoro, tipo_attivita_id per Manutenzione Mezzi
+4. "palestra" | "sport" | "allenamento" → settore_id per Persone, tipo_attivita_id per Sport
+5. "medico" | "dottore" | "visita" | "salute" → settore_id per Persone, tipo_attivita_id per Salute
+6. "veterinario" | "gatto" | "cane" → settore_id per Persone, tipo_attivita_id per Veterinario
+7. "imu" | "tari" | "tassa casa" → settore_id per Casa, tipo_attivita_id per IMU o TARI
+
+IMPORTANTE:
+- USA SOLO gli ID dalla lista SETTORI UTENTE sopra
+- Devi SEMPRE provare a fare il matching automatico
+- Metti null SOLO se davvero non riesci a capire
 
 REGOLE DATE:
 - Data corrente: 15 ottobre 2025
-- Se dice "14 novembre" → 2025-11-14
-- Se dice "domani" → 2025-10-16
+- "14 novembre" → 2025-11-14
+- "domani" → 2025-10-16
 - Se non menziona data → null
-
-IMPORTANTE:
-- Usa gli ID NUMERICI, non i nomi
-- Se non sei sicuro del settore/tipo, metti null
 
 MESSAGGIO UTENTE:
 {$message}
 
-JSON (SOLO JSON, nessun altro testo):
+JSON (SOLO JSON valido, nessun testo prima o dopo):
 PROMPT;
 
         try {

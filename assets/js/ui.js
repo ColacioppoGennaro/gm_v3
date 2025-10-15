@@ -1,6 +1,6 @@
 /**
- * assets/js/ui.js (SLIM)
- * Solo routing, rendering shell, bind eventi
+ * assets/js/ui.js (MODIFICATO)
+ * Aggiunto: Filtro Area + Bottone Organizza
  */
 
 import { checkSession, getInitialView, doLogin, doRegister, doForgot, doLogout } from './auth.js';
@@ -10,6 +10,7 @@ import { renderCalendar } from './calendar.js';
 import { loadAccountInfo, showUpgradeModal, activateProFromPage, doDowngrade, doDeleteAccount } from './account.js';
 import { renderEventsWidget } from './dashboard-events.js';
 import { openAssistantModal } from './assistant.js';
+import { openOrganizeModal } from './settings.js'; // ✨ NUOVO
 
 const LS_ROUTE_KEY = 'gmv3_route';
 
@@ -165,9 +166,13 @@ function dashboardSection(isPro, maxDocs, maxChat, maxSize) {
     <div class="card">
       <h3>📚 I Tuoi Documenti</h3>
       ${isPro ? `<div class="filter-bar">
-        <label>Filtra per categoria:</label>
-        <select id="filterCategory"><option value="">Tutte le categorie</option></select>
-        <button class="btn secondary" id="organizeDocsBtn">🔧 Organizza Documenti</button>
+        <label>Area:</label>
+        <select id="filterArea"><option value="">Tutte</option></select>
+        <label>Tipo:</label>
+        <select id="filterTipo"><option value="">Tutti</option></select>
+        <label>Categoria:</label>
+        <select id="filterCategory"><option value="">Tutte</option></select>
+        <button class="btn secondary" id="organizeBtn" style="margin-left:auto">🔧 Organizza</button>
       </div>` : ''}
       <table id="docsTable">
         <thead><tr>
@@ -335,13 +340,27 @@ function bindEvents() {
     setupUploadDropzone();
     document.getElementById('uploadBtn')?.addEventListener('click', uploadFile);
     document.getElementById('addCategoryBtn')?.addEventListener('click', createCategoryFromDashboard);
-    document.getElementById('organizeDocsBtn')?.addEventListener('click', showOrganizeModal);
+    
+    // ✨ NUOVO: Bottone Organizza
+    document.getElementById('organizeBtn')?.addEventListener('click', openOrganizeModal);
+    
+    // ✨ NUOVO: Filtri Area/Tipo
+    document.getElementById('filterArea')?.addEventListener('change', (e) => {
+      window.S.filterArea = e.target.value;
+      renderDocsTable();
+    });
+    
+    document.getElementById('filterTipo')?.addEventListener('change', (e) => {
+      window.S.filterTipo = e.target.value;
+      renderDocsTable();
+    });
+    
     document.getElementById('filterCategory')?.addEventListener('change', (e) => {
       window.S.filterCategory = e.target.value;
       renderDocsTable();
     });
 
-    // ✅ AGGIUNTO: Event listener per il nuovo assistente
+    // Assistente AI
     document.getElementById('btnOpenAssistant')?.addEventListener('click', () => {
       openAssistantModal();
     });
@@ -415,12 +434,12 @@ export function showPage(pageName) {
 
   // Carica dati specifici pagina
   if (pageName === 'dashboard') {
-    // La renderDashboard non esiste, la logica di rendering è nella showPage
-    // Ho spostato la logica di rendering della card dell'assistente nella dashboardSection
-    // e il listener è stato aggiunto in bindEvents()
     loadDocs();
-    if (window.S.user && window.S.user.role === 'pro') loadCategories();
-    renderEventsWidget(); // ✨ AGGIUNTO: carica widget eventi
+    if (window.S.user && window.S.user.role === 'pro') {
+      loadCategories();
+      loadFiltersData(); // ✨ NUOVO: Carica aree/tipi per filtri
+    }
+    renderEventsWidget();
   } else if (pageName === 'calendar') {
     renderCalendar();
   } else if (pageName === 'chat') {
@@ -431,6 +450,39 @@ export function showPage(pageName) {
   }
 
   localStorage.setItem(LS_ROUTE_KEY, pageName);
+}
+
+/**
+ * ✨ NUOVO: Carica dati per filtri Area/Tipo
+ */
+async function loadFiltersData() {
+  try {
+    const [settoriRes, tipiRes] = await Promise.all([
+      fetch('api/settori.php?a=list'),
+      fetch('api/tipi_attivita.php?a=list')
+    ]);
+    
+    const settori = await settoriRes.json();
+    const tipi = await tipiRes.json();
+    
+    if (settori.success) {
+      const filterArea = document.getElementById('filterArea');
+      if (filterArea) {
+        filterArea.innerHTML = '<option value="">Tutte</option>' + 
+          settori.data.map(s => `<option value="${s.id}">${s.icona} ${s.nome}</option>`).join('');
+      }
+    }
+    
+    if (tipi.success) {
+      const filterTipo = document.getElementById('filterTipo');
+      if (filterTipo) {
+        filterTipo.innerHTML = '<option value="">Tutti</option>' + 
+          tipi.data.map(t => `<option value="${t.id}">${t.icona} ${t.nome}</option>`).join('');
+      }
+    }
+  } catch (error) {
+    console.error('Errore caricamento filtri:', error);
+  }
 }
 
 /**

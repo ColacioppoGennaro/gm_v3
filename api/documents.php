@@ -161,6 +161,35 @@ try {
             json_out(['success' => false, 'message' => 'Errore DocAnalyzer: ' . $e->getMessage()], 500);
         }
     }
+    
+    // Ottieni singolo documento (per visualizzazione da calendario)
+    elseif ($action === 'get') {    
+        $docId = intval($_GET['id'] ?? 0);
+    
+        if (!$docId) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'ID documento mancante'], 400);
+        }
+    
+        // Verifica ownership
+        $stmt = $db->prepare("SELECT id, file_name, file_name as original_name, size, mime, created_at FROM documents WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $docId, $user['id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    
+        if ($result->num_rows === 0) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Documento non trovato'], 404);
+        }
+    
+        $document = $result->fetch_assoc();
+    
+        ob_end_clean();
+        json_out([
+            'success' => true,
+            'document' => $document
+        ]);
+    }
 
     elseif ($action === 'delete') {
         $docId = intval($_POST['id'] ?? 0);

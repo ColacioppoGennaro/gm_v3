@@ -1,3 +1,5 @@
+@import url('events-filters.css');
+
 :root{--bg:#0f172a;--panel:#111827;--fg:#e5e7eb;--muted:#94a3b8;--accent:#7c3aed;--ok:#10b981;--warn:#f59e0b;--danger:#ef4444;--card:#0b1220}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto;background:var(--bg);color:var(--fg);min-height:100vh}
@@ -558,4 +560,4 @@ h1{margin-bottom:8px}
 
 @import url('assistant.css');
 @import url('organize-styles.css');
-@import url('events-filters.css');
+

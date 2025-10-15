@@ -1,0 +1,204 @@
+/* ========================================
+   MODAL ORGANIZZA - AREE E TIPI
+   ======================================== */
+
+.organize-modal {
+    max-width: 800px;
+    max-height: 85vh;
+}
+
+.organize-modal .modal-body {
+    max-height: calc(85vh - 140px);
+    overflow-y: auto;
+}
+
+/* Area card */
+.area-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.area-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.area-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.area-header .badge {
+    font-size: 11px;
+    padding: 4px 8px;
+    background: var(--accent);
+    color: white;
+    border-radius: 12px;
+}
+
+/* Crea tipo row */
+.create-tipo-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+}
+
+.create-tipo-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+}
+
+/* Lista tipi */
+.tipi-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tipo-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.tipo-item:hover {
+    border-color: var(--border);
+    background: var(--card);
+}
+
+/* Checkbox collega documenti */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    margin-left: auto;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.checkbox-label:hover {
+    color: var(--text);
+}
+
+/* Bottoni small */
+.btn.small {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-width: auto;
+}
+
+.btn.small.del {
+    padding: 6px 10px;
+}
+
+/* Filter bar in dashboard */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-bar label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.filter-bar select {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    min-width: 150px;
+}
+
+.filter-bar select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .organize-modal {
+        max-width: 100%;
+        max-height: 100vh;
+        height: 100vh;
+        margin: 0;
+        border-radius: 0;
+    }
+    
+    .area-header {
+        flex-wrap: wrap;
+    }
+    
+    .create-tipo-row {
+        flex-direction: column;
+    }
+    
+    .tipo-item {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .checkbox-label {
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-bar select {
+        width: 100%;
+    }
+    
+    .filter-bar button {
+        width: 100%;
+    }
+}
+
+/* Animazione feedback */
+@keyframes pulse-success {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.tipo-item.success-feedback {
+    animation: pulse-success 0.3s ease;
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+}

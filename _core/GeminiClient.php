@@ -2,6 +2,7 @@
 /**
  * Google Gemini API Client
  * Fallback AI quando DocAnalyzer non trova risposta
+ * + SUPPORTO IMMAGINI MULTIMODALI per analisi documenti
  */
 class GeminiClient {
     private $apiKey;
@@ -43,6 +44,52 @@ class GeminiClient {
         }
     }
 
+    /**
+     * ✨ NUOVO: Analizza immagine con Gemini 2.0 Flash (multimodale)
+     * 
+     * @param string $prompt Prompt testuale per guidare l'analisi
+     * @param string $base64Image Immagine codificata in base64
+     * @param string $mimeType MIME type dell'immagine (es: image/jpeg, image/png)
+     * @return string Risposta testuale dell'AI
+     */
+    public function analyzeImage($prompt, $base64Image, $mimeType = 'image/jpeg') {
+        $payload = [
+            'contents' => [[
+                'parts' => [
+                    ['text' => $prompt],
+                    [
+                        'inline_data' => [
+                            'mime_type' => $mimeType,
+                            'data' => $base64Image
+                        ]
+                    ]
+                ]
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.4, // Più bassa per dati strutturati (OCR/estrazione)
+                'maxOutputTokens' => 2048,
+            ]
+        ];
+
+        error_log("Gemini Image Analysis: mime={$mimeType}, prompt_length=" . strlen($prompt));
+
+        try {
+            return $this->callGenerateContent($this->apiBase, $this->model, $payload);
+        } catch (Exception $e) {
+            $msg = $e->getMessage();
+            // Fallback a v1beta se necessario
+            if (stripos($msg, 'not found') !== false
+             || stripos($msg, 'is not supported') !== false
+             || stripos($msg, '404') !== false) {
+                $fallbackBase = 'https://generativelanguage.googleapis.com/v1beta';
+                $this->apiBase = $fallbackBase;
+                error_log("Gemini: Falling back to v1beta for image analysis");
+                return $this->callGenerateContent($fallbackBase, $this->model, $payload);
+            }
+            throw $e;
+        }
+    }
+
     private function callGenerateContent($apiBase, $model, array $data) {
         $url = "{$apiBase}/models/{$model}:generateContent?key={$this->apiKey}";
 
@@ -52,7 +99,7 @@ class GeminiClient {
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 60, // Aumentato per immagini
         ]);
 
         $response = curl_exec($ch);

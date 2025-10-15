@@ -556,4 +556,4 @@ h1{margin-bottom:8px}
   color: #ef4444;
 }
 
-@import 'assistant.css';
+@import url('assistant.css');

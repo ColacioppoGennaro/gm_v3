@@ -2,9 +2,12 @@
 /**
  * FILE: _core/AssistantAgent.php
  * 
- * Orchestratore AI conversazionale con sistema settori dinamico
+ * Orchestratore AI conversazionale INTELLIGENTE
+ * - Conversazione progressiva (max 2 domande alla volta)
+ * - Supporto analisi immagini via Gemini 2.0 Flash
+ * - Apertura modal calendario precompilato per conferma
  * 
- * @version 2.0.0 - Sistema Settori
+ * @version 3.0.0 - Intelligent Conversation
  */
 
 require_once __DIR__ . '/helpers.php';
@@ -18,13 +21,13 @@ class AssistantAgent {
     private $userId;
     private $gemini;
     private $db;
-    private $userContext; // ✨ NUOVO: contesto utente (settori/tipi)
-    
-    // ✅ RIMOSSO: Tipi fissi non servono più
-    // const VALID_TYPES = ['payment', 'maintenance', 'document', 'personal'];
+    private $userContext;
     
     // Campi obbligatori per creare evento
     const REQUIRED_FIELDS = ['title', 'date', 'settore_id', 'tipo_attivita_id'];
+    
+    // Campi opzionali suggeriti
+    const OPTIONAL_FIELDS = ['time', 'amount', 'reminder_days_before', 'description'];
     
     public function __construct($userId) {
         if (!$userId || !is_numeric($userId)) {
@@ -35,14 +38,13 @@ class AssistantAgent {
         $this->gemini = new GeminiClient();
         $this->db = db();
         
-        // ✨ NUOVO: Carica contesto utente
         $this->loadUserContext();
         
-        error_log("AssistantAgent initialized for user: {$this->userId}");
+        error_log("AssistantAgent v3.0 initialized for user: {$this->userId}");
     }
     
     /**
-     * ✨ NUOVO: Carica settori e tipi attività utente per context AI
+     * Carica settori e tipi attività utente per context AI
      */
     private function loadUserContext() {
         $settoriMgr = new SettoriManager($this->userId);
@@ -72,11 +74,11 @@ class AssistantAgent {
         }
         
         // Crea stringa contesto per AI
-        $contextLines = ["SETTORI UTENTE:"];
+        $contextLines = ["SETTORI E TIPI UTENTE:"];
         foreach ($settoriConTipi as $sid => $settore) {
-            $contextLines[] = "- {$settore['icona']} {$settore['nome']} (ID: {$sid})";
+            $contextLines[] = "- {$settore['icona']} {$settore['nome']} (settore_id: {$sid})";
             foreach ($settore['tipi'] as $tipo) {
-                $contextLines[] = "  → {$tipo['icona']} {$tipo['nome']} (ID: {$tipo['id']})";
+                $contextLines[] = "  → {$tipo['icona']} {$tipo['nome']} (tipo_attivita_id: {$tipo['id']})";
             }
         }
         
@@ -85,46 +87,50 @@ class AssistantAgent {
         error_log("User context loaded: " . strlen($this->userContext) . " chars");
     }
     
-    public function processMessage($message, $sessionState = null) {
+    /**
+     * ENTRY POINT: Processa messaggio utente (con o senza immagine)
+     */
+    public function processMessage($message, $sessionState = null, $imagePath = null) {
         try {
             $message = trim($message);
             
-            if (empty($message)) {
-                return $this->errorResponse("Messaggio vuoto");
-            }
-            
+            // Inizializza stato se primo messaggio
             if (!$sessionState) {
                 $sessionState = [
                     'intent' => null,
                     'partial_data' => [],
                     'missing_fields' => [],
-                    'turn' => 0
+                    'asked_fields' => [], // Campi già chiesti
+                    'turn' => 0,
+                    'image_analyzed' => false
                 ];
             }
             
             $sessionState['turn']++;
             
-            error_log("Processing message (turn {$sessionState['turn']}): " . substr($message, 0, 50));
+            error_log("Processing message (turn {$sessionState['turn']}): " . substr($message, 0, 50) . ($imagePath ? " [WITH IMAGE]" : ""));
             
-            if ($sessionState['turn'] === 1) {
+            // Se c'è un'immagine, analizzala PRIMA
+            if ($imagePath && !$sessionState['image_analyzed']) {
+                return $this->handleImageAnalysis($imagePath, $sessionState);
+            }
+            
+            // Primo turno: detect intent
+            if ($sessionState['turn'] === 1 && !$sessionState['intent']) {
                 $intent = $this->detectIntent($message);
                 $sessionState['intent'] = $intent;
                 
                 error_log("Intent detected: {$intent}");
                 
-                if ($intent === 'create_event') {
-                    return $this->handleEventCreation($message, $sessionState);
-                } elseif ($intent === 'query_calendar') {
-                    return $this->handleCalendarQuery($message, $sessionState);
-                } else {
+                // Se non è creazione evento, gestisci subito
+                if ($intent !== 'create_event') {
                     return $this->handleGeneric($message, $sessionState);
                 }
             }
             
+            // Gestione creazione evento (conversazionale)
             if ($sessionState['intent'] === 'create_event') {
                 return $this->handleEventCreation($message, $sessionState);
-            } elseif ($sessionState['intent'] === 'query_calendar') {
-                return $this->handleCalendarQuery($message, $sessionState);
             }
             
             return $this->handleGeneric($message, $sessionState);
@@ -135,36 +141,215 @@ class AssistantAgent {
         }
     }
     
-    private function detectIntent($message) {
-        $prompt = <<<PROMPT
-Sei un assistente AI che analizza messaggi utente per capire l'intento.
+    /**
+     * ANALISI IMMAGINE: Estrae dati da foto bolletta/documento
+     */
+    private function handleImageAnalysis($imagePath, $state) {
+        try {
+            error_log("Analyzing image: {$imagePath}");
+            
+            // Leggi immagine e converti in base64
+            $imageData = file_get_contents($imagePath);
+            $base64Image = base64_encode($imageData);
+            $mimeType = mime_content_type($imagePath);
+            
+            // Prompt per Gemini con immagine
+            $prompt = <<<PROMPT
+Analizza questa immagine di una bolletta/fattura/documento e estrai TUTTE le informazioni possibili.
 
-INTENTI POSSIBILI:
-- "create_event": Utente vuole creare un evento/promemoria
-- "query_calendar": Utente chiede info sul calendario
-- "generic": Altro
+Ritorna SOLO un oggetto JSON valido con questi campi:
+{
+  "tipo_documento": "bolletta|fattura|ricevuta|altro",
+  "fornitore": "nome azienda/ente",
+  "descrizione": "cosa è (es: Bolletta Luce, Fattura Telefono)",
+  "importo": "importo in euro (solo numero, es: 89.50)",
+  "data_scadenza": "YYYY-MM-DD se presente, altrimenti null",
+  "data_emissione": "YYYY-MM-DD se presente, altrimenti null",
+  "numero_documento": "codice/numero documento se presente",
+  "note": "altre info rilevanti"
+}
 
 REGOLE:
-- Rispondi SOLO con una delle 3 parole: create_event, query_calendar, generic
-- Se c'è minimo dubbio tra create_event e query_calendar, scegli create_event
-- Parole chiave create_event: bolletta, scadenza, tagliando, manutenzione, ricorda, promemoria, devo, ho ricevuto
+- Se non trovi un campo, metti null
+- Per importo usa solo numeri (es: 89.50, non €89,50)
+- Per date usa formato YYYY-MM-DD
+- Sii preciso ma non inventare dati
 
-MESSAGGIO UTENTE:
+JSON:
+PROMPT;
+
+            // Chiama Gemini con immagine
+            $response = $this->gemini->analyzeImage($prompt, $base64Image, $mimeType);
+            
+            // Parse JSON response
+            $response = trim($response);
+            $response = preg_replace('/^```json\s*/i', '', $response);
+            $response = preg_replace('/\s*```$/i', '', $response);
+            
+            $extractedData = json_decode($response, true);
+            
+            if (!is_array($extractedData)) {
+                throw new Exception("Errore parsing risposta AI");
+            }
+            
+            error_log("Image analysis result: " . json_encode($extractedData));
+            
+            // Salva documento in DB (NON inviare a DocAnalyzer)
+            $documentId = $this->saveImageDocument($imagePath, $extractedData);
+            
+            // Prepara dati parziali da immagine
+            $partialData = [
+                'document_id' => $documentId
+            ];
+            
+            // Mappa dati estratti
+            if (!empty($extractedData['descrizione'])) {
+                $partialData['title'] = $extractedData['descrizione'];
+            }
+            
+            if (!empty($extractedData['data_scadenza'])) {
+                $partialData['date'] = $extractedData['data_scadenza'];
+            }
+            
+            if (!empty($extractedData['importo'])) {
+                $partialData['amount'] = floatval($extractedData['importo']);
+            }
+            
+            if (!empty($extractedData['note'])) {
+                $partialData['description'] = $extractedData['note'];
+            }
+            
+            // Aggiorna stato
+            $state['partial_data'] = $partialData;
+            $state['image_analyzed'] = true;
+            $state['extracted_data'] = $extractedData;
+            
+            // Genera messaggio riepilogo
+            $summary = $this->generateImageSummary($extractedData);
+            
+            // Chiedi conferma + settore (SEMPRE necessario)
+            $question = $summary . "\n\n" . $this->askNextQuestions($state);
+            
+            return [
+                'status' => 'incomplete',
+                'message' => $question,
+                'data' => $partialData,
+                'state' => $state
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Image analysis failed: " . $e->getMessage());
+            return $this->errorResponse("Non sono riuscito a leggere l'immagine. Prova a descrivermi il documento a parole.");
+        }
+    }
+    
+    /**
+     * Salva immagine in DB (NON invia a DocAnalyzer)
+     */
+    private function saveImageDocument($imagePath, $extractedData) {
+        $fileName = basename($imagePath);
+        $fileSize = filesize($imagePath);
+        
+        // Sposta file in cartella uploads permanente
+        $uploadsDir = dirname(__DIR__) . '/uploads';
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+        }
+        
+        $newFileName = uniqid('img_') . '_' . $fileName;
+        $newPath = $uploadsDir . '/' . $newFileName;
+        
+        if (!copy($imagePath, $newPath)) {
+            throw new Exception("Errore salvataggio immagine");
+        }
+        
+        // Inserisci in DB
+        $title = $extractedData['descrizione'] ?? 'Documento fotografato';
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO documents (user_id, filename, original_name, file_size, mime_type, upload_date, docanalyzer_docid)
+            VALUES (?, ?, ?, ?, ?, NOW(), NULL)
+        ");
+        
+        $mimeType = mime_content_type($newPath);
+        
+        $stmt->bind_param("issds", 
+            $this->userId, 
+            $newFileName, 
+            $fileName, 
+            $fileSize, 
+            $mimeType
+        );
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Errore inserimento documento: " . $stmt->error);
+        }
+        
+        $documentId = $this->db->insert_id;
+        
+        error_log("Image saved as document ID: {$documentId}");
+        
+        return $documentId;
+    }
+    
+    /**
+     * Genera riepilogo dati estratti da immagine
+     */
+    private function generateImageSummary($data) {
+        $lines = ["📸 Ho analizzato l'immagine:"];
+        
+        if (!empty($data['descrizione'])) {
+            $lines[] = "📄 **{$data['descrizione']}**";
+        }
+        
+        if (!empty($data['fornitore'])) {
+            $lines[] = "🏢 Fornitore: {$data['fornitore']}";
+        }
+        
+        if (!empty($data['importo'])) {
+            $lines[] = "💰 Importo: €" . number_format($data['importo'], 2, ',', '.');
+        }
+        
+        if (!empty($data['data_scadenza'])) {
+            $lines[] = "📅 Scadenza: " . date('d/m/Y', strtotime($data['data_scadenza']));
+        }
+        
+        if (!empty($data['numero_documento'])) {
+            $lines[] = "🔢 N. {$data['numero_documento']}";
+        }
+        
+        return implode("\n", $lines);
+    }
+    
+    /**
+     * Detect intent del messaggio
+     */
+    private function detectIntent($message) {
+        $prompt = <<<PROMPT
+Analizza il messaggio e rispondi con UNA SOLA PAROLA.
+
+INTENTI:
+- "create_event" → vuole creare evento/promemoria/scadenza
+- "generic" → saluto/chiacchiera/altro
+
+KEYWORDS CREATE_EVENT: bolletta, fattura, scadenza, pagamento, manutenzione, tagliando, ricorda, promemoria, devo pagare, ho ricevuto
+
+MESSAGGIO:
 {$message}
 
-INTENT:
+INTENT (una sola parola):
 PROMPT;
 
         try {
             $response = $this->gemini->ask($prompt);
             $intent = strtolower(trim($response));
             
-            $validIntents = ['create_event', 'query_calendar', 'generic'];
-            if (!in_array($intent, $validIntents)) {
-                $createKeywords = ['bolletta', 'scadenza', 'tagliando', 'manutenzione', 'ricorda', 'promemoria', 'devo', 'ricevuto'];
+            if (!in_array($intent, ['create_event', 'generic'])) {
+                // Fallback: cerca keywords
+                $keywords = ['bolletta', 'fattura', 'scadenza', 'pagamento', 'manutenzione', 'tagliando', 'ricorda', 'promemoria', 'devo', 'ricevuto'];
                 $messageLower = strtolower($message);
                 
-                foreach ($createKeywords as $kw) {
+                foreach ($keywords as $kw) {
                     if (strpos($messageLower, $kw) !== false) {
                         return 'create_event';
                     }
@@ -177,22 +362,18 @@ PROMPT;
             
         } catch (Exception $e) {
             error_log("Intent detection failed: " . $e->getMessage());
-            $createKeywords = ['bolletta', 'scadenza', 'tagliando', 'manutenzione', 'ricorda', 'promemoria'];
-            $messageLower = strtolower($message);
-            
-            foreach ($createKeywords as $kw) {
-                if (strpos($messageLower, $kw) !== false) {
-                    return 'create_event';
-                }
-            }
-            
             return 'generic';
         }
     }
     
+    /**
+     * GESTIONE CREAZIONE EVENTO - Conversazione intelligente
+     */
     private function handleEventCreation($message, $state) {
+        // Estrai nuovi dati dal messaggio
         $extractedData = $this->extractEventData($message);
         
+        // Merge con dati parziali esistenti
         $partialData = $state['partial_data'];
         foreach ($extractedData as $key => $value) {
             if ($value !== null && $value !== '') {
@@ -200,31 +381,23 @@ PROMPT;
             }
         }
         
-        error_log("Partial data after extraction: " . json_encode($partialData));
+        error_log("Partial data: " . json_encode($partialData));
         
-        $validation = $this->validateAndCompleteEvent($partialData);
+        // Valida completezza
+        $validation = $this->validateEventData($partialData);
         
+        // Se completo, APRI MODAL CALENDARIO
         if ($validation['complete']) {
-            try {
-                $eventId = $this->createCalendarEvent($validation['data']);
-                
-                return [
-                    'status' => 'complete',
-                    'message' => $this->generateSuccessMessage($validation['data'], $eventId),
-                    'data' => [
-                        'event_id' => $eventId,
-                        'event_data' => $validation['data']
-                    ],
-                    'state' => null
-                ];
-                
-            } catch (Exception $e) {
-                error_log("Calendar event creation failed: " . $e->getMessage());
-                return $this->errorResponse("Non sono riuscito a creare l'evento: " . $e->getMessage());
-            }
+            return [
+                'status' => 'ready_for_modal',
+                'message' => "✅ Perfetto! Ho tutte le informazioni.\n\n" . $this->formatEventPreview($partialData) . "\n\n**Apro il calendario per la conferma...**",
+                'data' => $this->prepareEventForModal($partialData),
+                'state' => null
+            ];
         }
         
-        $question = $this->generateMissingFieldsQuestion($validation['missing'], $partialData);
+        // Altrimenti, chiedi SOLO i campi mancanti (max 2 alla volta)
+        $question = $this->askNextQuestions($state);
         
         return [
             'status' => 'incomplete',
@@ -234,62 +407,65 @@ PROMPT;
                 'intent' => 'create_event',
                 'partial_data' => $partialData,
                 'missing_fields' => $validation['missing'],
-                'turn' => $state['turn']
+                'asked_fields' => $state['asked_fields'] ?? [],
+                'turn' => $state['turn'],
+                'image_analyzed' => $state['image_analyzed'] ?? false,
+                'extracted_data' => $state['extracted_data'] ?? null
             ]
         ];
     }
     
     /**
-     * ✨ MODIFICATO: Estrae dati evento con matching settore/tipo dinamico
+     * ESTRAE dati evento da messaggio (AI intelligente)
      */
     private function extractEventData($message) {
+        $currentDate = date('Y-m-d');
+        
         $prompt = <<<PROMPT
-Sei un assistente che estrae informazioni per creare eventi calendario.
+Data corrente: {$currentDate}
 
 {$this->userContext}
 
-ESTRAI dal messaggio dell'utente e ritorna SOLO un oggetto JSON valido:
+Analizza il messaggio e estrai TUTTE le informazioni possibili.
+Ritorna SOLO JSON valido:
+
 {
-  "title": "titolo evento (breve)",
-  "date": "YYYY-MM-DD (solo se menzionata, altrimenti null)",
-  "time": "HH:MM formato 24h (solo se specifica, altrimenti null)",
-  "settore_id": ID_NUMERICO (usa la lista sopra),
-  "tipo_attivita_id": ID_NUMERICO (usa la lista sopra),
-  "category": "etichetta libera opzionale",
-  "recurrence": "DAILY | WEEKLY | MONTHLY | YEARLY (solo se ricorrente, altrimenti null)",
-  "reminder_days_before": numero intero giorni prima (null se non specificato),
-  "description": "note aggiuntive (null se non presenti)"
+  "title": "titolo evento (descrittivo)",
+  "date": "YYYY-MM-DD (null se non specificata)",
+  "time": "HH:MM (null se non specificata)",
+  "settore_id": numero_id (null se non determinabile),
+  "tipo_attivita_id": numero_id (null se non determinabile),
+  "amount": numero_decimale (null se non menzionato),
+  "reminder_days_before": numero_intero (null se non richiesto),
+  "description": "note extra (null se assenti)"
 }
 
-REGOLE MATCHING AUTOMATICO (IMPORTANTISSIMO):
-1. "bolletta" + ("luce" | "gas" | "acqua" | "telefono" | "internet") → settore_id per Casa, tipo_attivita_id per Bollette Utenze
-2. "fattura" | "stipendi" | "tfr" → settore_id per Lavoro
-3. "manutenzione" + ("auto" | "mezzo" | "macchina" | "camion") → settore_id per Lavoro, tipo_attivita_id per Manutenzione Mezzi
-4. "palestra" | "sport" | "allenamento" → settore_id per Persone, tipo_attivita_id per Sport
-5. "medico" | "dottore" | "visita" | "salute" → settore_id per Persone, tipo_attivita_id per Salute
-6. "veterinario" | "gatto" | "cane" → settore_id per Persone, tipo_attivita_id per Veterinario
-7. "imu" | "tari" | "tassa casa" → settore_id per Casa, tipo_attivita_id per IMU o TARI
+REGOLE MATCHING:
+- "bolletta luce/gas/acqua" → Casa + Bollette Utenze
+- "fattura/stipendio" → Lavoro
+- "manutenzione auto/mezzo" → Lavoro + Manutenzione Mezzi
+- "medico/visita" → Persone + Salute
+- "palestra/sport" → Persone + Sport
 
-IMPORTANTE:
-- USA SOLO gli ID dalla lista SETTORI UTENTE sopra
-- Devi SEMPRE provare a fare il matching automatico
-- Metti null SOLO se davvero non riesci a capire
+DATE:
+- "tra 15 giorni" → calcola da oggi
+- "25 novembre" → 2025-11-25
+- "domani" → {$currentDate} + 1 giorno
 
-REGOLE DATE:
-- Data corrente: 15 ottobre 2025
-- "14 novembre" → 2025-11-14
-- "domani" → 2025-10-16
-- Se non menziona data → null
+IMPORTI:
+- "100 euro" → 100.00
+- "€89,50" → 89.50
 
-MESSAGGIO UTENTE:
+MESSAGGIO:
 {$message}
 
-JSON (SOLO JSON valido, nessun testo prima o dopo):
+JSON:
 PROMPT;
 
         try {
             $response = $this->gemini->ask($prompt);
             
+            // Pulisci response
             $response = trim($response);
             $response = preg_replace('/^```json\s*/i', '', $response);
             $response = preg_replace('/\s*```$/i', '', $response);
@@ -297,32 +473,28 @@ PROMPT;
             $data = json_decode($response, true);
             
             if (!is_array($data)) {
-                error_log("Failed to parse Gemini JSON response: {$response}");
+                error_log("JSON parsing failed: {$response}");
                 return $this->getEmptyEventData();
             }
             
-            // Converte ID in int se presenti
-            if (isset($data['settore_id'])) {
-                $data['settore_id'] = intval($data['settore_id']);
-            }
-            if (isset($data['tipo_attivita_id'])) {
-                $data['tipo_attivita_id'] = intval($data['tipo_attivita_id']);
-            }
-            
-            error_log("Extracted event data: " . json_encode($data));
+            // Cast numerici
+            if (isset($data['settore_id'])) $data['settore_id'] = intval($data['settore_id']);
+            if (isset($data['tipo_attivita_id'])) $data['tipo_attivita_id'] = intval($data['tipo_attivita_id']);
+            if (isset($data['amount'])) $data['amount'] = floatval($data['amount']);
+            if (isset($data['reminder_days_before'])) $data['reminder_days_before'] = intval($data['reminder_days_before']);
             
             return $data;
             
         } catch (Exception $e) {
-            error_log("Event data extraction failed: " . $e->getMessage());
+            error_log("Extraction failed: " . $e->getMessage());
             return $this->getEmptyEventData();
         }
     }
     
     /**
-     * ✨ MODIFICATO: Validazione con nuovi campi obbligatori
+     * VALIDA completezza dati evento
      */
-    private function validateAndCompleteEvent($data) {
+    private function validateEventData($data) {
         $missing = [];
         
         foreach (self::REQUIRED_FIELDS as $field) {
@@ -331,191 +503,152 @@ PROMPT;
             }
         }
         
-        if (empty($missing)) {
-            $data['time'] = $data['time'] ?? null;
-            $data['category'] = $data['category'] ?? '';
-            $data['recurrence'] = $data['recurrence'] ?? null;
-            $data['reminder_days_before'] = $data['reminder_days_before'] ?? null;
-            $data['description'] = $data['description'] ?? '';
-            $data['status'] = 'pending';
-            $data['show_in_dashboard'] = true;
-            
-            return [
-                'complete' => true,
-                'data' => $data,
-                'missing' => []
-            ];
-        }
-        
         return [
-            'complete' => false,
-            'data' => $data,
+            'complete' => empty($missing),
             'missing' => $missing
         ];
     }
     
-    private function generateMissingFieldsQuestion($missingFields, $partialData) {
-        if (empty($missingFields)) {
-            return "Perfetto! Creo l'evento.";
+    /**
+     * CHIEDI campi mancanti (MAX 2 alla volta)
+     */
+    private function askNextQuestions($state) {
+        $missing = [];
+        foreach (self::REQUIRED_FIELDS as $field) {
+            if (!isset($state['partial_data'][$field]) || $state['partial_data'][$field] === null) {
+                if (!in_array($field, $state['asked_fields'] ?? [])) {
+                    $missing[] = $field;
+                }
+            }
         }
         
-        $field = $missingFields[0];
-        
-        $fallbacks = [
-            'title' => "Come vuoi chiamare questo evento?",
-            'date' => "Per quale data? (es: 15 marzo, 20/11/2025, domani)",
-            'settore_id' => "È per Lavoro, Casa o Persone?",
-            'tipo_attivita_id' => "Di che tipo di evento si tratta? (es: Bolletta, Manutenzione, Salute...)"
-        ];
-        
-        if (isset($fallbacks[$field])) {
-            return $fallbacks[$field];
+        if (empty($missing)) {
+            // Tutti i campi obbligatori ci sono
+            // Chiedi facoltativi utili
+            $optional = [];
+            if (!isset($state['partial_data']['amount'])) $optional[] = 'amount';
+            if (!isset($state['partial_data']['reminder_days_before'])) $optional[] = 'reminder_days_before';
+            
+            if (!empty($optional)) {
+                $missing = array_slice($optional, 0, 2);
+            }
         }
         
-        $prompt = <<<PROMPT
-Sei un assistente amichevole che crea eventi calendario.
-
-CONTESTO:
-{$this->formatPartialDataForPrompt($partialData)}
-
-CAMPO MANCANTE: {$field}
-
-Fai una domanda breve e naturale per chiedere questo campo.
-
-DOMANDA:
-PROMPT;
-
-        try {
-            $question = $this->gemini->ask($prompt);
-            return trim($question);
-        } catch (Exception $e) {
-            error_log("Question generation failed: " . $e->getMessage());
-            return $fallbacks[$field] ?? "Mi puoi dare più dettagli?";
+        if (empty($missing)) {
+            return "Ho tutte le informazioni!";
         }
+        
+        // Prendi max 2 campi
+        $toAsk = array_slice($missing, 0, 2);
+        
+        // Genera domanda naturale
+        $questions = [];
+        
+        foreach ($toAsk as $field) {
+            switch ($field) {
+                case 'title':
+                    $questions[] = "Come vuoi chiamare questo evento?";
+                    break;
+                case 'date':
+                    $questions[] = "Quando scade/è previsto?";
+                    break;
+                case 'settore_id':
+                    $questions[] = "È per **Lavoro**, **Casa** o **Persone**?";
+                    break;
+                case 'tipo_attivita_id':
+                    $settoreId = $state['partial_data']['settore_id'] ?? null;
+                    if ($settoreId) {
+                        $tipi = $this->getTipiBySettore($settoreId);
+                        $nomiTipi = array_map(fn($t) => $t['nome'], $tipi);
+                        $questions[] = "Che tipo? (" . implode(', ', $nomiTipi) . ")";
+                    } else {
+                        $questions[] = "Di che tipo è? (Bolletta, Manutenzione, Salute...)";
+                    }
+                    break;
+                case 'amount':
+                    $questions[] = "Qual è l'importo?";
+                    break;
+                case 'reminder_days_before':
+                    $questions[] = "Vuoi un promemoria? (es: 3 giorni prima)";
+                    break;
+            }
+            
+            // Marca come chiesto
+            $state['asked_fields'][] = $field;
+        }
+        
+        return implode("\n", $questions);
     }
     
     /**
-     * ✨ MODIFICATO: Creazione evento con nuova struttura extendedProperties
+     * Ottieni tipi per settore
      */
-    private function createCalendarEvent($eventData) {
-        $stmt = $this->db->prepare("SELECT google_oauth_token, google_oauth_refresh, google_oauth_expiry FROM users WHERE id = ?");
-        $stmt->bind_param("i", $this->userId);
+    private function getTipiBySettore($settoreId) {
+        $stmt = $this->db->prepare("
+            SELECT id, nome, icona
+            FROM tipi_attivita
+            WHERE user_id = ? AND settore_id = ?
+            ORDER BY ordine ASC
+        ");
+        $stmt->bind_param("ii", $this->userId, $settoreId);
         $stmt->execute();
-        $result = $stmt->get_result();
-        $oauth = $result->fetch_assoc();
-        
-        if (!$oauth || empty($oauth['google_oauth_token'])) {
-            throw new Exception("Google Calendar non connesso. Collegalo prima di creare eventi.");
-        }
-        
-        require_once __DIR__ . '/google_client.php';
-        
-        $oauthFormatted = [
-            'access_token' => $oauth['google_oauth_token'],
-            'refresh_token' => $oauth['google_oauth_refresh'] ?? null,
-            'access_expires_at' => $oauth['google_oauth_expiry'] ?? null,
-        ];
-        
-        try {
-            $client = makeGoogleClientForUser($oauthFormatted);
-            $service = new Google_Service_Calendar($client);
-        } catch (Exception $e) {
-            throw new Exception("Errore inizializzazione Google Calendar: " . $e->getMessage());
-        }
-        
-        $isAllDay = empty($eventData['time']);
-        
-        $event = new Google_Service_Calendar_Event([
-            'summary' => $eventData['title'],
-            'description' => $eventData['description'] ?? ''
-        ]);
-        
-        if ($isAllDay) {
-            $event->setStart(new Google_Service_Calendar_EventDateTime([
-                'date' => $eventData['date']
-            ]));
-            $event->setEnd(new Google_Service_Calendar_EventDateTime([
-                'date' => $eventData['date']
-            ]));
-        } else {
-            $dateTime = $eventData['date'] . 'T' . $eventData['time'] . ':00';
-            $endTime = date('Y-m-d\TH:i:s', strtotime($dateTime . ' +1 hour'));
-            
-            $event->setStart(new Google_Service_Calendar_EventDateTime([
-                'dateTime' => $dateTime,
-                'timeZone' => 'Europe/Rome'
-            ]));
-            $event->setEnd(new Google_Service_Calendar_EventDateTime([
-                'dateTime' => $endTime,
-                'timeZone' => 'Europe/Rome'
-            ]));
-        }
-        
-        if (!empty($eventData['recurrence'])) {
-            $event->setRecurrence(['RRULE:FREQ=' . $eventData['recurrence']]);
-        }
-        
-        if (!empty($eventData['reminder_days_before'])) {
-            $minutes = intval($eventData['reminder_days_before']) * 1440;
-            $reminder = new Google_Service_Calendar_EventReminder([
-                'method' => 'popup',
-                'minutes' => $minutes
-            ]);
-            $reminders = new Google_Service_Calendar_EventReminders([
-                'useDefault' => false,
-                'overrides' => [$reminder]
-            ]);
-            $event->setReminders($reminders);
-        }
-        
-        // ✨ NUOVA STRUTTURA: Extended Properties con settore e tipo
-        $extProps = new Google_Service_Calendar_EventExtendedProperties();
-        $privateData = [
-            'settore_id' => (string)$eventData['settore_id'],
-            'tipo_attivita_id' => (string)$eventData['tipo_attivita_id'],
-            'status' => 'pending',
-            'trigger' => 'assistant',
-            'show_in_dashboard' => 'true'
-        ];
-        
-        if (!empty($eventData['category'])) {
-            $privateData['category'] = $eventData['category'];
-        }
-        
-        $extProps->setPrivate($privateData);
-        $event->setExtendedProperties($extProps);
-        
-        $createdEvent = $service->events->insert('primary', $event);
-        
-        if (!$createdEvent || !$createdEvent->getId()) {
-            throw new Exception("Errore creazione evento su Google Calendar");
-        }
-        
-        return $createdEvent->getId();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
     
-    private function handleCalendarQuery($message, $state) {
+    /**
+     * Formatta preview evento
+     */
+    private function formatEventPreview($data) {
+        $lines = ["📋 **Riepilogo Evento:**"];
+        
+        $lines[] = "📄 " . ($data['title'] ?? 'Senza titolo');
+        $lines[] = "📅 " . date('d/m/Y', strtotime($data['date']));
+        
+        if (!empty($data['time'])) {
+            $lines[] = "🕒 " . $data['time'];
+        }
+        
+        $settoreNome = $this->getSettoreNome($data['settore_id']);
+        $tipoNome = $this->getTipoNome($data['tipo_attivita_id']);
+        $lines[] = "📂 {$settoreNome} → {$tipoNome}";
+        
+        if (!empty($data['amount'])) {
+            $lines[] = "💰 €" . number_format($data['amount'], 2, ',', '.');
+        }
+        
+        if (!empty($data['reminder_days_before'])) {
+            $reminderDate = date('d/m/Y', strtotime($data['date'] . " -{$data['reminder_days_before']} days"));
+            $lines[] = "🔔 Promemoria: {$reminderDate}";
+        }
+        
+        return implode("\n", $lines);
+    }
+    
+    /**
+     * Prepara dati per modal calendario
+     */
+    private function prepareEventForModal($data) {
         return [
-            'status' => 'complete',
-            'message' => "Scusa, la funzione di ricerca eventi non è ancora disponibile. Posso aiutarti a creare un nuovo evento?",
-            'data' => null,
-            'state' => null
+            'title' => $data['title'],
+            'date' => $data['date'],
+            'time' => $data['time'] ?? null,
+            'settore_id' => $data['settore_id'],
+            'tipo_attivita_id' => $data['tipo_attivita_id'],
+            'amount' => $data['amount'] ?? null,
+            'reminder_days_before' => $data['reminder_days_before'] ?? null,
+            'description' => $data['description'] ?? '',
+            'document_id' => $data['document_id'] ?? null,
+            'status' => 'pending',
+            'show_in_dashboard' => true
         ];
     }
     
+    /**
+     * Gestione messaggi generici
+     */
     private function handleGeneric($message, $state) {
         try {
-            $prompt = <<<PROMPT
-Sei un assistente AI per la gestione di documenti e calendario.
-
-Rispondi in modo breve e amichevole al messaggio dell'utente.
-
-MESSAGGIO:
-{$message}
-
-RISPOSTA (max 2-3 frasi):
-PROMPT;
-
+            $prompt = "Rispondi in modo breve e amichevole (max 2 frasi).\n\nMessaggio: {$message}\n\nRisposta:";
             $response = $this->gemini->ask($prompt);
             
             return [
@@ -528,50 +661,14 @@ PROMPT;
         } catch (Exception $e) {
             return [
                 'status' => 'complete',
-                'message' => "Ciao! Sono il tuo assistente AI. Posso aiutarti a creare eventi nel calendario. Come posso aiutarti?",
+                'message' => "Ciao! Sono il tuo assistente AI. Posso aiutarti a creare eventi nel calendario. Prova a dirmi 'Ho ricevuto una bolletta' oppure carica una foto! 📸",
                 'data' => null,
                 'state' => null
             ];
         }
     }
     
-    /**
-     * ✨ MODIFICATO: Messaggio di successo con info settore/tipo
-     */
-    private function generateSuccessMessage($eventData, $eventId) {
-        $date = date('d/m/Y', strtotime($eventData['date']));
-        $time = !empty($eventData['time']) ? ' alle ' . $eventData['time'] : '';
-        
-        // Ottieni nomi settore e tipo
-        $settoreNome = $this->getSettoreNome($eventData['settore_id']);
-        $tipoNome = $this->getTipoNome($eventData['tipo_attivita_id']);
-        
-        $msg = "✅ Evento creato con successo!\n\n";
-        $msg .= "📅 **{$eventData['title']}**\n";
-        $msg .= "🗓️ {$date}{$time}\n";
-        $msg .= "📂 {$settoreNome} → {$tipoNome}\n";
-        
-        if (!empty($eventData['category'])) {
-            $msg .= "🏷️ Categoria: {$eventData['category']}\n";
-        }
-        
-        if (!empty($eventData['reminder_days_before'])) {
-            $reminderDate = date('d/m/Y', strtotime($eventData['date'] . " -{$eventData['reminder_days_before']} days"));
-            $msg .= "🔔 Promemoria: {$reminderDate}\n";
-        }
-        
-        if (!empty($eventData['recurrence'])) {
-            $recurrence = [
-                'DAILY' => 'ogni giorno',
-                'WEEKLY' => 'ogni settimana',
-                'MONTHLY' => 'ogni mese',
-                'YEARLY' => 'ogni anno'
-            ];
-            $msg .= "🔁 Si ripete: {$recurrence[$eventData['recurrence']]}\n";
-        }
-        
-        return $msg;
-    }
+    // ========== HELPER METHODS ==========
     
     private function getSettoreNome($settoreId) {
         $stmt = $this->db->prepare("SELECT nome FROM settori WHERE id = ? AND user_id = ?");
@@ -589,21 +686,6 @@ PROMPT;
         return $result['nome'] ?? 'Sconosciuto';
     }
     
-    private function formatPartialDataForPrompt($data) {
-        if (empty($data)) {
-            return "(nessuna informazione ancora)";
-        }
-        
-        $lines = [];
-        foreach ($data as $key => $value) {
-            if ($value !== null && $value !== '') {
-                $lines[] = "- {$key}: {$value}";
-            }
-        }
-        
-        return implode("\n", $lines);
-    }
-    
     private function getEmptyEventData() {
         return [
             'title' => null,
@@ -611,8 +693,7 @@ PROMPT;
             'time' => null,
             'settore_id' => null,
             'tipo_attivita_id' => null,
-            'category' => null,
-            'recurrence' => null,
+            'amount' => null,
             'reminder_days_before' => null,
             'description' => null
         ];

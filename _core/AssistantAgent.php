@@ -260,16 +260,24 @@ REGOLE TIPO:
 - "personal": tutto il resto
 
 REGOLE DATE:
+- Data corrente: 15 ottobre 2025
+- Se dice "14 novembre" o "14/11" o "14/11/2025" → 2025-11-14
 - Se dice "15 marzo" → 2025-03-15 (anno corrente se non specificato)
-- Se dice "tra 2 giorni" → calcola da oggi (2025-10-14)
-- Se dice "domani" → 2025-10-15
+- Se dice "tra 2 giorni" → calcola da oggi (2025-10-15)
+- Se dice "domani" → 2025-10-16
 - Se dice "prossimo lunedì" → calcola
+- Se dice "fine mese" → ultimo giorno mese corrente
+- Se dice "in che senso?" o domanda → null (utente chiede chiarimenti)
 - Se non menziona data → null
 
 REGOLE REMINDER:
 - "2 giorni prima" → 2
 - "una settimana prima" → 7
 - "promemoria" senza specificare → 1
+
+IMPORTANTE:
+- Se l'utente fa una domanda o chiede chiarimenti, lascia tutti i campi null
+- Estrai info SOLO se l'utente fornisce dati concreti
 
 MESSAGGIO UTENTE:
 {$message}
@@ -362,6 +370,22 @@ PROMPT;
         
         $field = $missingFields[0]; // Chiedi un campo alla volta
         
+        // Domande predefinite ottimizzate
+        $fallbacks = [
+            'title' => "Come vuoi chiamare questo evento?",
+            'date' => "Per quale data? (es: 15 marzo, 20/11/2025, domani)",
+            'type' => "È un pagamento, una manutenzione, un documento o qualcosa di personale?"
+        ];
+        
+        // Se abbiamo già chiesto per la data, usa formato diverso
+        static $dateAskedCount = 0;
+        if ($field === 'date') {
+            $dateAskedCount++;
+            if ($dateAskedCount > 1) {
+                return "Mi serve la data esatta. Puoi dirmi giorno e mese? (es: 20 novembre)";
+            }
+        }
+        
         $prompt = <<<PROMPT
 Sei un assistente amichevole che crea eventi calendario.
 
@@ -375,10 +399,11 @@ Devi chiedere il campo "{$field}".
 REGOLE:
 - Fai una domanda breve, naturale, amichevole
 - Se il campo è "title": chiedi "Come vuoi chiamare questo evento?" o simile
-- Se il campo è "date": chiedi "Quando scade?" o "Per quale data?"
+- Se il campo è "date": chiedi "Per quale data?" e dai esempio (es: 15 marzo, 20/11/2025)
 - Se il campo è "type": chiedi "È personale o di lavoro?" o elenca opzioni
 - Massimo 1-2 frasi
 - Tono colloquiale
+- NON ripetere domande già fatte
 
 DOMANDA:
 PROMPT;
@@ -387,14 +412,8 @@ PROMPT;
             $question = $this->gemini->ask($prompt);
             return trim($question);
         } catch (Exception $e) {
-            // Fallback domande predefinite
-            $fallbacks = [
-                'title' => "Come vuoi chiamare questo evento?",
-                'date' => "Per quale data?",
-                'type' => "È un pagamento, una manutenzione, un documento o qualcosa di personale?"
-            ];
-            
-            return $fallbacks[$field] ?? "Mi puoi dare più dettagli?";
+            error_log("Question generation failed: " . $e->getMessage());
+            return $fallbacks[$field] ?? "Mi puoi dare più dettagli su {$field}?";
         }
     }
     

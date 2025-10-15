@@ -9,7 +9,7 @@
  * - Indicatori visivi (typing, intent, turn counter)
  */
 
-import { API } from './api.js';
+import { api } from './api.js';
 
 // State locale
 const assistantState = {

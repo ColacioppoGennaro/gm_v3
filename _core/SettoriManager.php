@@ -2,6 +2,7 @@
 /**
  * FILE: _core/SettoriManager.php
  * Gestione CRUD settori utente
+ * ✅ LIMITI: FREE 2 aree, PRO 20 aree
  */
 
 require_once __DIR__ . '/helpers.php';
@@ -10,8 +11,8 @@ class SettoriManager {
     private $db;
     private $userId;
     
-    const MAX_SETTORI_FREE = 3;
-    const MAX_SETTORI_PRO = 999;
+    const MAX_SETTORI_FREE = 2;
+    const MAX_SETTORI_PRO = 20;
     
     public function __construct($userId) {
         if (!$userId || !is_numeric($userId)) {
@@ -53,16 +54,16 @@ class SettoriManager {
         $count = $this->countUserSettori();
         
         if ($count >= $maxSettori) {
-            throw new Exception("Limite settori raggiunto. Passa a PRO per settori illimitati.");
+            throw new Exception("Limite aree raggiunto (" . ($role === 'pro' ? '20 per PRO' : '2 per FREE') . "). Passa a PRO per più aree.");
         }
         
         $nome = trim($nome);
         if (empty($nome)) {
-            throw new Exception("Nome settore obbligatorio");
+            throw new Exception("Nome area obbligatorio");
         }
         
         if ($this->settoreExists($nome)) {
-            throw new Exception("Settore già esistente");
+            throw new Exception("Area già esistente");
         }
         
         $stmt = $this->db->prepare("SELECT COALESCE(MAX(ordine), 0) + 1 AS next_ordine FROM settori WHERE user_id = ?");
@@ -74,7 +75,7 @@ class SettoriManager {
         $stmt->bind_param("isssi", $this->userId, $nome, $icona, $colore, $ordine);
         
         if (!$stmt->execute()) {
-            throw new Exception("Errore creazione settore: " . $stmt->error);
+            throw new Exception("Errore creazione area: " . $stmt->error);
         }
         
         return [
@@ -103,7 +104,7 @@ class SettoriManager {
             $stmt->bind_param("isi", $this->userId, $nome, $settoreId);
             $stmt->execute();
             if ($stmt->get_result()->num_rows > 0) {
-                throw new Exception("Nome settore già esistente");
+                throw new Exception("Nome area già esistente");
             }
             
             $updates[] = "nome = ?";

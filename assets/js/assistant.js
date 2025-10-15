@@ -132,7 +132,7 @@ async function sendMessage() {
   showTyping();
   
   try {
-    const response = await API.api('api/assistant.php', { message });
+    const response = await api('api/assistant.php', { message });
     
     hideTyping();
     
@@ -279,7 +279,7 @@ async function resetConversation() {
   if (!confirm('Vuoi iniziare una nuova conversazione?')) return;
   
   try {
-    await API.api('api/assistant.php', { reset: true });
+    await api('api/assistant.php', { reset: true });
     
     // Reset state locale
     assistantState.conversationActive = false;

@@ -2,15 +2,13 @@
 /**
  * FILE: api/settori.php
  * API CRUD per settori utente
- * 
- * GET    /api/settori.php?a=list
- * POST   /api/settori.php?a=create   (nome, icona?, colore?)
- * PATCH  /api/settori.php?a=update   (id, nome?, icona?, colore?, ordine?)
- * DELETE /api/settori.php?a=delete   (id)
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
+
+// ✅ BUFFER OUTPUT per evitare output accidentale
+ob_start();
 
 session_start();
 
@@ -22,8 +20,6 @@ require_login();
 $userId = user()['id'];
 $action = $_GET['a'] ?? $_POST['a'] ?? 'list';
 
-header('Content-Type: application/json; charset=utf-8');
-
 try {
     $manager = new SettoriManager($userId);
     
@@ -32,11 +28,16 @@ try {
         // ===== LIST =====
         case 'list':
             $settori = $manager->list();
-            json_out([
+            
+            // ✅ PULISCI BUFFER PRIMA DI JSON
+            ob_end_clean();
+            
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
                 'success' => true,
                 'data' => $settori
             ]);
-            break;
+            exit;
         
         // ===== CREATE =====
         case 'create':
@@ -47,17 +48,23 @@ try {
             $colore = $input['colore'] ?? '#7c3aed';
             
             if (!$nome) {
-                json_out(['success' => false, 'message' => 'Nome obbligatorio'], 400);
+                ob_end_clean();
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Nome obbligatorio']);
+                exit;
             }
             
             $result = $manager->create($nome, $icona, $colore);
             
-            json_out([
+            ob_end_clean();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
                 'success' => true,
                 'message' => 'Settore creato',
                 'data' => $result
             ]);
-            break;
+            exit;
         
         // ===== UPDATE =====
         case 'update':
@@ -66,18 +73,24 @@ try {
             $id = $input['id'] ?? null;
             
             if (!$id) {
-                json_out(['success' => false, 'message' => 'ID obbligatorio'], 400);
+                ob_end_clean();
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'ID obbligatorio']);
+                exit;
             }
             
             unset($input['id'], $input['a']);
             
             $manager->update($id, $input);
             
-            json_out([
+            ob_end_clean();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
                 'success' => true,
                 'message' => 'Settore aggiornato'
             ]);
-            break;
+            exit;
         
         // ===== DELETE =====
         case 'delete':
@@ -86,25 +99,39 @@ try {
             $id = $input['id'] ?? $_GET['id'] ?? null;
             
             if (!$id) {
-                json_out(['success' => false, 'message' => 'ID obbligatorio'], 400);
+                ob_end_clean();
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'ID obbligatorio']);
+                exit;
             }
             
             $manager->delete($id);
             
-            json_out([
+            ob_end_clean();
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
                 'success' => true,
                 'message' => 'Settore eliminato'
             ]);
-            break;
+            exit;
         
         default:
-            json_out(['success' => false, 'message' => 'Azione non valida'], 400);
+            ob_end_clean();
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => 'Azione non valida']);
+            exit;
     }
     
 } catch (Exception $e) {
+    ob_end_clean();
     error_log("Settori API Error: " . $e->getMessage());
-    json_out([
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
         'success' => false,
         'message' => $e->getMessage()
-    ], 500);
+    ]);
+    exit;
 }

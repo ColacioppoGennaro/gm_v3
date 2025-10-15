@@ -1,15 +1,8 @@
-</document>
-
----
-
-### 📄 FILE 2: `_core/TipiAttivitaManager.php`
-
-<document path="_core/TipiAttivitaManager.php">
-```php
 <?php
 /**
  * _core/TipiAttivitaManager.php
  * Gestione CRUD tipi attività
+ * ✅ LIMITI: FREE 4 tipi per area, PRO 50 tipi per area
  */
 
 require_once __DIR__ . '/helpers.php';
@@ -18,9 +11,9 @@ class TipiAttivitaManager {
     private $db;
     private $userId;
     
-    // Limiti
-    const MAX_TIPI_PER_SETTORE_FREE = 5;
-    const MAX_TIPI_PER_SETTORE_PRO = 999;
+    // ✅ LIMITI CORRETTI
+    const MAX_TIPI_PER_SETTORE_FREE = 4;
+    const MAX_TIPI_PER_SETTORE_PRO = 50;
     
     public function __construct($userId) {
         if (!$userId || !is_numeric($userId)) {
@@ -31,12 +24,8 @@ class TipiAttivitaManager {
         $this->db = db();
     }
     
-    /**
-     * Lista tipi attività (opzionale: filtro per settore)
-     */
     public function list($settoreId = null) {
         if ($settoreId) {
-            // Lista tipi di un settore specifico
             $stmt = $this->db->prepare("
                 SELECT 
                     t.id,
@@ -54,7 +43,6 @@ class TipiAttivitaManager {
             ");
             $stmt->bind_param("ii", $this->userId, $settoreId);
         } else {
-            // Lista tutti i tipi raggruppati per settore
             $stmt = $this->db->prepare("
                 SELECT 
                     t.id,
@@ -80,48 +68,39 @@ class TipiAttivitaManager {
         return $result->fetch_all(MYSQLI_ASSOC);
     }
     
-    /**
-     * Crea nuovo tipo attività
-     */
     public function create($settoreId, $nome, $icona = '📌', $colore = null, $puoCollegareDoc = false) {
-        // Verifica ownership settore
         if (!$this->userOwnsSettore($settoreId)) {
             throw new Exception("Settore non trovato");
         }
         
-        // Verifica limiti
+        // ✅ VERIFICA LIMITI
         $role = $this->getUserRole();
         $maxTipi = ($role === 'pro') ? self::MAX_TIPI_PER_SETTORE_PRO : self::MAX_TIPI_PER_SETTORE_FREE;
         
         $count = $this->countTipiInSettore($settoreId);
         
         if ($count >= $maxTipi) {
-            throw new Exception("Limite tipi raggiunto per questo settore. Passa a PRO per tipi illimitati.");
+            throw new Exception("Limite tipi raggiunto per questa area (" . ($role === 'pro' ? '50 per PRO' : '4 per FREE') . ")");
         }
         
-        // Validazione
         $nome = trim($nome);
         if (empty($nome)) {
             throw new Exception("Nome tipo attività obbligatorio");
         }
         
-        // Check duplicati
         if ($this->tipoExists($settoreId, $nome)) {
-            throw new Exception("Tipo attività già esistente in questo settore");
+            throw new Exception("Tipo attività già esistente in questa area");
         }
         
-        // Colore default da settore se non specificato
         if (!$colore) {
             $colore = $this->getSettoreColore($settoreId);
         }
         
-        // Prossimo ordine
         $stmt = $this->db->prepare("SELECT COALESCE(MAX(ordine), 0) + 1 AS next_ordine FROM tipi_attivita WHERE user_id = ? AND settore_id = ?");
         $stmt->bind_param("ii", $this->userId, $settoreId);
         $stmt->execute();
         $ordine = $stmt->get_result()->fetch_assoc()['next_ordine'];
         
-        // Insert
         $stmt = $this->db->prepare("
             INSERT INTO tipi_attivita (user_id, settore_id, nome, icona, colore, puo_collegare_documento, ordine) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -143,9 +122,6 @@ class TipiAttivitaManager {
         ];
     }
     
-    /**
-     * Aggiorna tipo attività
-     */
     public function update($tipoId, $data) {
         if (!$this->userOwnsTipo($tipoId)) {
             throw new Exception("Accesso negato");
@@ -159,13 +135,12 @@ class TipiAttivitaManager {
             $nome = trim($data['nome']);
             if (empty($nome)) throw new Exception("Nome non può essere vuoto");
             
-            // Check duplicati
             $tipo = $this->getTipo($tipoId);
             $stmt = $this->db->prepare("SELECT id FROM tipi_attivita WHERE user_id = ? AND settore_id = ? AND nome = ? AND id != ?");
             $stmt->bind_param("iisi", $this->userId, $tipo['settore_id'], $nome, $tipoId);
             $stmt->execute();
             if ($stmt->get_result()->num_rows > 0) {
-                throw new Exception("Nome tipo già esistente in questo settore");
+                throw new Exception("Nome tipo già esistente in questa area");
             }
             
             $updates[] = "nome = ?";
@@ -216,9 +191,6 @@ class TipiAttivitaManager {
         return ['success' => true];
     }
     
-    /**
-     * Elimina tipo attività
-     */
     public function delete($tipoId) {
         if (!$this->userOwnsTipo($tipoId)) {
             throw new Exception("Accesso negato");
@@ -234,7 +206,6 @@ class TipiAttivitaManager {
         return ['success' => true];
     }
     
-    // Helper methods
     private function countTipiInSettore($settoreId) {
         $stmt = $this->db->prepare("SELECT COUNT(*) AS cnt FROM tipi_attivita WHERE user_id = ? AND settore_id = ?");
         $stmt->bind_param("ii", $this->userId, $settoreId);

@@ -1,36 +1,31 @@
 <?php
 /**
- * _core/AssistantAgent.php
+ * FILE: _core/AssistantAgent.php
  * 
- * Orchestratore AI conversazionale per creazione eventi calendario tramite dialogo naturale.
- * Gestisce conversazioni multi-turno con state management e integrazione Gemini + Google Calendar.
+ * Orchestratore AI conversazionale con sistema settori dinamico
  * 
- * @author gm_v3 Assistant
- * @version 1.0.0
+ * @version 2.0.0 - Sistema Settori
  */
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/GeminiClient.php';
 require_once __DIR__ . '/DocAnalyzerClient.php';
+require_once __DIR__ . '/SettoriManager.php';
+require_once __DIR__ . '/TipiAttivitaManager.php';
 
 class AssistantAgent {
     
     private $userId;
     private $gemini;
     private $db;
+    private $userContext; // ✨ NUOVO: contesto utente (settori/tipi)
     
-    // Tipi evento validi
-    const VALID_TYPES = ['payment', 'maintenance', 'document', 'personal'];
+    // ✅ RIMOSSO: Tipi fissi non servono più
+    // const VALID_TYPES = ['payment', 'maintenance', 'document', 'personal'];
     
     // Campi obbligatori per creare evento
-    const REQUIRED_FIELDS = ['title', 'date', 'type'];
+    const REQUIRED_FIELDS = ['title', 'date', 'settore_id', 'tipo_attivita_id'];
     
-    /**
-     * Constructor
-     * 
-     * @param int $userId ID utente corrente
-     * @throws Exception se user_id non valido
-     */
     public function __construct($userId) {
         if (!$userId || !is_numeric($userId)) {
             throw new Exception("User ID non valido");
@@ -40,16 +35,56 @@ class AssistantAgent {
         $this->gemini = new GeminiClient();
         $this->db = db();
         
+        // ✨ NUOVO: Carica contesto utente
+        $this->loadUserContext();
+        
         error_log("AssistantAgent initialized for user: {$this->userId}");
     }
     
     /**
-     * Processa messaggio utente e gestisce conversazione multi-turno
-     * 
-     * @param string $message Messaggio utente
-     * @param array|null $sessionState Stato conversazione da sessione
-     * @return array Response con status, message, data, state
+     * ✨ NUOVO: Carica settori e tipi attività utente per context AI
      */
+    private function loadUserContext() {
+        $settoriMgr = new SettoriManager($this->userId);
+        $tipiMgr = new TipiAttivitaManager($this->userId);
+        
+        $settori = $settoriMgr->list();
+        $tipi = $tipiMgr->list();
+        
+        // Organizza tipi per settore
+        $settoriConTipi = [];
+        foreach ($settori as $settore) {
+            $settoriConTipi[$settore['id']] = [
+                'nome' => $settore['nome'],
+                'icona' => $settore['icona'],
+                'tipi' => []
+            ];
+        }
+        
+        foreach ($tipi as $tipo) {
+            if (isset($settoriConTipi[$tipo['settore_id']])) {
+                $settoriConTipi[$tipo['settore_id']]['tipi'][] = [
+                    'id' => $tipo['id'],
+                    'nome' => $tipo['nome'],
+                    'icona' => $tipo['icona']
+                ];
+            }
+        }
+        
+        // Crea stringa contesto per AI
+        $contextLines = ["SETTORI UTENTE:"];
+        foreach ($settoriConTipi as $sid => $settore) {
+            $contextLines[] = "- {$settore['icona']} {$settore['nome']} (ID: {$sid})";
+            foreach ($settore['tipi'] as $tipo) {
+                $contextLines[] = "  → {$tipo['icona']} {$tipo['nome']} (ID: {$tipo['id']})";
+            }
+        }
+        
+        $this->userContext = implode("\n", $contextLines);
+        
+        error_log("User context loaded: " . strlen($this->userContext) . " chars");
+    }
+    
     public function processMessage($message, $sessionState = null) {
         try {
             $message = trim($message);
@@ -58,7 +93,6 @@ class AssistantAgent {
                 return $this->errorResponse("Messaggio vuoto");
             }
             
-            // Inizializza stato se non esiste
             if (!$sessionState) {
                 $sessionState = [
                     'intent' => null,
@@ -72,32 +106,27 @@ class AssistantAgent {
             
             error_log("Processing message (turn {$sessionState['turn']}): " . substr($message, 0, 50));
             
-            // Se è il primo turno, detecta intent
             if ($sessionState['turn'] === 1) {
                 $intent = $this->detectIntent($message);
                 $sessionState['intent'] = $intent;
                 
                 error_log("Intent detected: {$intent}");
                 
-                // Per ora gestiamo solo create_event
                 if ($intent === 'create_event') {
                     return $this->handleEventCreation($message, $sessionState);
                 } elseif ($intent === 'query_calendar') {
                     return $this->handleCalendarQuery($message, $sessionState);
                 } else {
-                    // Risposta generica
                     return $this->handleGeneric($message, $sessionState);
                 }
             }
             
-            // Turni successivi: continua flow basato su intent
             if ($sessionState['intent'] === 'create_event') {
                 return $this->handleEventCreation($message, $sessionState);
             } elseif ($sessionState['intent'] === 'query_calendar') {
                 return $this->handleCalendarQuery($message, $sessionState);
             }
             
-            // Fallback
             return $this->handleGeneric($message, $sessionState);
             
         } catch (Exception $e) {
@@ -106,20 +135,14 @@ class AssistantAgent {
         }
     }
     
-    /**
-     * Detecta intent del messaggio usando Gemini
-     * 
-     * @param string $message Messaggio utente
-     * @return string Intent: 'create_event' | 'query_calendar' | 'generic'
-     */
     private function detectIntent($message) {
         $prompt = <<<PROMPT
 Sei un assistente AI che analizza messaggi utente per capire l'intento.
 
 INTENTI POSSIBILI:
-- "create_event": Utente vuole creare un evento/promemoria (es: "mi è arrivata una bolletta", "devo fare il tagliando", "ricordami di chiamare")
-- "query_calendar": Utente chiede info sul calendario (es: "quando va mia figlia in palestra?", "che eventi ho domani?")
-- "generic": Altro (saluti, domande generiche, conversazione)
+- "create_event": Utente vuole creare un evento/promemoria
+- "query_calendar": Utente chiede info sul calendario
+- "generic": Altro
 
 REGOLE:
 - Rispondi SOLO con una delle 3 parole: create_event, query_calendar, generic
@@ -136,10 +159,8 @@ PROMPT;
             $response = $this->gemini->ask($prompt);
             $intent = strtolower(trim($response));
             
-            // Validazione intent
             $validIntents = ['create_event', 'query_calendar', 'generic'];
             if (!in_array($intent, $validIntents)) {
-                // Fallback: cerca parole chiave
                 $createKeywords = ['bolletta', 'scadenza', 'tagliando', 'manutenzione', 'ricorda', 'promemoria', 'devo', 'ricevuto'];
                 $messageLower = strtolower($message);
                 
@@ -156,7 +177,6 @@ PROMPT;
             
         } catch (Exception $e) {
             error_log("Intent detection failed: " . $e->getMessage());
-            // Fallback basato su keyword
             $createKeywords = ['bolletta', 'scadenza', 'tagliando', 'manutenzione', 'ricorda', 'promemoria'];
             $messageLower = strtolower($message);
             
@@ -170,18 +190,9 @@ PROMPT;
         }
     }
     
-    /**
-     * Gestisce creazione evento con conversazione multi-turno
-     * 
-     * @param string $message Messaggio utente
-     * @param array $state Stato conversazione
-     * @return array Response
-     */
     private function handleEventCreation($message, $state) {
-        // Estrai dati dal messaggio corrente
         $extractedData = $this->extractEventData($message);
         
-        // Merge con dati parziali esistenti
         $partialData = $state['partial_data'];
         foreach ($extractedData as $key => $value) {
             if ($value !== null && $value !== '') {
@@ -191,11 +202,9 @@ PROMPT;
         
         error_log("Partial data after extraction: " . json_encode($partialData));
         
-        // Valida e trova campi mancanti
         $validation = $this->validateAndCompleteEvent($partialData);
         
         if ($validation['complete']) {
-            // Tutti i campi presenti: crea evento
             try {
                 $eventId = $this->createCalendarEvent($validation['data']);
                 
@@ -206,7 +215,7 @@ PROMPT;
                         'event_id' => $eventId,
                         'event_data' => $validation['data']
                     ],
-                    'state' => null // Resetta stato
+                    'state' => null
                 ];
                 
             } catch (Exception $e) {
@@ -215,7 +224,6 @@ PROMPT;
             }
         }
         
-        // Campi mancanti: chiedi info
         $question = $this->generateMissingFieldsQuestion($validation['missing'], $partialData);
         
         return [
@@ -232,52 +240,43 @@ PROMPT;
     }
     
     /**
-     * Estrae dati evento da messaggio usando Gemini
-     * 
-     * @param string $message Messaggio utente
-     * @return array Dati evento estratti (null per campi non trovati)
+     * ✨ MODIFICATO: Estrae dati evento con matching settore/tipo dinamico
      */
     private function extractEventData($message) {
         $prompt = <<<PROMPT
 Sei un assistente che estrae informazioni per creare eventi calendario.
 
-ESTRAI dal messaggio dell'utente e ritorna SOLO un oggetto JSON valido con questi campi:
+{$this->userContext}
+
+ESTRAI dal messaggio dell'utente e ritorna SOLO un oggetto JSON valido:
 {
-  "title": "titolo evento (breve, es: Bolletta, Tagliando auto)",
-  "date": "YYYY-MM-DD (solo se menzionata data specifica, altrimenti null)",
-  "time": "HH:MM formato 24h (solo se ora specifica, altrimenti null)",
-  "type": "payment | maintenance | document | personal (inferisci dal contesto)",
-  "category": "etichetta libera (es: bolletta, multa, tagliando, assicurazione)",
+  "title": "titolo evento (breve)",
+  "date": "YYYY-MM-DD (solo se menzionata, altrimenti null)",
+  "time": "HH:MM formato 24h (solo se specifica, altrimenti null)",
+  "settore_id": "ID settore più appropriato (numero, non nome)",
+  "tipo_attivita_id": "ID tipo attività più appropriato (numero, non nome)",
+  "category": "etichetta libera opzionale",
   "recurrence": "DAILY | WEEKLY | MONTHLY | YEARLY (solo se ricorrente, altrimenti null)",
   "reminder_days_before": "numero intero giorni prima per promemoria (null se non specificato)",
   "description": "note aggiuntive (null se non presenti)"
 }
 
-REGOLE TIPO:
-- "payment": bollette, pagamenti, multe, tasse
-- "maintenance": tagliandi, manutenzioni, revisioni
-- "document": scadenze documenti, rinnovi
-- "personal": tutto il resto
+REGOLE MATCHING:
+- "bolletta luce" → Settore: Casa, Tipo: Bollette Utenze
+- "stipendi" → Settore: Lavoro, Tipo: Stipendi da Pagare
+- "tagliando auto" → Settore: Lavoro, Tipo: Manutenzione Mezzi
+- "gatto veterinario" → Settore: Persone, Tipo: Veterinario
+- "palestra" → Settore: Persone, Tipo: Sport
 
 REGOLE DATE:
 - Data corrente: 15 ottobre 2025
-- Se dice "14 novembre" o "14/11" o "14/11/2025" → 2025-11-14
-- Se dice "15 marzo" → 2025-03-15 (anno corrente se non specificato)
-- Se dice "tra 2 giorni" → calcola da oggi (2025-10-15)
+- Se dice "14 novembre" → 2025-11-14
 - Se dice "domani" → 2025-10-16
-- Se dice "prossimo lunedì" → calcola
-- Se dice "fine mese" → ultimo giorno mese corrente
-- Se dice "in che senso?" o domanda → null (utente chiede chiarimenti)
 - Se non menziona data → null
 
-REGOLE REMINDER:
-- "2 giorni prima" → 2
-- "una settimana prima" → 7
-- "promemoria" senza specificare → 1
-
 IMPORTANTE:
-- Se l'utente fa una domanda o chiede chiarimenti, lascia tutti i campi null
-- Estrai info SOLO se l'utente fornisce dati concreti
+- Usa gli ID NUMERICI, non i nomi
+- Se non sei sicuro del settore/tipo, metti null
 
 MESSAGGIO UTENTE:
 {$message}
@@ -288,7 +287,6 @@ PROMPT;
         try {
             $response = $this->gemini->ask($prompt);
             
-            // Pulisci response (rimuovi markdown se presente)
             $response = trim($response);
             $response = preg_replace('/^```json\s*/i', '', $response);
             $response = preg_replace('/\s*```$/i', '', $response);
@@ -300,9 +298,12 @@ PROMPT;
                 return $this->getEmptyEventData();
             }
             
-            // Valida tipo
-            if (isset($data['type']) && !in_array($data['type'], self::VALID_TYPES)) {
-                $data['type'] = 'personal'; // Fallback
+            // Converte ID in int se presenti
+            if (isset($data['settore_id'])) {
+                $data['settore_id'] = intval($data['settore_id']);
+            }
+            if (isset($data['tipo_attivita_id'])) {
+                $data['tipo_attivita_id'] = intval($data['tipo_attivita_id']);
             }
             
             error_log("Extracted event data: " . json_encode($data));
@@ -316,24 +317,18 @@ PROMPT;
     }
     
     /**
-     * Valida dati evento e trova campi mancanti
-     * 
-     * @param array $data Dati parziali evento
-     * @return array ['complete' => bool, 'data' => array, 'missing' => array]
+     * ✨ MODIFICATO: Validazione con nuovi campi obbligatori
      */
     private function validateAndCompleteEvent($data) {
         $missing = [];
         
-        // Controlla campi obbligatori
         foreach (self::REQUIRED_FIELDS as $field) {
             if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
                 $missing[] = $field;
             }
         }
         
-        // Se completo, aggiungi defaults
         if (empty($missing)) {
-            // Default per campi opzionali
             $data['time'] = $data['time'] ?? null;
             $data['category'] = $data['category'] ?? '';
             $data['recurrence'] = $data['recurrence'] ?? null;
@@ -356,54 +351,33 @@ PROMPT;
         ];
     }
     
-    /**
-     * Genera domanda naturale per campi mancanti
-     * 
-     * @param array $missingFields Campi mancanti
-     * @param array $partialData Dati già raccolti
-     * @return string Domanda per utente
-     */
     private function generateMissingFieldsQuestion($missingFields, $partialData) {
         if (empty($missingFields)) {
             return "Perfetto! Creo l'evento.";
         }
         
-        $field = $missingFields[0]; // Chiedi un campo alla volta
+        $field = $missingFields[0];
         
-        // Domande predefinite ottimizzate
         $fallbacks = [
             'title' => "Come vuoi chiamare questo evento?",
             'date' => "Per quale data? (es: 15 marzo, 20/11/2025, domani)",
-            'type' => "È un pagamento, una manutenzione, un documento o qualcosa di personale?"
+            'settore_id' => "È per Lavoro, Casa o Persone?",
+            'tipo_attivita_id' => "Di che tipo di evento si tratta? (es: Bolletta, Manutenzione, Salute...)"
         ];
         
-        // Se abbiamo già chiesto per la data, usa formato diverso
-        static $dateAskedCount = 0;
-        if ($field === 'date') {
-            $dateAskedCount++;
-            if ($dateAskedCount > 1) {
-                return "Mi serve la data esatta. Puoi dirmi giorno e mese? (es: 20 novembre)";
-            }
+        if (isset($fallbacks[$field])) {
+            return $fallbacks[$field];
         }
         
         $prompt = <<<PROMPT
 Sei un assistente amichevole che crea eventi calendario.
 
 CONTESTO:
-Stai raccogliendo informazioni per creare un evento. L'utente ha già fornito:
 {$this->formatPartialDataForPrompt($partialData)}
 
-CAMPO MANCANTE:
-Devi chiedere il campo "{$field}".
+CAMPO MANCANTE: {$field}
 
-REGOLE:
-- Fai una domanda breve, naturale, amichevole
-- Se il campo è "title": chiedi "Come vuoi chiamare questo evento?" o simile
-- Se il campo è "date": chiedi "Per quale data?" e dai esempio (es: 15 marzo, 20/11/2025)
-- Se il campo è "type": chiedi "È personale o di lavoro?" o elenca opzioni
-- Massimo 1-2 frasi
-- Tono colloquiale
-- NON ripetere domande già fatte
+Fai una domanda breve e naturale per chiedere questo campo.
 
 DOMANDA:
 PROMPT;
@@ -413,19 +387,14 @@ PROMPT;
             return trim($question);
         } catch (Exception $e) {
             error_log("Question generation failed: " . $e->getMessage());
-            return $fallbacks[$field] ?? "Mi puoi dare più dettagli su {$field}?";
+            return $fallbacks[$field] ?? "Mi puoi dare più dettagli?";
         }
     }
     
     /**
-     * Crea evento su Google Calendar
-     * 
-     * @param array $eventData Dati completi evento
-     * @return string Event ID creato
-     * @throws Exception se creazione fallisce
+     * ✨ MODIFICATO: Creazione evento con nuova struttura extendedProperties
      */
     private function createCalendarEvent($eventData) {
-        // Verifica che l'utente abbia Google Calendar connesso
         $stmt = $this->db->prepare("SELECT google_oauth_token, google_oauth_refresh, google_oauth_expiry FROM users WHERE id = ?");
         $stmt->bind_param("i", $this->userId);
         $stmt->execute();
@@ -436,7 +405,6 @@ PROMPT;
             throw new Exception("Google Calendar non connesso. Collegalo prima di creare eventi.");
         }
         
-        // Carica Google Client
         require_once __DIR__ . '/google_client.php';
         
         $oauthFormatted = [
@@ -452,7 +420,6 @@ PROMPT;
             throw new Exception("Errore inizializzazione Google Calendar: " . $e->getMessage());
         }
         
-        // Prepara evento
         $isAllDay = empty($eventData['time']);
         
         $event = new Google_Service_Calendar_Event([
@@ -460,7 +427,6 @@ PROMPT;
             'description' => $eventData['description'] ?? ''
         ]);
         
-        // Date/Time
         if ($isAllDay) {
             $event->setStart(new Google_Service_Calendar_EventDateTime([
                 'date' => $eventData['date']
@@ -482,12 +448,10 @@ PROMPT;
             ]));
         }
         
-        // Ricorrenza
         if (!empty($eventData['recurrence'])) {
             $event->setRecurrence(['RRULE:FREQ=' . $eventData['recurrence']]);
         }
         
-        // Promemoria
         if (!empty($eventData['reminder_days_before'])) {
             $minutes = intval($eventData['reminder_days_before']) * 1440;
             $reminder = new Google_Service_Calendar_EventReminder([
@@ -501,10 +465,11 @@ PROMPT;
             $event->setReminders($reminders);
         }
         
-        // Extended Properties (tipizzazione)
+        // ✨ NUOVA STRUTTURA: Extended Properties con settore e tipo
         $extProps = new Google_Service_Calendar_EventExtendedProperties();
         $privateData = [
-            'type' => $eventData['type'],
+            'settore_id' => (string)$eventData['settore_id'],
+            'tipo_attivita_id' => (string)$eventData['tipo_attivita_id'],
             'status' => 'pending',
             'trigger' => 'assistant',
             'show_in_dashboard' => 'true'
@@ -517,7 +482,6 @@ PROMPT;
         $extProps->setPrivate($privateData);
         $event->setExtendedProperties($extProps);
         
-        // Crea evento
         $createdEvent = $service->events->insert('primary', $event);
         
         if (!$createdEvent || !$createdEvent->getId()) {
@@ -527,15 +491,7 @@ PROMPT;
         return $createdEvent->getId();
     }
     
-    /**
-     * Gestisce query calendario (es: "quando va mia figlia in palestra?")
-     * 
-     * @param string $message Messaggio utente
-     * @param array $state Stato conversazione
-     * @return array Response
-     */
     private function handleCalendarQuery($message, $state) {
-        // TODO: Implementare in Sprint 4
         return [
             'status' => 'complete',
             'message' => "Scusa, la funzione di ricerca eventi non è ancora disponibile. Posso aiutarti a creare un nuovo evento?",
@@ -544,20 +500,12 @@ PROMPT;
         ];
     }
     
-    /**
-     * Gestisce conversazione generica
-     * 
-     * @param string $message Messaggio utente
-     * @param array $state Stato conversazione
-     * @return array Response
-     */
     private function handleGeneric($message, $state) {
         try {
             $prompt = <<<PROMPT
 Sei un assistente AI per la gestione di documenti e calendario.
 
 Rispondi in modo breve e amichevole al messaggio dell'utente.
-Se possibile, suggerisci come puoi aiutare (creare eventi, cercare nel calendario, etc).
 
 MESSAGGIO:
 {$message}
@@ -577,7 +525,7 @@ PROMPT;
         } catch (Exception $e) {
             return [
                 'status' => 'complete',
-                'message' => "Ciao! Sono il tuo assistente AI. Posso aiutarti a creare eventi nel calendario o rispondere a domande generiche. Come posso aiutarti?",
+                'message' => "Ciao! Sono il tuo assistente AI. Posso aiutarti a creare eventi nel calendario. Come posso aiutarti?",
                 'data' => null,
                 'state' => null
             ];
@@ -585,19 +533,20 @@ PROMPT;
     }
     
     /**
-     * Genera messaggio di successo dopo creazione evento
-     * 
-     * @param array $eventData Dati evento creato
-     * @param string $eventId Event ID
-     * @return string Messaggio
+     * ✨ MODIFICATO: Messaggio di successo con info settore/tipo
      */
     private function generateSuccessMessage($eventData, $eventId) {
         $date = date('d/m/Y', strtotime($eventData['date']));
         $time = !empty($eventData['time']) ? ' alle ' . $eventData['time'] : '';
         
+        // Ottieni nomi settore e tipo
+        $settoreNome = $this->getSettoreNome($eventData['settore_id']);
+        $tipoNome = $this->getTipoNome($eventData['tipo_attivita_id']);
+        
         $msg = "✅ Evento creato con successo!\n\n";
         $msg .= "📅 **{$eventData['title']}**\n";
         $msg .= "🗓️ {$date}{$time}\n";
+        $msg .= "📂 {$settoreNome} → {$tipoNome}\n";
         
         if (!empty($eventData['category'])) {
             $msg .= "🏷️ Categoria: {$eventData['category']}\n";
@@ -621,9 +570,22 @@ PROMPT;
         return $msg;
     }
     
-    /**
-     * Helper: formatta dati parziali per prompt
-     */
+    private function getSettoreNome($settoreId) {
+        $stmt = $this->db->prepare("SELECT nome FROM settori WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $settoreId, $this->userId);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        return $result['nome'] ?? 'Sconosciuto';
+    }
+    
+    private function getTipoNome($tipoId) {
+        $stmt = $this->db->prepare("SELECT nome FROM tipi_attivita WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $tipoId, $this->userId);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        return $result['nome'] ?? 'Sconosciuto';
+    }
+    
     private function formatPartialDataForPrompt($data) {
         if (empty($data)) {
             return "(nessuna informazione ancora)";
@@ -639,15 +601,13 @@ PROMPT;
         return implode("\n", $lines);
     }
     
-    /**
-     * Helper: dati evento vuoti
-     */
     private function getEmptyEventData() {
         return [
             'title' => null,
             'date' => null,
             'time' => null,
-            'type' => null,
+            'settore_id' => null,
+            'tipo_attivita_id' => null,
             'category' => null,
             'recurrence' => null,
             'reminder_days_before' => null,
@@ -655,9 +615,6 @@ PROMPT;
         ];
     }
     
-    /**
-     * Helper: response di errore
-     */
     private function errorResponse($message) {
         return [
             'status' => 'error',

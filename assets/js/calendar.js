@@ -678,7 +678,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         </div>
         <div class="form-group" style="display:block !important;">
           <label>Tipo *</label>
-          <select id="eventEntity" style="display:block !important; width:100%;"><option value="">Seleziona...</option></select>
+          <select id="eventTipoSelect" style="display:block !important; width:100%;padding:8px;border:1px solid #374151;border-radius:6px;background:var(--card);color:var(--text);"><option value="">Seleziona...</option></select>
           <small style="color:var(--muted);display:block;margin-top:4px">I tipi dipendono dall'area selezionata</small>
         </div>`;
       catGroup.parentNode.insertBefore(wrapper, catGroup);
@@ -686,7 +686,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
     // Carica Aree/Tipi (DOPO aver inserito l'HTML!)
     const areaSel = document.getElementById('eventArea');
-    const tipoSel = document.getElementById('eventEntity');
+    const tipoSel = document.getElementById('eventTipoSelect');
     const organizeBtn = document.getElementById('btnOrganizeAreaTipo');
     
     console.log('🎯 Elementi DOM trovati:', { 
@@ -1082,6 +1082,7 @@ async function createEvent() {
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
   const eventType = document.getElementById('eventType')?.value || 'personal';
+  const tipoAttivitaId = document.getElementById('eventTipoSelect')?.value || '';
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
   const showInDashboard = document.getElementById('showInDashboard')?.checked !== false;
@@ -1091,13 +1092,13 @@ async function createEvent() {
   if (!title || !start || !end) {
     return alert('Compila tutti i campi obbligatori (titolo e date)');
   }
-  if (!entityId) {
+  if (!tipoAttivitaId) {
     return alert('Seleziona Area e Tipo');
   }
 
   // Se categoria è testo libero: prova a crearla se non esiste e c'è spazio (<50)
   const areaSelVal = document.getElementById('eventArea')?.value || '';
-  const tipoSelVal = document.getElementById('eventEntity')?.value || '';
+  const tipoSelVal = document.getElementById('eventTipoSelect')?.value || '';
   if (eventCategory && tipoSelVal) {
     await ensureEventCategoryExists(tipoSelVal, eventCategory);
   }
@@ -1108,6 +1109,7 @@ async function createEvent() {
   fd.append('type', eventType);
   fd.append('status', 'pending');
   fd.append('trigger', 'manual');
+  if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
   if (documentId) fd.append('document_id', documentId);
@@ -1160,6 +1162,7 @@ async function updateEvent(event) {
   const colorId = document.getElementById('eventColor').value;
   const eventType = document.getElementById('eventType')?.value || 'personal';
   const eventStatus = document.getElementById('eventStatus')?.value || 'pending';
+  const tipoAttivitaId = document.getElementById('eventTipoSelect')?.value || '';
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
   const showInDashboard = document.getElementById('showInDashboard')?.checked !== false;
@@ -1169,12 +1172,12 @@ async function updateEvent(event) {
   if (!title) {
     return alert('Inserisci un titolo');
   }
-  if (!entityId) {
+  if (!tipoAttivitaId) {
     return alert('Seleziona Area e Tipo');
   }
 
   const areaSelVal2 = document.getElementById('eventArea')?.value || '';
-  const tipoSelVal2 = document.getElementById('eventEntity')?.value || '';
+  const tipoSelVal2 = document.getElementById('eventTipoSelect')?.value || '';
   if (eventCategory && tipoSelVal2) {
     await ensureEventCategoryExists(tipoSelVal2, eventCategory);
   }
@@ -1184,6 +1187,7 @@ async function updateEvent(event) {
   fd.append('description', description || '');
   fd.append('type', eventType);
   fd.append('status', eventStatus);
+  if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
   if (documentId) fd.append('document_id', documentId);

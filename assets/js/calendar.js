@@ -683,10 +683,17 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       catGroup.parentNode.insertBefore(wrapper, catGroup);
     }
 
-    // Carica Aree/Tipi
+    // Carica Aree/Tipi (DOPO aver inserito l'HTML!)
     const areaSel = document.getElementById('eventArea');
     const tipoSel = document.getElementById('eventEntity');
     const organizeBtn = document.getElementById('btnOrganizeAreaTipo');
+    
+    console.log('🎯 Elementi DOM trovati:', { 
+      areaSel: !!areaSel, 
+      tipoSel: !!tipoSel, 
+      organizeBtn: !!organizeBtn,
+      tipoSelVisible: tipoSel ? tipoSel.offsetParent !== null : false
+    });
 
     let _settori = [];
     let _tipi = [];

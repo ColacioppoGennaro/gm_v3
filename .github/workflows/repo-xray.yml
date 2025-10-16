@@ -1,0 +1,164 @@
+name: Repo X-Ray
+
+on:
+  workflow_dispatch:      # lo lanci a mano da Actions
+  push:
+    branches: [ xray ]    # facoltativo: rigenera ad ogni push sul branch "xray"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Write scanner script
+        run: |
+          mkdir -p scripts _report
+          cat > scripts/xray.js <<'NODE'
+          import fs from 'fs';
+          import path from 'path';
+          const ROOT = process.cwd();
+          const REPORT_DIR = path.join(ROOT, '_report');
+          fs.mkdirSync(REPORT_DIR, { recursive: true });
+
+          // --- helpers ---
+          const IGNORES = new Set(['.git','node_modules','vendor','_report','.github']);
+          function walk(dir) {
+            const out = [];
+            for (const ent of fs.readdirSync(dir, {withFileTypes:true})) {
+              if (IGNORES.has(ent.name)) continue;
+              const p = path.join(dir, ent.name);
+              if (ent.isDirectory()) out.push(...walk(p));
+              else out.push(p);
+            }
+            return out;
+          }
+          function rel(p){ return path.relative(ROOT, p).replace(/\\/g,'/'); }
+          function read(p){ try { return fs.readFileSync(p,'utf8'); } catch{ return ''; } }
+
+          // --- scan ---
+          const files = walk(ROOT);
+          const jsFiles  = files.filter(f=>/\.(m?js|jsx|ts|tsx)$/.test(f));
+          const phpFiles = files.filter(f=>/\.php$/.test(f));
+
+          // JS imports map
+          const jsRefs = new Map(); // file -> Set(importedRel)
+          const importRe = /\bimport\s+.*?from\s+['"](.+?)['"]|require\s*\(\s*['"](.+?)['"]\s*\)/g;
+          for (const f of jsFiles) {
+            const R = rel(f);
+            const t = read(f);
+            const set = new Set();
+            let m;
+            while ((m = importRe.exec(t))) {
+              const raw = (m[1]||m[2]||'').trim();
+              if (!raw) continue;
+              // normalizza solo import relativi
+              if (raw.startsWith('.')) {
+                const abs = path.normalize(path.join(path.dirname(f), raw));
+                let cand = rel(abs);
+                // aggiungi estensioni probabili
+                if (!/\.(m?js|jsx|ts|tsx)$/.test(cand)) {
+                  const exts = ['.js','.mjs','.ts','.tsx','.jsx','/index.js','/index.ts'];
+                  for (const ext of exts) {
+                    if (fs.existsSync(path.join(ROOT, cand+ext))) { cand = cand+ext; break; }
+                  }
+                }
+                set.add(cand);
+              } else {
+                // import package -> ignora
+              }
+            }
+            jsRefs.set(R, set);
+          }
+          const jsReferenced = new Set(Array.from(jsRefs.values()).flatMap(s=>Array.from(s)));
+          const jsOrphans = jsFiles
+            .map(rel)
+            .filter(f => !jsReferenced.has(f))
+            .filter(f => !/\/index\.(m?js|jsx|ts|tsx)$/.test(f)); // tieni gli index
+
+          // PHP include/require map
+          const incRe = /(include|require)(_once)?\s*\(?\s*['"](.+?\.php)['"]\s*\)?/g;
+          const phpIncludes = [];
+          for (const f of phpFiles) {
+            const R = rel(f);
+            const t = read(f);
+            let m;
+            while ((m = incRe.exec(t))) {
+              const target = m[3];
+              // risolvi relativi
+              const base = path.dirname(R);
+              const norm = target.startsWith('/')
+                ? target.replace(/^\//,'')
+                : path.posix.normalize(base + '/' + target);
+              phpIncludes.push({from:R, to:norm});
+            }
+          }
+          const includedTargets = new Set(phpIncludes.map(x=>x.to));
+
+          // API calls dal front-end verso /api/*.php
+          const apiCallRe1 = /fetch\(\s*['"]([^'"]*api\/[^'"]*\.php[^'"]*)['"]/g;
+          const apiCallRe2 = /API\.api\(\s*['"]([^'"]*api\/[^'"]*\.php[^'"]*)['"]/g;
+          const allCode = [...jsFiles, ...phpFiles].map(f=>({f:rel(f), t:read(f)}));
+          const apiTargets = new Set();
+          const apiCallsList = [];
+          for (const {f,t} of allCode) {
+            let m;
+            while ((m = apiCallRe1.exec(t))) { apiCallsList.push({from:f, url:m[1]}); apiTargets.add(m[1].split('?')[0].replace(/^\.?\//,'')); }
+            while ((m = apiCallRe2.exec(t))) { apiCallsList.push({from:f, url:m[1]}); apiTargets.add(m[1].split('?')[0].replace(/^\.?\//,'')); }
+          }
+
+          // PHP orfani = mai inclusi e mai chiamati come endpoint
+          const phpUsed = new Set([...includedTargets, ...apiTargets]);
+          const phpOrphans = phpFiles
+            .map(rel)
+            .filter(f => !phpUsed.has(f))
+            .filter(f => !/^index\.php$/.test(f) && !/\/index\.php$/.test(f))
+            .filter(f => !/^vendor\//.test(f));
+
+          // Report
+          const out = [];
+          out.push('# Repo X-Ray\n');
+          out.push('## JS');
+          out.push(`- File JS totali: ${jsFiles.length}`);
+          out.push(`- JS orfani (non importati da nessuno): ${jsOrphans.length}`);
+          if (jsOrphans.length) {
+            out.push('\n### Elenco JS orfani');
+            jsOrphans.forEach(f=>out.push(`- ${f}`));
+          }
+
+          out.push('\n## PHP');
+          out.push(`- File PHP totali: ${phpFiles.length}`);
+          out.push(`- Target PHP inclusi: ${includedTargets.size}`);
+          out.push(`- Endpoint API referenziati: ${apiTargets.size}`);
+          out.push(`- PHP orfani (mai inclusi/mai chiamati): ${phpOrphans.length}`);
+          if (phpOrphans.length) {
+            out.push('\n### Elenco PHP orfani');
+            phpOrphans.forEach(f=>out.push(`- ${f}`));
+          }
+
+          out.push('\n## Collegamenti front-end → API (prime 120 righe)');
+          apiCallsList.slice(0,120).forEach(x=>out.push(`- ${x.from}  →  ${x.url}`));
+          if (apiCallsList.length > 120) out.push(`… (${apiCallsList.length-120} altri)`);
+
+          fs.writeFileSync(path.join(REPORT_DIR, 'summary.md'), out.join('\n'), 'utf8');
+          fs.writeFileSync(path.join(REPORT_DIR, 'orphans_js.csv'), ['file', ...jsOrphans].join('\n'), 'utf8');
+          fs.writeFileSync(path.join(REPORT_DIR, 'orphans_php.csv'), ['file', ...phpOrphans].join('\n'), 'utf8');
+
+          console.log('OK: _report/summary.md generato');
+          NODE
+
+      - name: Run scanner
+        run: node scripts/xray.js
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-xray
+          path: _report/**

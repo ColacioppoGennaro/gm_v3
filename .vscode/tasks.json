@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+        "label": "🚀 Ship to main",
+        "type": "shell",
+        "command": "git add -A; git commit -m 'update: quick save'; git push origin main --force-with-lease",
+        "problemMatcher": [],
+        "group": {
+            "kind": "build",
+            "isDefault": true
+        }
+    }
+]
+}

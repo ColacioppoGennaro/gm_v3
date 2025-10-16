@@ -438,6 +438,7 @@ function initFullCalendar() {
 }
 
 function showEventModal(event = null, startDate = null, endDate = null) {
+  console.log('🚀 showEventModal chiamata', { event: !!event, startDate, endDate });
   const isEdit = !!event;
   const modalId = 'eventModal';
   document.getElementById(modalId)?.remove();
@@ -906,7 +907,10 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
     window.__gmv3_getCurrentEventCats = () => (_cats || []).map(c=>c.nome);
     window.__gmv3_loadCatsForTipo = loadCategoriesForTipo;
-  } catch(e) { console.warn('Setup Area/Tipo fallito', e); }
+  } catch(e) { 
+    console.error('❌ Setup Area/Tipo fallito:', e);
+    console.error('❌ Stack trace:', e.stack);
+  }
   
   const attendeesListEl = document.getElementById('attendeesList');
   

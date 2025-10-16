@@ -726,6 +726,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         _tipi = tipi.data || [];
         
         console.log('Dati caricati:', { settori: _settori.length, tipi: _tipi.length });
+        console.log('🏢 Settori disponibili:', _settori.map(s => ({id: s.id, nome: s.nome})));
         
         // Popola area
         if (areaSel) {
@@ -761,6 +762,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         console.warn('tipoSel non trovato');
         return;
       }
+      
+      console.log('🔍 Popolamento tipi su elemento:', tipoSel.id, 'Visible:', tipoSel.offsetParent !== null);
       
       const selArea = areaSel?.value ? Number(areaSel.value) : null;
       let list = _tipi || [];
@@ -802,7 +805,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     }
 
     areaSel?.addEventListener('change', async () => { 
-      console.log('Area cambiata:', areaSel.value);
+      console.log('🏢 Area cambiata:', areaSel.value, 'Nome:', areaSel.options[areaSel.selectedIndex]?.text);
       populateTipi(); 
       await loadCategoriesForTipo(''); 
     });

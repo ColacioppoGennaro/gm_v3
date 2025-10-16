@@ -795,8 +795,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     // Carica i dati iniziali
     loadAreaTipo().catch(e => console.error('Errore caricamento iniziale:', e));
     
-    // Carica documenti se è un nuovo evento
-    if (!isEdit) {
+    // Carica documenti se è un nuovo evento e il select esiste
+    if (!isEdit && document.getElementById('eventDocumentSelect')) {
       loadDocuments();
     }
 
@@ -840,14 +840,18 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
     async function loadDocuments() {
       try {
-        const response = await fetch('api/documents.php?action=list');
+        const response = await fetch('api/documents.php?a=list');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
         
         if (data.success && data.documents) {
           const select = document.getElementById('eventDocumentSelect');
           if (select) {
             const options = data.documents.map(doc => 
-              `<option value="${doc.id}">${doc.original_name} (${doc.category || 'Senza categoria'})</option>`
+              `<option value="${doc.id}">${doc.file_name || doc.original_name} (${doc.category || 'Senza categoria'})</option>`
             ).join('');
             
             select.innerHTML = '<option value="">Nessun documento</option>' + options;
@@ -857,9 +861,12 @@ function showEventModal(event = null, startDate = null, endDate = null) {
               document.getElementById('eventDocumentId').value = e.target.value;
             });
           }
+        } else {
+          console.warn('Nessun documento disponibile o errore API:', data.message);
         }
       } catch (e) {
-        console.warn('Errore caricamento documenti:', e);
+        console.warn('Errore caricamento documenti:', e.message);
+        // Non bloccare il resto dell'applicazione se i documenti non si caricano
       }
     }
 

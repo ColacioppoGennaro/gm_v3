@@ -790,9 +790,10 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       
       // Popola select con i tipi disponibili
       const optionsHtml = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+      console.log('🎯 Prima di popolare - innerHTML attuale:', tipoSel.innerHTML);
       tipoSel.innerHTML = optionsHtml;
-      
-      console.log('Options HTML generato:', optionsHtml);
+      console.log('🎯 Dopo popolamento - innerHTML nuovo:', tipoSel.innerHTML);
+      console.log('🎯 Numero opzioni nel DOM:', tipoSel.options.length);
       
       if (cur && Array.from(tipoSel.options).some(o=>o.value===cur)) {
         tipoSel.value = cur;

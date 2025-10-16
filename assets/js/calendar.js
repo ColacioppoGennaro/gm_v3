@@ -707,7 +707,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         _settori = settori.data || [];
         _tipi = tipi.data || [];
         
-        // console.log('Dati caricati:', { settori: _settori.length, tipi: _tipi.length });
+        console.log('Dati caricati:', { settori: _settori.length, tipi: _tipi.length });
         
         // Popola area
         if (areaSel) {
@@ -747,11 +747,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       const selArea = areaSel?.value ? Number(areaSel.value) : null;
       let list = _tipi || [];
       
-      // console.log('populateTipi - Area selezionata:', selArea, 'Tipi totali:', list.length);
+      console.log('populateTipi - Area selezionata:', selArea, 'Tipi totali:', list.length);
       
       if (selArea) {
         list = list.filter(t => Number(t.settore_id) === selArea);
-        // console.log('Tipi filtrati per area', selArea, ':', list.length, list.map(t => t.nome));
+        console.log('Tipi filtrati per area', selArea, ':', list.length, list.map(t => t.nome));
       }
       
       const cur = tipoSel.value || '';
@@ -767,7 +767,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       const optionsHtml = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
       tipoSel.innerHTML = optionsHtml;
       
-      // console.log('Options HTML generato:', optionsHtml);
+      console.log('Options HTML generato:', optionsHtml);
       
       if (cur && Array.from(tipoSel.options).some(o=>o.value===cur)) {
         tipoSel.value = cur;
@@ -776,17 +776,17 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         tipoSel.value = String(list[0].id);
       }
       
-      // console.log('Valore finale tipoSel:', tipoSel.value);
+      console.log('Valore finale tipoSel:', tipoSel.value);
     }
 
     areaSel?.addEventListener('change', async () => { 
-      // console.log('Area cambiata:', areaSel.value);
+      console.log('Area cambiata:', areaSel.value);
       populateTipi(); 
       await loadCategoriesForTipo(''); 
     });
     
     tipoSel?.addEventListener('change', async () => { 
-      // console.log('Tipo cambiato:', tipoSel.value);
+      console.log('Tipo cambiato:', tipoSel.value);
       await loadCategoriesForTipo(tipoSel.value); 
     });
     

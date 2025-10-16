@@ -676,9 +676,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
             <button type="button" class="btn small secondary" id="btnOrganizeAreaTipo">Organizza</button>
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="display:block !important;">
           <label>Tipo *</label>
-          <select id="eventEntity"><option value="">Seleziona...</option></select>
+          <select id="eventEntity" style="display:block !important; width:100%;"><option value="">Seleziona...</option></select>
           <small style="color:var(--muted);display:block;margin-top:4px">I tipi dipendono dall'area selezionata</small>
         </div>`;
       catGroup.parentNode.insertBefore(wrapper, catGroup);

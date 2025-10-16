@@ -38,10 +38,10 @@ export async function openOrganizeModal() {
         modal.id = 'organizeModal';
         
         modal.innerHTML = `
-            <div class="modal organize-modal">
+            <div class="modal organize-modal" style="max-width:900px">
                 <div class="modal-header">
-                    <h2>🔧 Organizza Aree e Tipi</h2>
-                    <button class="close-btn" onclick="window.closeOrganizeModal()">✕</button>
+                    <h2 style="margin:0">🔧 Organizza Aree e Tipi</h2>
+                    <button class="close-btn" onclick="window.closeOrganizeModal()">Chiudi</button>
                 </div>
                 
                 <div class="modal-body">

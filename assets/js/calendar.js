@@ -727,7 +727,12 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         seedDefaultTypesForArea(selArea).then(() => loadAreaTipo());
       }
       tipoSel.innerHTML = '<option value="">Seleziona...</option>' + (list||[]).map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
-      if (cur) tipoSel.value = cur;
+      if (cur && Array.from(tipoSel.options).some(o=>o.value===cur)) {
+        tipoSel.value = cur;
+      } else if (!cur && (list||[]).length>0) {
+        // seleziona il primo tipo disponibile per evitare lista vuota
+        tipoSel.value = String(list[0].id);
+      }
     }
 
     areaSel?.addEventListener('change', async () => { populateTipi(); await loadCategoriesForTipo(''); });

@@ -5,9 +5,13 @@
  * ✅ Ricarica automatica quando si torna alla dashboard
  */
 import { API } from './api.js';
+import { openOrganizeModal } from './settings.js';
 
-let currentFilters = { type: null, category: null };
+let currentFilters = { areaId: null, tipoId: null, category: null };
 const _allCategories = new Set();
+let _settori = [];
+let _tipi = [];
+let _tipoById = new Map();
 
 // ancore per lo scroll
 let anchorUp = new Date().toISOString();
@@ -74,6 +78,34 @@ export async function renderEventsWidget() {
       </div>
     </div>`;
 
+  // Ricostruzione filter bar: Area, Tipo, Categoria, Mostra completati, Organizza
+  const _fb = container.querySelector('.filter-bar');
+  if (_fb) {
+    _fb.innerHTML = [
+      '<div style="display:flex;gap:8px;align-items:center">',
+      '  <label>Area:</label>',
+      '  <select id="filterArea"><option value="">Tutte</option></select>',
+      '</div>',
+      '<div style="display:flex;gap:8px;align-items:center">',
+      '  <label>Tipo:</label>',
+      '  <select id="filterTipo"><option value="">Tutti</option></select>',
+      '</div>',
+      '<div style="display:flex;gap:8px;align-items:center">',
+      '  <label>Categoria:</label>',
+      '  <select id="filterCategory"><option value="">Tutte</option></select>',
+      '</div>',
+      '<div style="display:flex;gap:8px;align-items:center;margin-left:auto">',
+      '  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none">',
+      '    <input type="checkbox" id="showCompleted" style="cursor:pointer">',
+      '    <span>Mostra completati</span>',
+      '  </label>',
+      '  <button class="btn secondary" id="btnOrganize" title="Gestisci Aree e Tipi">Organizza</button>',
+      // placeholder nascosto per compat con codice esistente
+      '  <select id="filterType" style="display:none"><option value=""></option></select>',
+      '</div>'
+    ].join('');
+  }
+
   // ✅ Aspetta che il DOM sia effettivamente renderizzato
   await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -93,8 +125,24 @@ export async function renderEventsWidget() {
   filterCategory.addEventListener('change', applyFiltersAndReload);
   showCompleted.addEventListener('change', applyFiltersAndReload);
 
+  // Nuovi controlli: Area/Tipo + Organizza
+  const filterArea = document.getElementById('filterArea');
+  const filterTipo = document.getElementById('filterTipo');
+  const btnOrganize = document.getElementById('btnOrganize');
+  try {
+    await loadAreaTipoOptions();
+  } catch (_) { /* ignore */ }
+  filterArea?.addEventListener('change', () => { populateTipoOptions(); applyFiltersAndReload(); });
+  filterTipo?.addEventListener('change', applyFiltersAndReload);
+  btnOrganize?.addEventListener('click', () => openOrganizeModal());
+
   // ✅ Carica immediatamente
   await initializeAndLoad();
+
+  // Se l'utente modifica Aree/Tipi da "Organizza", aggiorna i select
+  window.addEventListener('gm:taxonomyChanged', async () => {
+    try { await loadAreaTipoOptions(); applyFiltersAndReload(); } catch(_){}
+  });
 
   // ✅ Observer per ricaricare se il widget diventa visibile dopo essere stato nascosto
   observer = new IntersectionObserver((entries) => {
@@ -128,10 +176,12 @@ async function initializeAndLoad() {
 
 // ✅ Funzione per applicare filtri e ricaricare
 async function applyFiltersAndReload() {
-  const typeVal = document.getElementById('filterType')?.value || '';
+  const areaVal = document.getElementById('filterArea')?.value || '';
+  const tipoVal = document.getElementById('filterTipo')?.value || '';
   const catVal = document.getElementById('filterCategory')?.value || '';
   
-  currentFilters.type = typeVal === '' ? null : typeVal;
+  currentFilters.areaId = areaVal === '' ? null : parseInt(areaVal, 10);
+  currentFilters.tipoId = tipoVal === '' ? null : parseInt(tipoVal, 10);
   currentFilters.category = catVal === '' ? null : catVal;
   
   console.log('🔍 Filtri applicati:', currentFilters);
@@ -174,7 +224,6 @@ async function primeLoad() {
       dir: 'up',
       rangeDays: RANGE_DAYS,
       include_done: showCompleted,
-      type: currentFilters.type,
       category: currentFilters.category,
       limit: 10
     });
@@ -185,7 +234,6 @@ async function primeLoad() {
       dir: 'down',
       rangeDays: 7, // Solo ultimi 7 giorni
       include_done: showCompleted,
-      type: currentFilters.type,
       category: currentFilters.category,
       limit: 10
     });
@@ -197,8 +245,9 @@ async function primeLoad() {
     anchorUp = futureData?.meta?.nextAnchorUp || anchorUp;
     anchorDown = pastData?.meta?.nextAnchorDown || anchorDown;
     
-    // aggiorna categorie
-    const allEvents = [...(pastData.events || []), ...(futureData.events || [])];
+    // aggiorna categorie (sulla base dei risultati filtrati per Area/Tipo)
+    let allEvents = [...(pastData.events || []), ...(futureData.events || [])];
+    allEvents = filterByAreaTipo(allEvents);
     allEvents.map(e=>e.category).filter(Boolean).forEach(c=>_allCategories.add(c));
     renderCategories();
     
@@ -206,12 +255,12 @@ async function primeLoad() {
     list.innerHTML = '';
     
     // Ordina: passati in ordine cronologico inverso (più recente prima)
-    const pastSorted = (pastData.events || []).sort((a, b) => 
+    const pastSorted = filterByAreaTipo((pastData.events || [])).sort((a, b) => 
       new Date(b.start).getTime() - new Date(a.start).getTime()
     );
     
     // Futuri già in ordine corretto
-    const futureEvents = futureData.events || [];
+    const futureEvents = filterByAreaTipo(futureData.events || []);
     
     if (pastSorted.length === 0 && futureEvents.length === 0) {
       list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">📭 Nessun evento trovato</div>';
@@ -318,7 +367,9 @@ function prependOrAppend(items, mode) {
   const list = document.getElementById('eventsList');
   if (!list) return;
   if (!items || items.length===0) return;
-  const html = items.map(eventRowHtml).join('');
+  const filtered = filterByAreaTipo(items);
+  if (!filtered || filtered.length === 0) return;
+  const html = filtered.map(eventRowHtml).join('');
   if (mode === 'prepend') list.insertAdjacentHTML('afterbegin', html); else list.insertAdjacentHTML('beforeend', html);
 }
 
@@ -385,7 +436,6 @@ function setupScrollHandlers() {
           dir: 'up',
           rangeDays: RANGE_DAYS,
           include_done: showCompleted,
-          type: currentFilters.type,
           category: currentFilters.category,
           limit: 20
         });
@@ -436,7 +486,6 @@ function setupScrollHandlers() {
           dir: 'down',
           rangeDays: RANGE_DAYS,
           include_done: showCompleted,
-          type: currentFilters.type,
           category: currentFilters.category,
           limit: 20
         });
@@ -514,3 +563,55 @@ window.viewEventDetails = async function(eventId){
   const fcEvent = { id:e.id, title:e.title, start:new Date(e.start), end:e.end?new Date(e.end):null, allDay:!!e.allDay, extendedProps:e.extendedProps||{} };
   const cal = await import('./calendar.js'); cal.showEventModal? cal.showEventModal(fcEvent) : location.hash='#/calendar';
 };
+
+// -------------------------
+// Helpers Area/Tipo
+// -------------------------
+async function loadAreaTipoOptions() {
+  try {
+    const [settoriRes, tipiRes] = await Promise.all([
+      fetch('api/settori.php?a=list'),
+      fetch('api/tipi_attivita.php?a=list')
+    ]);
+    const settori = await settoriRes.json().catch(()=>({success:false}));
+    const tipi = await tipiRes.json().catch(()=>({success:false}));
+    _settori = settori?.success ? (settori.data||[]) : [];
+    _tipi = tipi?.success ? (tipi.data||[]) : [];
+    _tipoById = new Map(_tipi.map(t => [Number(t.id), t]));
+    populateAreaOptions();
+    populateTipoOptions();
+  } catch (e) {
+    console.warn('Errore caricamento Aree/Tipi', e);
+  }
+}
+
+function populateAreaOptions() {
+  const sel = document.getElementById('filterArea');
+  if (!sel) return;
+  const cur = String(currentFilters.areaId ?? '');
+  sel.innerHTML = '<option value="">Tutte</option>' + _settori.map(s => `<option value="${s.id}" ${String(s.id)===cur?'selected':''}>${s.nome}</option>`).join('');
+}
+
+function populateTipoOptions() {
+  const sel = document.getElementById('filterTipo');
+  if (!sel) return;
+  const areaVal = document.getElementById('filterArea')?.value || '';
+  const selectedAreaId = areaVal ? parseInt(areaVal,10) : null;
+  const cur = String(currentFilters.tipoId ?? '');
+  let list = _tipi;
+  if (selectedAreaId) list = list.filter(t => Number(t.settore_id) === selectedAreaId);
+  sel.innerHTML = '<option value="">Tutti</option>' + list.map(t => `<option value="${t.id}" ${String(t.id)===cur?'selected':''}>${t.nome}</option>`).join('');
+}
+
+function filterByAreaTipo(items) {
+  if ((!currentFilters.areaId && !currentFilters.tipoId)) return items || [];
+  return (items || []).filter(e => {
+    const entId = e.entity_id ? Number(e.entity_id) : null;
+    if (!entId) return false; // se filtro attivo ma evento non ha entity
+    const tipo = _tipoById.get(entId);
+    if (!tipo) return false;
+    if (currentFilters.tipoId && entId !== currentFilters.tipoId) return false;
+    if (currentFilters.areaId && Number(tipo.settore_id) !== currentFilters.areaId) return false;
+    return true;
+  });
+}

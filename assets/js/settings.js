@@ -198,6 +198,8 @@ async function createArea() {
         
         input.value = '';
         
+        // Notifica altri componenti e ricarica modal
+        window.dispatchEvent(new CustomEvent('gm:taxonomyChanged', { detail: { scope: 'area', action: 'create' } }));
         // Ricarica modal
         closeOrganizeModal();
         setTimeout(() => openOrganizeModal(), 100);
@@ -229,6 +231,8 @@ async function deleteArea(settoreId) {
             throw new Error(data.message || 'Errore eliminazione');
         }
         
+        // Notifica altri componenti e ricarica modal
+        window.dispatchEvent(new CustomEvent('gm:taxonomyChanged', { detail: { scope: 'area', action: 'delete' } }));
         // Ricarica modal
         closeOrganizeModal();
         setTimeout(() => openOrganizeModal(), 100);
@@ -266,6 +270,8 @@ async function createTipo(settoreId, nome) {
             throw new Error(data.message || 'Errore creazione tipo');
         }
         
+        // Notifica altri componenti e ricarica modal
+        window.dispatchEvent(new CustomEvent('gm:taxonomyChanged', { detail: { scope: 'tipo', action: 'create', settoreId } }));
         // Ricarica modal
         closeOrganizeModal();
         setTimeout(() => openOrganizeModal(), 100);
@@ -297,6 +303,8 @@ async function deleteTipo(tipoId) {
             throw new Error(data.message || 'Errore eliminazione');
         }
         
+        // Notifica altri componenti e ricarica modal
+        window.dispatchEvent(new CustomEvent('gm:taxonomyChanged', { detail: { scope: 'tipo', action: 'delete' } }));
         // Ricarica modal
         closeOrganizeModal();
         setTimeout(() => openOrganizeModal(), 100);
@@ -327,6 +335,8 @@ async function toggleDocumentLink(tipoId, enabled) {
             throw new Error(data.message || 'Errore aggiornamento');
         }
         
+        // Notifica e feedback visivo
+        window.dispatchEvent(new CustomEvent('gm:taxonomyChanged', { detail: { scope: 'tipo', action: 'update' } }));
         // Feedback visivo
         const checkbox = document.querySelector(`[data-tipo-checkbox="${tipoId}"]`);
         if (checkbox) {

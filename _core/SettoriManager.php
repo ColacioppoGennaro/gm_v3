@@ -12,7 +12,7 @@ class SettoriManager {
     private $userId;
     
     const MAX_SETTORI_FREE = 2;
-    const MAX_SETTORI_PRO = 20;
+    const MAX_SETTORI_PRO = 50; // cap globale richiesto: max 50
     
     public function __construct($userId) {
         if (!$userId || !is_numeric($userId)) {

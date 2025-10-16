@@ -5,6 +5,7 @@
  */
 
 import { API } from './api.js';
+import { openOrganizeModal } from './settings.js';
 
 let calendar = null;
 let currentDate = new Date();
@@ -637,18 +638,123 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   </div>`;
 
   document.body.insertAdjacentHTML('beforeend', html);
-  
-  const typeSelect = document.getElementById('eventType');
-  const entityGroup = document.getElementById('entityGroup');
-  
-  function updateEntityVisibility() {
-    const selectedType = typeSelect.value;
-    const typeConfig = EVENT_TYPES[selectedType];
-    entityGroup.style.display = typeConfig?.showEntity ? 'block' : 'none';
-  }
-  
-  typeSelect.addEventListener('change', updateEntityVisibility);
-  updateEntityVisibility();
+
+  // --- Nuovi campi Area/Tipo/Categoria ---
+  try {
+    const typeSelect = document.getElementById('eventType');
+    const entityGroup = document.getElementById('entityGroup');
+    // Nascondi i vecchi campi (manteniamo value per compatibilità)
+    if (typeSelect) {
+      typeSelect.value = 'personal';
+      const fg = typeSelect.closest('.form-group');
+      if (fg) fg.style.display = 'none';
+    }
+    if (entityGroup) entityGroup.style.display = 'none';
+
+    // Inserisci Area/Tipo sopra la categoria
+    const catInput = document.getElementById('eventCategory');
+    const catGroup = catInput?.closest('.form-group');
+    if (catGroup) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `
+        <div class="form-group">
+          <label>Area *</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="eventArea"><option value="">Seleziona...</option></select>
+            <button type="button" class="btn small secondary" id="btnOrganizeAreaTipo">Organizza</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="eventEntity"><option value="">Seleziona...</option></select>
+          <small style="color:var(--muted);display:block;margin-top:4px">I tipi dipendono dall'area selezionata</small>
+        </div>`;
+      catGroup.parentNode.insertBefore(wrapper, catGroup);
+    }
+
+    // Carica Aree/Tipi
+    const areaSel = document.getElementById('eventArea');
+    const tipoSel = document.getElementById('eventEntity');
+    const organizeBtn = document.getElementById('btnOrganizeAreaTipo');
+
+    let _settori = [];
+    let _tipi = [];
+    let _cats = [];
+
+    async function loadAreaTipo() {
+      try {
+        const [settoriRes, tipiRes] = await Promise.all([
+          fetch('api/settori.php?a=list'),
+          fetch('api/tipi_attivita.php?a=list')
+        ]);
+        const settori = await settoriRes.json().catch(()=>({success:false}));
+        const tipi = await tipiRes.json().catch(()=>({success:false}));
+        _settori = settori?.success ? (settori.data||[]) : [];
+        _tipi = tipi?.success ? (tipi.data||[]) : [];
+        // Popola area
+        if (areaSel) {
+          const current = areaSel.value || '';
+          areaSel.innerHTML = '<option value="">Seleziona...</option>' + _settori.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
+          if (current) areaSel.value = current;
+        }
+        populateTipi();
+
+        // Se l'evento ha già entity_id, seleziona area e tipo coerenti
+        if (tipoSel && entityId) {
+          const t = _tipi.find(x => String(x.id) === String(entityId));
+          if (t) {
+            if (areaSel) areaSel.value = String(t.settore_id);
+            populateTipi();
+            tipoSel.value = String(t.id);
+          }
+        }
+
+        // carica categorie per tipo corrente
+        if (tipoSel && tipoSel.value) {
+          await loadCategoriesForTipo(tipoSel.value);
+        }
+      } catch (e) { console.warn('Errore loadAreaTipo', e); }
+    }
+
+    function populateTipi() {
+      if (!tipoSel) return;
+      const selArea = areaSel?.value ? Number(areaSel.value) : null;
+      let list = _tipi;
+      if (selArea) list = list.filter(t => Number(t.settore_id) === selArea);
+      const cur = tipoSel.value || '';
+      tipoSel.innerHTML = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+      if (cur) tipoSel.value = cur;
+    }
+
+    areaSel?.addEventListener('change', async () => { populateTipi(); await loadCategoriesForTipo(''); });
+    tipoSel?.addEventListener('change', async () => { await loadCategoriesForTipo(tipoSel.value); });
+    organizeBtn?.addEventListener('click', () => openOrganizeModal());
+    loadAreaTipo();
+
+    // Aggiorna select se cambia la tassonomia da Organizza
+    window.addEventListener('gm:taxonomyChanged', async () => {
+      await loadAreaTipo();
+    });
+
+    async function loadCategoriesForTipo(tipoId) {
+      try {
+        _cats = [];
+        const dl = document.getElementById('categoryDatalist');
+        if (dl) dl.innerHTML = '';
+        tipoId = parseInt(tipoId||'0',10);
+        if (!tipoId) return;
+        const res = await fetch(`api/event_categories.php?a=list&tipo_id=${encodeURIComponent(tipoId)}`);
+        const js = await res.json();
+        if (js?.success) {
+          _cats = js.data || [];
+          if (dl) dl.innerHTML = _cats.map(c => `<option value="${c.nome}">`).join('');
+        }
+      } catch(e){ console.warn('loadCategoriesForTipo failed', e); }
+    }
+
+    window.__gmv3_getCurrentEventCats = () => (_cats || []).map(c=>c.nome);
+    window.__gmv3_loadCatsForTipo = loadCategoriesForTipo;
+  } catch(e) { console.warn('Setup Area/Tipo fallito', e); }
   
   const attendeesListEl = document.getElementById('attendeesList');
   
@@ -819,15 +925,25 @@ async function createEvent() {
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
-  const eventType = document.getElementById('eventType').value;
+  const eventType = document.getElementById('eventType')?.value || 'personal';
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
   const showInDashboard = document.getElementById('showInDashboard')?.checked !== false;
   const documentId = document.getElementById('eventDocumentId')?.value || '';
 
 
-  if (!title || !start || !end || !eventType) {
-    return alert('Compila tutti i campi obbligatori (titolo, date e tipo)');
+  if (!title || !start || !end) {
+    return alert('Compila tutti i campi obbligatori (titolo e date)');
+  }
+  if (!entityId) {
+    return alert('Seleziona Area e Tipo');
+  }
+
+  // Se categoria è testo libero: prova a crearla se non esiste e c'è spazio (<50)
+  const areaSelVal = document.getElementById('eventArea')?.value || '';
+  const tipoSelVal = document.getElementById('eventEntity')?.value || '';
+  if (eventCategory && tipoSelVal) {
+    await ensureEventCategoryExists(tipoSelVal, eventCategory);
   }
 
   const fd = new FormData();
@@ -886,7 +1002,7 @@ async function updateEvent(event) {
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
-  const eventType = document.getElementById('eventType').value;
+  const eventType = document.getElementById('eventType')?.value || 'personal';
   const eventStatus = document.getElementById('eventStatus')?.value || 'pending';
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
@@ -894,8 +1010,17 @@ async function updateEvent(event) {
   const documentId = document.getElementById('eventDocumentId')?.value || '';
 
 
-  if (!title || !eventType) {
-    return alert('Inserisci un titolo e seleziona un tipo');
+  if (!title) {
+    return alert('Inserisci un titolo');
+  }
+  if (!entityId) {
+    return alert('Seleziona Area e Tipo');
+  }
+
+  const areaSelVal2 = document.getElementById('eventArea')?.value || '';
+  const tipoSelVal2 = document.getElementById('eventEntity')?.value || '';
+  if (eventCategory && tipoSelVal2) {
+    await ensureEventCategoryExists(tipoSelVal2, eventCategory);
   }
 
   const fd = new FormData();

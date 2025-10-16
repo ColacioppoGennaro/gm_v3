@@ -649,9 +649,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   document.body.insertAdjacentHTML('beforeend', html);
 
   // --- Nuovi campi Area/Tipo/Categoria ---
+  console.log('🔧 Inizializzando sezione Area/Tipo...');
   try {
     const typeSelect = document.getElementById('eventType');
     const entityGroup = document.getElementById('entityGroup');
+    console.log('🔧 Elementi trovati:', { typeSelect: !!typeSelect, entityGroup: !!entityGroup });
     // Nascondi i vecchi campi (manteniamo value per compatibilità)
     if (typeSelect) {
       typeSelect.value = 'personal';
@@ -692,15 +694,31 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
     async function loadAreaTipo() {
       try {
+        console.log('📡 Chiamando API settori e tipi...');
         const [settoriRes, tipiRes] = await Promise.all([
           fetch('api/settori.php?a=list'),
           fetch('api/tipi_attivita.php?a=list')
         ]);
-        const settori = await settoriRes.json().catch(()=>({success:false}));
-        const tipi = await tipiRes.json().catch(()=>({success:false}));
+        console.log('📡 Risposte ricevute:', { settoriStatus: settoriRes.status, tipiStatus: tipiRes.status });
+        
+        const settori = await settoriRes.json().catch((e)=>{
+          console.error('Errore parsing settori:', e);
+          return {success:false};
+        });
+        const tipi = await tipiRes.json().catch((e)=>{
+          console.error('Errore parsing tipi:', e);
+          return {success:false};
+        });
+        
+        console.log('📋 Dati ricevuti:', { settori: settori, tipi: tipi });
         
         if (!settori?.success || !tipi?.success) {
-          console.error('Errore caricamento dati:', { settori: settori?.success, tipi: tipi?.success });
+          console.error('❌ Errore caricamento dati:', { 
+            settori: settori?.success, 
+            tipi: tipi?.success,
+            settoriMsg: settori?.message,
+            tipiMsg: tipi?.message
+          });
           return;
         }
         
@@ -797,7 +815,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     organizeBtn?.addEventListener('click', () => openOrganizeModal());
     
     // Carica i dati iniziali
-    loadAreaTipo().catch(e => console.error('Errore caricamento iniziale:', e));
+    console.log('🚀 Iniziando caricamento Area/Tipo...');
+    loadAreaTipo().catch(e => console.error('❌ Errore caricamento iniziale:', e));
     
     // Carica documenti se è un nuovo evento e il select esiste
     if (!isEdit && document.getElementById('eventDocumentSelect')) {

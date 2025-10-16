@@ -722,7 +722,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       let list = _tipi;
       if (selArea) list = list.filter(t => Number(t.settore_id) === selArea);
       const cur = tipoSel.value || '';
-      tipoSel.innerHTML = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+      // Se nessun tipo per quest'area: crea i 4 default e ricarica
+      if ((list || []).length === 0 && selArea) {
+        seedDefaultTypesForArea(selArea).then(() => loadAreaTipo());
+      }
+      tipoSel.innerHTML = '<option value="">Seleziona...</option>' + (list||[]).map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
       if (cur) tipoSel.value = cur;
     }
 
@@ -735,6 +739,23 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     window.addEventListener('gm:taxonomyChanged', async () => {
       await loadAreaTipo();
     });
+
+    async function seedDefaultTypesForArea(settoreId){
+      try{
+        const defaults = [
+          { nome:'documenti', ico:'📄', doc:1 },
+          { nome:'macchina',  ico:'🛠️', doc:1 },
+          { nome:'pagamenti', ico:'💳', doc:0 },
+          { nome:'personale', ico:'👤', doc:0 }
+        ];
+        for (const d of defaults){
+          await fetch('api/tipi_attivita.php?a=create', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ settore_id: Number(settoreId), nome: d.nome, icona: d.ico, puo_collegare_documento: d.doc?1:0 })
+          }).then(r=>r.json()).catch(()=>null);
+        }
+      }catch(e){ console.warn('seedDefaultTypesForArea failed', e); }
+    }
 
     async function loadCategoriesForTipo(tipoId) {
       try {

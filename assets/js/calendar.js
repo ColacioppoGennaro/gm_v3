@@ -748,10 +748,14 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       let list = _tipi || [];
       
       console.log('populateTipi - Area selezionata:', selArea, 'Tipi totali:', list.length);
+      console.log('Tutti i tipi disponibili:', list.map(t => ({id: t.id, nome: t.nome, settore_id: t.settore_id})));
       
       if (selArea) {
         list = list.filter(t => Number(t.settore_id) === selArea);
         console.log('Tipi filtrati per area', selArea, ':', list.length, list.map(t => t.nome));
+      } else {
+        console.log('Nessuna area selezionata, mostrando tutti i tipi');
+        // Mostra tutti i tipi se nessuna area è selezionata
       }
       
       const cur = tipoSel.value || '';

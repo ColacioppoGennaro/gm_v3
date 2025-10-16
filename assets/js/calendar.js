@@ -490,8 +490,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         <textarea id="eventDescription" placeholder="Descrizione opzionale" rows="3">${description}</textarea>
       </div>
 
-      <div id="eventDocumentSection" class="form-group hidden">
-          <label>📎 Documento Allegato</label>
+      <div id="eventDocumentSection" class="form-group ${isEdit ? (documentId ? '' : 'hidden') : ''}">
+          <label>📎 Documento Allegato ${isEdit ? '' : '(opzionale)'}</label>
+          ${isEdit ? `
           <div style="display:flex;gap:8px;align-items:center">
               <span id="eventDocumentName" style="flex:1;font-size:13px"></span>
               <button type="button" class="btn small secondary" id="btnViewDocument">
@@ -501,6 +502,14 @@ function showEventModal(event = null, startDate = null, endDate = null) {
                   ⬇️ Scarica
               </button>
           </div>
+          ` : `
+          <select id="eventDocumentSelect" style="width:100%">
+              <option value="">Nessun documento</option>
+          </select>
+          <small style="color:var(--muted);display:block;margin-top:4px">
+              Collega un documento esistente a questo evento per future implementazioni AI
+          </small>
+          `}
       </div>
       
       <div class="form-group">
@@ -689,14 +698,25 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         ]);
         const settori = await settoriRes.json().catch(()=>({success:false}));
         const tipi = await tipiRes.json().catch(()=>({success:false}));
-        _settori = settori?.success ? (settori.data||[]) : [];
-        _tipi = tipi?.success ? (tipi.data||[]) : [];
+        
+        if (!settori?.success || !tipi?.success) {
+          console.error('Errore caricamento dati:', { settori: settori?.success, tipi: tipi?.success });
+          return;
+        }
+        
+        _settori = settori.data || [];
+        _tipi = tipi.data || [];
+        
+        // console.log('Dati caricati:', { settori: _settori.length, tipi: _tipi.length });
+        
         // Popola area
         if (areaSel) {
           const current = areaSel.value || '';
           areaSel.innerHTML = '<option value="">Seleziona...</option>' + _settori.map(s=>`<option value="${s.id}">${s.nome}</option>`).join('');
           if (current) areaSel.value = current;
         }
+        
+        // Popola tipi (questo è il punto cruciale)
         populateTipi();
 
         // Se l'evento ha già entity_id, seleziona area e tipo coerenti
@@ -713,32 +733,72 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         if (tipoSel && tipoSel.value) {
           await loadCategoriesForTipo(tipoSel.value);
         }
-      } catch (e) { console.warn('Errore loadAreaTipo', e); }
+      } catch (e) { 
+        console.error('Errore loadAreaTipo:', e); 
+      }
     }
 
     function populateTipi() {
-      if (!tipoSel) return;
-      const selArea = areaSel?.value ? Number(areaSel.value) : null;
-      let list = _tipi;
-      if (selArea) list = list.filter(t => Number(t.settore_id) === selArea);
-      const cur = tipoSel.value || '';
-      // Se nessun tipo per quest'area: crea i 4 default e ricarica
-      if ((list || []).length === 0 && selArea) {
-        seedDefaultTypesForArea(selArea).then(() => loadAreaTipo());
+      if (!tipoSel) {
+        console.warn('tipoSel non trovato');
+        return;
       }
-      tipoSel.innerHTML = '<option value="">Seleziona...</option>' + (list||[]).map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+      
+      const selArea = areaSel?.value ? Number(areaSel.value) : null;
+      let list = _tipi || [];
+      
+      // console.log('populateTipi - Area selezionata:', selArea, 'Tipi totali:', list.length);
+      
+      if (selArea) {
+        list = list.filter(t => Number(t.settore_id) === selArea);
+        // console.log('Tipi filtrati per area', selArea, ':', list.length, list.map(t => t.nome));
+      }
+      
+      const cur = tipoSel.value || '';
+      
+      // Se nessun tipo per quest'area: crea i 4 default e ricarica
+      if (list.length === 0 && selArea) {
+        console.log('Nessun tipo trovato per area', selArea, '- creando tipi default');
+        seedDefaultTypesForArea(selArea).then(() => loadAreaTipo());
+        return;
+      }
+      
+      // Popola select con i tipi disponibili
+      const optionsHtml = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
+      tipoSel.innerHTML = optionsHtml;
+      
+      // console.log('Options HTML generato:', optionsHtml);
+      
       if (cur && Array.from(tipoSel.options).some(o=>o.value===cur)) {
         tipoSel.value = cur;
-      } else if (!cur && (list||[]).length>0) {
+      } else if (!cur && list.length > 0) {
         // seleziona il primo tipo disponibile per evitare lista vuota
         tipoSel.value = String(list[0].id);
       }
+      
+      // console.log('Valore finale tipoSel:', tipoSel.value);
     }
 
-    areaSel?.addEventListener('change', async () => { populateTipi(); await loadCategoriesForTipo(''); });
-    tipoSel?.addEventListener('change', async () => { await loadCategoriesForTipo(tipoSel.value); });
+    areaSel?.addEventListener('change', async () => { 
+      // console.log('Area cambiata:', areaSel.value);
+      populateTipi(); 
+      await loadCategoriesForTipo(''); 
+    });
+    
+    tipoSel?.addEventListener('change', async () => { 
+      // console.log('Tipo cambiato:', tipoSel.value);
+      await loadCategoriesForTipo(tipoSel.value); 
+    });
+    
     organizeBtn?.addEventListener('click', () => openOrganizeModal());
-    loadAreaTipo();
+    
+    // Carica i dati iniziali
+    loadAreaTipo().catch(e => console.error('Errore caricamento iniziale:', e));
+    
+    // Carica documenti se è un nuovo evento
+    if (!isEdit) {
+      loadDocuments();
+    }
 
     // Aggiorna select se cambia la tassonomia da Organizza
     window.addEventListener('gm:taxonomyChanged', async () => {
@@ -776,6 +836,31 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           if (dl) dl.innerHTML = _cats.map(c => `<option value="${c.nome}">`).join('');
         }
       } catch(e){ console.warn('loadCategoriesForTipo failed', e); }
+    }
+
+    async function loadDocuments() {
+      try {
+        const response = await fetch('api/documents.php?action=list');
+        const data = await response.json();
+        
+        if (data.success && data.documents) {
+          const select = document.getElementById('eventDocumentSelect');
+          if (select) {
+            const options = data.documents.map(doc => 
+              `<option value="${doc.id}">${doc.original_name} (${doc.category || 'Senza categoria'})</option>`
+            ).join('');
+            
+            select.innerHTML = '<option value="">Nessun documento</option>' + options;
+            
+            // Gestisci la selezione del documento
+            select.addEventListener('change', (e) => {
+              document.getElementById('eventDocumentId').value = e.target.value;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Errore caricamento documenti:', e);
+      }
     }
 
     window.__gmv3_getCurrentEventCats = () => (_cats || []).map(c=>c.nome);

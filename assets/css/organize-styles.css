@@ -3,22 +3,38 @@
    ======================================== */
 
 .organize-modal {
-    max-width: 800px;
+    max-width: 900px;
     max-height: 85vh;
+    background: var(--card) !important;
+    padding: 28px !important;
+}
+
+.organize-modal .modal-header {
+    padding: 0 0 20px 0;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 24px;
+}
+
+.organize-modal .modal-header h2 {
+    font-size: 24px;
+    color: var(--accent);
+    margin: 0;
 }
 
 .organize-modal .modal-body {
     max-height: calc(85vh - 140px);
     overflow-y: auto;
+    padding-right: 8px;
 }
 
 /* Area card */
 .area-card {
-    background: var(--card);
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .area-header {
@@ -31,8 +47,23 @@
 }
 
 .area-header h3 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+}
+
+.organize-modal h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 12px;
+}
+
+.organize-modal .tipo-item .nome {
+    font-weight: 500;
+    color: var(--fg);
+    font-size: 14px;
 }
 
 .area-header .badge {
@@ -46,11 +77,12 @@
 /* Crea tipo row */
 .create-tipo-row {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    padding: 12px;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px;
     background: var(--bg);
-    border-radius: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
 }
 
 .create-tipo-row input {
@@ -67,18 +99,20 @@
 .tipi-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+    padding-top: 8px;
 }
 
 .tipo-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    background: var(--bg);
-    border-radius: 8px;
-    border: 1px solid transparent;
+    gap: 16px;
+    padding: 14px 16px;
+    background: var(--card);
+    border-radius: 10px;
+    border: 1px solid var(--border);
     transition: all 0.2s;
+    min-height: 56px;
 }
 
 .tipo-item:hover {

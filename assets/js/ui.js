@@ -134,14 +134,7 @@ function dashboardSection(isPro, maxDocs, maxChat, maxSize) {
     
     <div id="eventsWidget"></div>
     
-    <!-- ✅ FILTRI EVENTI: Area/Tipo + Organizza (visibili anche FREE con limiti) -->
-    <div class="filter-bar" style="margin-bottom:16px">
-      <label>Area:</label>
-      <select id="filterEventArea"><option value="">Tutte</option></select>
-      <label>Tipo:</label>
-      <select id="filterEventTipo"><option value="">Tutti</option></select>
-      <button class="btn secondary" id="organizeBtn" style="margin-left:auto">🔧 Organizza</button>
-    </div>
+    
     
     <div class="cards stats">
       <div class="card"><div class="stat-label">Documenti Archiviati</div><div class="stat-number"><span id="docCount">0</span> / ${maxDocs}</div></div>

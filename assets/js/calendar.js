@@ -711,6 +711,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   const eventCategory = event?.extendedProps?.category || '';
   const showInDashboard = event?.extendedProps?.show_in_dashboard !== false;
   const documentId = event?.extendedProps?.document_id || '';
+  const areaId = event?.extendedProps?.area_id || '';
+  const tipoAttivitaId = event?.extendedProps?.tipo_attivita_id || '';
 
 
   const pad = (n) => String(n).padStart(2, '0');
@@ -1252,6 +1254,17 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const colorId = event.extendedProps.colorId;
     if (colorId) document.getElementById('eventColor').value = colorId;
     
+    // Pre-seleziona Area e Tipo se disponibili
+    const areaSel = document.getElementById('eventArea');
+    if (areaSel && areaId) {
+      areaSel.value = areaId;
+    }
+    
+    const tipoSel = document.getElementById('eventTipoSelect');
+    if (tipoSel && tipoAttivitaId) {
+      tipoSel.value = tipoAttivitaId;
+    }
+    
     const recurSel = document.getElementById('eventRecurrence');
     const recurrence = event.extendedProps.recurrence;
     if (recurrence && recurrence.length > 0) {
@@ -1410,6 +1423,7 @@ async function createEvent() {
   const end = document.getElementById('eventEnd').value;
   const colorId = document.getElementById('eventColor').value;
   const eventType = document.getElementById('eventType')?.value || 'personal';
+  const areaId = document.getElementById('eventArea')?.value || '';
   const tipoAttivitaId = document.getElementById('eventTipoSelect')?.value || '';
   const entityId = document.getElementById('eventEntity')?.value || '';
   const eventCategory = document.getElementById('eventCategory')?.value.trim() || '';
@@ -1437,6 +1451,7 @@ async function createEvent() {
   fd.append('type', eventType);
   fd.append('status', 'pending');
   fd.append('trigger', 'manual');
+  if (areaId) fd.append('area_id', areaId);
   if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
@@ -1515,6 +1530,7 @@ async function updateEvent(event) {
   fd.append('description', description || '');
   fd.append('type', eventType);
   fd.append('status', eventStatus);
+  if (areaId) fd.append('area_id', areaId);
   if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);

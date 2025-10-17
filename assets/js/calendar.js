@@ -1524,6 +1524,12 @@ async function createEvent() {
     fd.append('attendees', _attendees.join(','));
   }
 
+  // 🔍 DEBUG: Mostra cosa viene inviato
+  console.log('📤 FormData inviata a Google Calendar:');
+  for (let [key, value] of fd.entries()) {
+    console.log(`  ${key}: ${value}`);
+  }
+
   try {
     await API.createGoogleEvent('primary', fd);
     if (calendar) calendar.refetchEvents();

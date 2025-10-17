@@ -80,6 +80,14 @@ async function handleCalendarFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   
+  const isFromCamera = event.target.id === 'calendarCameraInput';
+  
+  // Verifica tipo file per fotocamera
+  if (isFromCamera && !file.type.startsWith('image/')) {
+    alert('📷 La fotocamera può acquisire solo immagini');
+    return;
+  }
+  
   // Verifica dimensione file
   const maxSizeMB = 5; // TODO: prendere da limiti utente
   if (file.size > maxSizeMB * 1024 * 1024) {
@@ -93,9 +101,11 @@ async function handleCalendarFileUpload(event) {
   const originalUploadText = uploadBtn?.textContent || '';
   const originalPhotoText = photoBtn?.textContent || '';
   
-  if (uploadBtn) uploadBtn.innerHTML = '⏳ Caricamento...';
-  if (photoBtn) photoBtn.innerHTML = '⏳ Analisi...';
-  
+  if (isFromCamera) {
+    if (photoBtn) photoBtn.innerHTML = '⏳ Analisi...';
+  } else {
+    if (uploadBtn) uploadBtn.innerHTML = '⏳ Caricamento...';
+  }
   try {
     // Prepara FormData per upload
     const formData = new FormData();
@@ -141,8 +151,11 @@ async function handleCalendarFileUpload(event) {
     alert('❌ Errore durante il caricamento: ' + error.message);
   } finally {
     // Ripristina pulsanti
-    if (uploadBtn) uploadBtn.innerHTML = originalUploadText;
-    if (photoBtn) photoBtn.innerHTML = originalPhotoText;
+    if (isFromCamera) {
+      if (photoBtn) photoBtn.innerHTML = originalPhotoText;
+    } else {
+      if (uploadBtn) uploadBtn.innerHTML = originalUploadText;
+    }
     
     // Reset input
     event.target.value = '';
@@ -775,7 +788,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       
       <!-- Input nascosti per upload documenti -->
       <input type="file" id="calendarFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none">
-      <input type="file" id="calendarCameraInput" accept="image/*" capture="camera" style="display:none">
+      <input type="file" id="calendarCameraInput" accept="image/*" capture="environment" style="display:none">
     </div>
   </div>`;
 

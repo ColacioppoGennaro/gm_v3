@@ -151,8 +151,48 @@ try {
             $stmt->bind_param("iisssis", $user['id'], $label['id'], $fileName, $localPath, $mime, $file['size'], $result['docid']);
             $stmt->execute();
             
+            $documentId = $db->insert_id;
+            $aiAnalysis = null;
+            
+            // Se richiesta analisi AI, processa con Gemini
+            if (isset($_POST['analyze_with_ai']) && $_POST['analyze_with_ai'] === 'true') {
+                require_once __DIR__ . '/../_core/GeminiClient.php';
+                require_once __DIR__ . '/../_core/AILimits.php';
+                
+                // Verifica limiti AI
+                $limits = AILimits::checkAnalysisLimit($user['id']);
+                if (!$limits['allowed']) {
+                    // Non blocchiamo l'upload, ma avvisiamo
+                    $aiAnalysis = [
+                        'error' => 'Limite analisi AI raggiunto',
+                        'message' => "Hai usato {$limits['used']}/{$limits['limit']} analisi questo mese. Passa a Pro per più analisi!"
+                    ];
+                } else {
+                    try {
+                        $gemini = new GeminiClient();
+                        $aiAnalysis = $gemini->analyzeDocumentForCalendar($localPath, $fileName);
+                        
+                        // TODO: Salva analisi nel DB quando avremo i campi
+                        // $stmt = $db->prepare("UPDATE documents SET ai_extracted_data=?, analysis_status='completed', analyzed_at=NOW() WHERE id=?");
+                        // $stmt->bind_param("si", json_encode($aiAnalysis), $documentId);
+                        // $stmt->execute();
+                        
+                    } catch (Exception $e) {
+                        error_log("Gemini analysis error: " . $e->getMessage());
+                        $aiAnalysis = [
+                            'error' => 'Analisi AI fallita',
+                            'message' => 'Documento caricato ma analisi non riuscita: ' . $e->getMessage()
+                        ];
+                    }
+                }
+            }
+            
             ob_end_clean();
-            json_out(['success' => true, 'id' => $db->insert_id]);
+            json_out([
+                'success' => true, 
+                'document_id' => $documentId,
+                'ai_analysis' => $aiAnalysis
+            ]);
             
         } catch (Exception $e) {
             @unlink($localPath);

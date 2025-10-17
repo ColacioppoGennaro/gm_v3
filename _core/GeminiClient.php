@@ -153,4 +153,113 @@ class GeminiClient {
         curl_close($ch);
         return $response; // JSON string
     }
+    
+    /**
+     * Analizza documento per estrazione dati calendario
+     * Estrae date, scadenze, importi, periodicità per creare eventi automatici
+     */
+    public function analyzeDocumentForCalendar($filePath, $fileName) {
+        $mimeType = mime_content_type($filePath);
+        
+        // Prompt specifico per estrazione dati calendario
+        $prompt = "Analizza questo documento e estrai SOLO i dati utili per creare eventi nel calendario.
+        
+FORMATO OUTPUT richiesto (JSON):
+{
+  \"title\": \"Titolo evento da creare\",
+  \"description\": \"Descrizione dettagliata\", 
+  \"due_date\": \"YYYY-MM-DD o YYYY-MM-DDTHH:MM se c'è orario\",
+  \"reminder_date\": \"YYYY-MM-DD per promemoria anticipato\",
+  \"category\": \"bolletta|multa|tagliando|assicurazione|medico|altro\",
+  \"amount\": \"importo se presente\",
+  \"recurring\": \"none|monthly|yearly|custom\",
+  \"recurring_details\": \"descrizione periodicità se custom\",
+  \"extracted_data\": {
+    \"scadenze\": [\"lista date scadenza\"],
+    \"importi\": [\"lista importi trovati\"],
+    \"riferimenti\": \"codici/numeri importanti\"
+  }
+}
+
+ESEMPI di cosa estrarre:
+- Bollette: scadenza pagamento, importo, tipo utenza
+- Documenti auto: scadenza revisione/assicurazione, targa
+- Ricette mediche: date visite/esami, farmaci con posologia
+- Manuali: date manutenzioni programmate, intervalli km/ore
+- Contratti: scadenze rinnovo, disdetta
+
+Rispondi SOLO con il JSON, niente altro testo.";
+
+        if (str_starts_with($mimeType, 'image/')) {
+            // Documento immagine - usa analisi multimodale
+            return $this->analyzeImage($prompt, $filePath);
+        } else {
+            // Documento testo - estrai testo e analizza
+            $text = $this->extractTextFromFile($filePath, $mimeType);
+            if (!$text) {
+                throw new Exception('Impossibile estrarre testo dal documento');
+            }
+            
+            $fullPrompt = $prompt . "\n\nCONTENUTO DOCUMENTO:\n" . substr($text, 0, 8000); // Limita lunghezza
+            $response = $this->ask($fullPrompt);
+            
+            // Parsing JSON dalla risposta
+            return $this->parseAIResponse($response);
+        }
+    }
+    
+    /**
+     * Estrae testo da file PDF/DOC/DOCX
+     */
+    private function extractTextFromFile($filePath, $mimeType) {
+        switch ($mimeType) {
+            case 'application/pdf':
+                // TODO: implementare estrazione PDF se necessario
+                return "PDF content extraction not implemented yet";
+                
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            case 'application/msword':
+                // TODO: implementare estrazione Word se necessario
+                return "Word content extraction not implemented yet";
+                
+            case 'text/plain':
+                return file_get_contents($filePath);
+                
+            default:
+                return null;
+        }
+    }
+    
+    /**
+     * Parsing risposta AI in formato JSON
+     */
+    private function parseAIResponse($response) {
+        try {
+            // La risposta potrebbe contenere altro testo, cerchiamo il JSON
+            $text = is_array($response) ? ($response['text'] ?? '') : $response;
+            
+            // Cerca pattern JSON nella risposta
+            if (preg_match('/\{.*\}/s', $text, $matches)) {
+                $json = json_decode($matches[0], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return $json;
+                }
+            }
+            
+            // Fallback: estrai dati con regex se JSON non funziona
+            return [
+                'title' => 'Documento analizzato',
+                'description' => substr($text, 0, 200),
+                'category' => 'altro',
+                'error' => 'Formato risposta AI non valido'
+            ];
+            
+        } catch (Exception $e) {
+            return [
+                'title' => 'Errore analisi',
+                'description' => 'Documento caricato ma analisi fallita',
+                'error' => $e->getMessage()
+            ];
+        }
+    }
 }

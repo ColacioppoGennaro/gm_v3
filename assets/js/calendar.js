@@ -9,7 +9,9 @@ import { openOrganizeModal } from './settings.js';
 
 // Rileva se siamo su dispositivo mobile
 function isMobile() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (typeof window.orientation !== "undefined") ||
+         (navigator.maxTouchPoints > 0);
 }
 
 let calendar = null;
@@ -115,7 +117,7 @@ async function handleCalendarFileUpload(event) {
     // Prepara FormData per upload
     const formData = new FormData();
     formData.append('file', file);
-    // Usa categoria vuota per default 'master' 
+    formData.append('category', 'master'); // Usa categoria master esistente
     formData.append('analyze_with_ai', 'true'); // Flag per analisi AI
     
     // Upload documento
@@ -179,11 +181,12 @@ async function openCameraModal() {
             <button class="btn icon-only secondary" onclick="closeCameraModal()">✕</button>
           </div>
           <div class="modal-body" style="text-align: center;">
-            <video id="cameraVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+            <div id="cameraStatus">🔄 Attivazione fotocamera...</div>
+            <video id="cameraVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px; display: none;"></video>
             <canvas id="cameraCanvas" style="display: none;"></canvas>
             <div style="margin-top: 16px;">
               <button class="btn secondary" onclick="closeCameraModal()">Annulla</button>
-              <button class="btn" id="captureBtn">📸 Scatta</button>
+              <button class="btn" id="captureBtn" style="display: none;">📸 Scatta</button>
             </div>
           </div>
         </div>
@@ -195,40 +198,62 @@ async function openCameraModal() {
     const video = document.getElementById('cameraVideo');
     const canvas = document.getElementById('cameraCanvas');
     const captureBtn = document.getElementById('captureBtn');
+    const status = document.getElementById('cameraStatus');
     
-    // Avvia fotocamera
-    navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: 'environment' } // Fotocamera posteriore
-    })
-    .then(stream => {
-      video.srcObject = stream;
-      
-      captureBtn.onclick = () => {
-        // Cattura frame da video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        
-        // Converti in blob
-        canvas.toBlob(blob => {
-          // Stop camera
-          stream.getTracks().forEach(track => track.stop());
+    // Prova diverse opzioni per la fotocamera
+    const constraints = [
+      { video: { facingMode: 'environment' } }, // Fotocamera posteriore
+      { video: { facingMode: 'user' } },        // Fotocamera frontale  
+      { video: true }                           // Qualsiasi fotocamera
+    ];
+    
+    async function tryCamera(constraintIndex = 0) {
+      if (constraintIndex >= constraints.length) {
+        status.textContent = '❌ Fotocamera non disponibile';
+        setTimeout(() => {
           closeCameraModal();
+          reject(new Error('Nessuna fotocamera disponibile'));
+        }, 2000);
+        return;
+      }
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints[constraintIndex]);
+        video.srcObject = stream;
+        video.style.display = 'block';
+        captureBtn.style.display = 'inline-block';
+        status.style.display = 'none';
+        
+        captureBtn.onclick = () => {
+          // Cattura frame da video
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0);
           
-          // Simula file upload
-          const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
-          const event = { target: { files: [file], id: 'calendarCameraInput' } };
-          handleCalendarFileUpload(event);
-          
-          resolve();
-        }, 'image/jpeg', 0.8);
-      };
-    })
-    .catch(error => {
-      closeCameraModal();
-      reject(error);
-    });
+          // Converti in blob
+          canvas.toBlob(blob => {
+            // Stop camera
+            stream.getTracks().forEach(track => track.stop());
+            closeCameraModal();
+            
+            // Simula file upload
+            const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+            const event = { target: { files: [file], id: 'calendarCameraInput' } };
+            handleCalendarFileUpload(event);
+            
+            resolve();
+          }, 'image/jpeg', 0.8);
+        };
+        
+      } catch (error) {
+        console.warn(`Camera constraint ${constraintIndex} failed:`, error);
+        status.textContent = `🔄 Provo fotocamera alternativa...`;
+        tryCamera(constraintIndex + 1);
+      }
+    }
+    
+    tryCamera();
   });
 }
 
@@ -1274,16 +1299,24 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   });
   
   document.getElementById('btnTakePhoto')?.addEventListener('click', async () => {
-    if (isMobile() && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    const mobile = isMobile();
+    const hasCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    
+    console.log('Camera button clicked:', { mobile, hasCamera, userAgent: navigator.userAgent });
+    
+    if (mobile && hasCamera) {
       try {
         // Prova fotocamera vera su mobile
         await openCameraModal();
       } catch (error) {
         console.warn('Fotocamera non disponibile, uso file picker:', error);
-        document.getElementById('calendarCameraInput').click();
+        // Fallback a file picker con capture
+        const cameraInput = document.getElementById('calendarCameraInput');
+        cameraInput.setAttribute('capture', 'environment');
+        cameraInput.click();
       }
     } else {
-      // Desktop o fallback - usa file picker
+      // Desktop o browser senza supporto - usa file picker
       const cameraInput = document.getElementById('calendarCameraInput');
       cameraInput.removeAttribute('capture');
       cameraInput.click();

@@ -1255,30 +1255,13 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const colorId = event.extendedProps.colorId;
     if (colorId) document.getElementById('eventColor').value = colorId;
     
-    // Estrai area_id e tipo_attivita_id dalle extendedProps
+    // Estrai area_id e tipo_attivita_id dalle extendedProps per usarli dopo
     const savedAreaId = event.extendedProps.area_id;
     const savedTipoId = event.extendedProps.tipo_attivita_id;
     
     console.log('🔍 EDIT MODE - extendedProps completi:', event.extendedProps);
     console.log('🔍 EDIT MODE - Area salvata:', savedAreaId);
     console.log('🔍 EDIT MODE - Tipo salvato:', savedTipoId);
-    
-    // Pre-seleziona Area e Tipo se disponibili
-    const areaSel = document.getElementById('eventArea');
-    if (areaSel && savedAreaId) {
-      areaSel.value = savedAreaId;
-      console.log('✅ Area pre-selezionata:', areaSel.value);
-    } else {
-      console.warn('⚠️ Area NON pre-selezionata. areaSel:', areaSel, 'savedAreaId:', savedAreaId);
-    }
-    
-    const tipoSel = document.getElementById('eventTipoSelect');
-    if (tipoSel && savedTipoId) {
-      tipoSel.value = savedTipoId;
-      console.log('✅ Tipo pre-selezionato:', tipoSel.value);
-    } else {
-      console.warn('⚠️ Tipo NON pre-selezionato. tipoSel:', tipoSel, 'savedTipoId:', savedTipoId);
-    }
     
     const recurSel = document.getElementById('eventRecurrence');
     const recurrence = event.extendedProps.recurrence;
@@ -1308,7 +1291,28 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     // In edit mode, carica Area/Tipo in modo da pre-selezionare i valori
     console.log('🚀 Edit mode: caricamento Area/Tipo...');
     if (window.loadAreaTipo) {
-      window.loadAreaTipo().catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));
+      window.loadAreaTipo().then(() => {
+        // DOPO che le opzioni sono caricate, imposta i valori salvati
+        console.log('✅ Area/Tipo caricati, ora imposto i valori salvati...');
+        
+        const areaSel = document.getElementById('eventArea');
+        if (areaSel && savedAreaId) {
+          areaSel.value = savedAreaId;
+          console.log('✅ Area impostata a:', areaSel.value);
+          
+          // Triggera il change event per caricare i tipi filtrati
+          areaSel.dispatchEvent(new Event('change'));
+        }
+        
+        // Aspetta un attimo che i tipi si carichino, poi imposta il tipo
+        setTimeout(() => {
+          const tipoSel = document.getElementById('eventTipoSelect');
+          if (tipoSel && savedTipoId) {
+            tipoSel.value = savedTipoId;
+            console.log('✅ Tipo impostato a:', tipoSel.value);
+          }
+        }, 100);
+      }).catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));
     } else {
       console.warn('⚠️ loadAreaTipo non ancora disponibile');
     }

@@ -1164,8 +1164,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     window.__gmv3_getCurrentEventCats = () => (_cats || []).map(c=>c.nome);
     window.__gmv3_loadCatsForTipo = loadCategoriesForTipo;
     
-    // Rendi loadDocuments globale per l'upload
+    // Rendi funzioni globali per accesso da fuori
     window.loadDocuments = loadDocuments;
+    window.loadAreaTipo = loadAreaTipo;
   } catch(e) { 
     console.error('❌ Setup Area/Tipo fallito:', e);
     console.error('❌ Stack trace:', e.stack);
@@ -1292,7 +1293,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     
     // In edit mode, carica Area/Tipo in modo da pre-selezionare i valori
     console.log('🚀 Edit mode: caricamento Area/Tipo...');
-    loadAreaTipo().catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));
+    if (window.loadAreaTipo) {
+      window.loadAreaTipo().catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));
+    } else {
+      console.warn('⚠️ loadAreaTipo non ancora disponibile');
+    }
   }
 
   // Caricamento documento - funziona sia per edit che per new event

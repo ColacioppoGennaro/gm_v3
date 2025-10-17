@@ -1277,32 +1277,48 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       renderAttendeeChips();
     }
 
-    // Aggiungi logica per mostrare documento quando evento viene caricato
-    const docId = event.extendedProps?.document_id;
-    if (docId) {
-      document.getElementById('eventDocumentSection').classList.remove('hidden');
-      document.getElementById('eventDocumentId').value = docId;
+  }
 
-      fetch(`api/documents.php?action=get&id=${docId}`)
-          .then(r => r.json())
-          .then(data => {
-              if (data.success && data.document) {
-                  document.getElementById('eventDocumentName').textContent = data.document.original_name;
-                  document.getElementById('btnViewDocument').onclick = () => {
-                      window.open(`uploads/${data.document.filename}`, '_blank');
+  // Caricamento documento - funziona sia per edit che per view
+  const docId = event?.extendedProps?.document_id;
+  if (docId) {
+    document.getElementById('eventDocumentSection').classList.remove('hidden');
+    document.getElementById('eventDocumentId').value = docId;
+
+    fetch(`api/documents.php?a=get&id=${docId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.document) {
+                const docNameEl = document.getElementById('eventDocumentName');
+                if (docNameEl) {
+                  docNameEl.textContent = data.document.file_name;
+                }
+                
+                const btnView = document.getElementById('btnViewDocument');
+                const btnDownload = document.getElementById('btnDownloadDocument');
+                
+                if (btnView) {
+                  btnView.onclick = () => {
+                      window.open(`_var/uploads/${data.document.file_name}`, '_blank');
                   };
-                  document.getElementById('btnDownloadDocument').onclick = () => {
+                }
+                
+                if (btnDownload) {
+                  btnDownload.onclick = () => {
                       const a = document.createElement('a');
-                      a.href = `uploads/${data.document.filename}`;
-                      a.download = data.document.original_name;
+                      a.href = `_var/uploads/${data.document.file_name}`;
+                      a.download = data.document.file_name;
                       a.click();
                   };
-              }
-          })
-          .catch(err => console.error('Errore caricamento documento:', err));
-    } else {
-        document.getElementById('eventDocumentSection').classList.add('hidden');
-    }
+                }
+            } else {
+                console.error('Errore risposta API documento:', data);
+            }
+        })
+        .catch(err => console.error('Errore caricamento documento:', err));
+  } else if (isEdit) {
+      // Solo in edit mode, nascondi se non c'è documento
+      document.getElementById('eventDocumentSection')?.classList.add('hidden');
   }
 
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();

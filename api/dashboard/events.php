@@ -135,6 +135,9 @@ try {
             'entity_id' => $private['entity_id'] ?? null,
             'trigger' => $private['trigger'] ?? null,
             'show_in_dashboard' => $show,
+            'area_id' => $private['area_id'] ?? null,
+            'tipo_attivita_id' => $private['tipo_attivita_id'] ?? null,
+            'document_id' => $private['document_id'] ?? null,
             'color' => getTypeColor($type)
         ];
 

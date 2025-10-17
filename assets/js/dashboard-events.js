@@ -606,12 +606,24 @@ function populateTipoOptions() {
 function filterByAreaTipo(items) {
   if ((!currentFilters.areaId && !currentFilters.tipoId)) return items || [];
   return (items || []).filter(e => {
-    const entId = e.entity_id ? Number(e.entity_id) : null;
-    if (!entId) return false; // se filtro attivo ma evento non ha entity
-    const tipo = _tipoById.get(entId);
-    if (!tipo) return false;
-    if (currentFilters.tipoId && entId !== currentFilters.tipoId) return false;
-    if (currentFilters.areaId && Number(tipo.settore_id) !== currentFilters.areaId) return false;
+    // ✅ Usa i nuovi campi area_id e tipo_attivita_id
+    const areaId = e.area_id ? Number(e.area_id) : null;
+    const tipoId = e.tipo_attivita_id ? Number(e.tipo_attivita_id) : null;
+    
+    console.log('🔍 Filtro evento:', { 
+      title: e.title, 
+      eventAreaId: areaId, 
+      eventTipoId: tipoId,
+      filterAreaId: currentFilters.areaId,
+      filterTipoId: currentFilters.tipoId
+    });
+    
+    // Se il filtro Area è attivo, controlla che coincida
+    if (currentFilters.areaId && areaId !== currentFilters.areaId) return false;
+    
+    // Se il filtro Tipo è attivo, controlla che coincida
+    if (currentFilters.tipoId && tipoId !== currentFilters.tipoId) return false;
+    
     return true;
   });
 }

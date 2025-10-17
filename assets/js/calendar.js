@@ -75,6 +75,126 @@ function toRFC3339WithOffset(date) {
   return `${yyyy}-${mm}-${dd}T${HH}:${MM}:${SS}${sign}${oh}:${om}`;
 }
 
+// Gestisce upload documenti dal calendario con analisi AI
+async function handleCalendarFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Verifica dimensione file
+  const maxSizeMB = 5; // TODO: prendere da limiti utente
+  if (file.size > maxSizeMB * 1024 * 1024) {
+    alert(`File troppo grande. Massimo ${maxSizeMB}MB consentiti.`);
+    return;
+  }
+  
+  // Mostra loading
+  const uploadBtn = document.getElementById('btnUploadNewDoc');
+  const photoBtn = document.getElementById('btnTakePhoto');
+  const originalUploadText = uploadBtn?.textContent || '';
+  const originalPhotoText = photoBtn?.textContent || '';
+  
+  if (uploadBtn) uploadBtn.innerHTML = '⏳ Caricamento...';
+  if (photoBtn) photoBtn.innerHTML = '⏳ Analisi...';
+  
+  try {
+    // Prepara FormData per upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('analyze_with_ai', 'true'); // Flag per analisi AI
+    
+    // Upload documento
+    const response = await fetch('api/documents.php', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Documento caricato con successo
+      const docId = result.document_id;
+      const aiData = result.ai_analysis;
+      
+      // Aggiorna dropdown documenti
+      await loadDocuments();
+      
+      // Seleziona il documento appena caricato
+      const docSelect = document.getElementById('eventDocumentSelect');
+      if (docSelect) {
+        docSelect.value = docId;
+        document.getElementById('eventDocumentId').value = docId;
+      }
+      
+      // Se l'AI ha estratto dati, pre-compila il form
+      if (aiData) {
+        await fillEventFormFromAI(aiData);
+      }
+      
+      alert('✅ Documento caricato e analizzato con successo!');
+      
+    } else {
+      throw new Error(result.message || 'Errore durante il caricamento');
+    }
+    
+  } catch (error) {
+    console.error('Errore upload:', error);
+    alert('❌ Errore durante il caricamento: ' + error.message);
+  } finally {
+    // Ripristina pulsanti
+    if (uploadBtn) uploadBtn.innerHTML = originalUploadText;
+    if (photoBtn) photoBtn.innerHTML = originalPhotoText;
+    
+    // Reset input
+    event.target.value = '';
+  }
+}
+
+// Pre-compila il form evento con dati estratti dall'AI
+async function fillEventFormFromAI(aiData) {
+  try {
+    // Titolo evento
+    if (aiData.title && !document.getElementById('eventTitle').value) {
+      document.getElementById('eventTitle').value = aiData.title;
+    }
+    
+    // Descrizione
+    if (aiData.description) {
+      const descField = document.getElementById('eventDescription');
+      if (descField && !descField.value) {
+        descField.value = aiData.description;
+      }
+    }
+    
+    // Date (scadenza, promemoria)
+    if (aiData.due_date) {
+      const startField = document.getElementById('eventStart');
+      if (startField && !startField.value) {
+        startField.value = aiData.due_date;
+      }
+    }
+    
+    if (aiData.reminder_date) {
+      const endField = document.getElementById('eventEnd');
+      if (endField && !endField.value) {
+        endField.value = aiData.reminder_date;
+      }
+    }
+    
+    // Categoria se estratta
+    if (aiData.category) {
+      const categoryField = document.getElementById('eventCategory');
+      if (categoryField && !categoryField.value) {
+        categoryField.value = aiData.category;
+      }
+    }
+    
+    // TODO: Auto-select area/tipo in base ai dati estratti
+    
+  } catch (error) {
+    console.warn('Errore pre-compilazione form:', error);
+  }
+}
+
 function nextDate(yyyy_mm_dd) {
   const [Y, M, D] = yyyy_mm_dd.split('-').map(Number);
   const d = new Date(Y, M - 1, D);
@@ -507,8 +627,16 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           <select id="eventDocumentSelect" style="width:100%">
               <option value="">Nessun documento</option>
           </select>
+          <div style="display:flex;gap:8px;margin-top:8px">
+              <button type="button" class="btn small secondary" id="btnUploadNewDoc">
+                  📎 Carica nuovo
+              </button>
+              <button type="button" class="btn small secondary" id="btnTakePhoto">
+                  📷 Foto
+              </button>
+          </div>
           <small style="color:var(--muted);display:block;margin-top:4px">
-              Collega un documento esistente a questo evento per future implementazioni AI
+              Collega un documento esistente o carica nuovo con analisi AI automatica
           </small>
           `}
       </div>
@@ -644,6 +772,10 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         <button class="btn" id="saveEventBtn">${isEdit ? 'Salva' : 'Crea'}</button>
       </div>
       <input type="hidden" id="eventDocumentId" value="${documentId}"/>
+      
+      <!-- Input nascosti per upload documenti -->
+      <input type="file" id="calendarFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none">
+      <input type="file" id="calendarCameraInput" accept="image/*" capture="camera" style="display:none">
     </div>
   </div>`;
 
@@ -1051,6 +1183,18 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   document.getElementById('closeEventModal').onclick = () => document.getElementById(modalId).remove();
   document.getElementById('saveEventBtn').onclick = () => isEdit ? updateEvent(event) : createEvent();
   if (isEdit) document.getElementById('deleteEventBtn').onclick = () => deleteEvent(event);
+  
+  // Event listeners per upload documenti
+  document.getElementById('btnUploadNewDoc')?.addEventListener('click', () => {
+    document.getElementById('calendarFileInput').click();
+  });
+  
+  document.getElementById('btnTakePhoto')?.addEventListener('click', () => {
+    document.getElementById('calendarCameraInput').click();
+  });
+  
+  document.getElementById('calendarFileInput')?.addEventListener('change', handleCalendarFileUpload);
+  document.getElementById('calendarCameraInput')?.addEventListener('change', handleCalendarFileUpload);
   
   document.getElementById('eventAllDay').addEventListener('change', (e) => {
     const isAllDay = e.target.checked;

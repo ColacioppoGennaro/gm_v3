@@ -882,11 +882,11 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         
         const data = await response.json();
         
-        if (data.success && data.documents) {
+        if (data.success && data.data) {
           const select = document.getElementById('eventDocumentSelect');
           if (select) {
-            const options = data.documents.map(doc => 
-              `<option value="${doc.id}">${doc.file_name || doc.original_name} (${doc.category || 'Senza categoria'})</option>`
+            const options = data.data.map(doc => 
+              `<option value="${doc.id}">${doc.file_name} (${doc.category || 'Senza categoria'})</option>`
             ).join('');
             
             select.innerHTML = '<option value="">Nessun documento</option>' + options;

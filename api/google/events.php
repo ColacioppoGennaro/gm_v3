@@ -250,6 +250,9 @@ try {
             $areaId = $in['area_id'] ?? null;
             $tipoAttivitaId = $in['tipo_attivita_id'] ?? null;
             $documentId = $in['document_id'] ?? null;
+            
+            // 🔍 DEBUG: Log dei valori ricevuti
+            error_log('📦 CREATE EVENT - area_id: ' . ($areaId ?? 'NULL') . ', tipo_attivita_id: ' . ($tipoAttivitaId ?? 'NULL'));
 
             // Promemoria
             $remOverrides = [];
@@ -348,6 +351,9 @@ try {
             if ($areaId) $privateData['area_id'] = $areaId;
             if ($tipoAttivitaId) $privateData['tipo_attivita_id'] = $tipoAttivitaId;
             if ($documentId) $privateData['document_id'] = $documentId;
+            
+            // 🔍 DEBUG: Log dei dati salvati in extendedProperties
+            error_log('💾 SAVING extendedProperties: ' . json_encode($privateData));
             
             $extProps->setPrivate($privateData);
             $ev->setExtendedProperties($extProps);

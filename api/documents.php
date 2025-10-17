@@ -191,6 +191,7 @@ try {
             json_out([
                 'success' => true, 
                 'document_id' => $documentId,
+                'document_name' => $fileName,
                 'ai_analysis' => $aiAnalysis
             ]);
             

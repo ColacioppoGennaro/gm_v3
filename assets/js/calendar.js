@@ -133,14 +133,24 @@ async function handleCalendarFileUpload(event) {
       const docId = result.document_id;
       const aiData = result.ai_analysis;
       
-      // Aggiorna dropdown documenti
-      await loadDocuments();
-      
-      // Seleziona il documento appena caricato
+      // Aggiorna dropdown documenti aggiungendo il nuovo documento
       const docSelect = document.getElementById('eventDocumentSelect');
-      if (docSelect) {
+      if (docSelect && result.document_name) {
+        const newOption = document.createElement('option');
+        newOption.value = docId;
+        newOption.textContent = `${result.document_name} (master)`;
+        docSelect.appendChild(newOption);
         docSelect.value = docId;
         document.getElementById('eventDocumentId').value = docId;
+      } else if (window.loadDocuments) {
+        // Fallback: ricarica tutti i documenti
+        await window.loadDocuments();
+        // Seleziona il documento appena caricato
+        const docSelect = document.getElementById('eventDocumentSelect');
+        if (docSelect) {
+          docSelect.value = docId;
+          document.getElementById('eventDocumentId').value = docId;
+        }
       }
       
       // Se l'AI ha estratto dati, pre-compila il form
@@ -1151,6 +1161,9 @@ function showEventModal(event = null, startDate = null, endDate = null) {
 
     window.__gmv3_getCurrentEventCats = () => (_cats || []).map(c=>c.nome);
     window.__gmv3_loadCatsForTipo = loadCategoriesForTipo;
+    
+    // Rendi loadDocuments globale per l'upload
+    window.loadDocuments = loadDocuments;
   } catch(e) { 
     console.error('❌ Setup Area/Tipo fallito:', e);
     console.error('❌ Stack trace:', e.stack);

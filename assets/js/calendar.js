@@ -7,6 +7,11 @@
 import { API } from './api.js';
 import { openOrganizeModal } from './settings.js';
 
+// Rileva se siamo su dispositivo mobile
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 let calendar = null;
 let currentDate = new Date();
 let allEvents = [];
@@ -110,10 +115,11 @@ async function handleCalendarFileUpload(event) {
     // Prepara FormData per upload
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('category', 'Documento da calendario'); // Categoria predefinita
     formData.append('analyze_with_ai', 'true'); // Flag per analisi AI
     
     // Upload documento
-    const response = await fetch('api/documents.php', {
+    const response = await fetch('api/documents.php?a=upload', {
       method: 'POST',
       body: formData
     });
@@ -645,7 +651,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
                   📎 Carica nuovo
               </button>
               <button type="button" class="btn small secondary" id="btnTakePhoto">
-                  📷 Foto
+                  📷 ${isMobile() ? 'Foto' : 'Immagine'}
               </button>
           </div>
           <small style="color:var(--muted);display:block;margin-top:4px">
@@ -788,7 +794,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       
       <!-- Input nascosti per upload documenti -->
       <input type="file" id="calendarFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none">
-      <input type="file" id="calendarCameraInput" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="calendarCameraInput" accept="image/*" style="display:none">
     </div>
   </div>`;
 
@@ -833,13 +839,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const areaSel = document.getElementById('eventArea');
     const tipoSel = document.getElementById('eventTipoSelect');
     const organizeBtn = document.getElementById('btnOrganizeAreaTipo');
-    
-    console.log('🎯 Elementi DOM trovati:', { 
-      areaSel: !!areaSel, 
-      tipoSel: !!tipoSel, 
-      organizeBtn: !!organizeBtn,
-      tipoSelVisible: tipoSel ? tipoSel.offsetParent !== null : false
-    });
 
     let _settori = [];
     let _tipi = [];
@@ -943,10 +942,7 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       
       // Popola select con i tipi disponibili
       const optionsHtml = '<option value="">Seleziona...</option>' + list.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('');
-      console.log('🎯 Prima di popolare - innerHTML attuale:', tipoSel.innerHTML);
       tipoSel.innerHTML = optionsHtml;
-      console.log('🎯 Dopo popolamento - innerHTML nuovo:', tipoSel.innerHTML);
-      console.log('🎯 Numero opzioni nel DOM:', tipoSel.options.length);
       
       if (cur && Array.from(tipoSel.options).some(o=>o.value===cur)) {
         tipoSel.value = cur;
@@ -954,8 +950,6 @@ function showEventModal(event = null, startDate = null, endDate = null) {
         // seleziona il primo tipo disponibile per evitare lista vuota
         tipoSel.value = String(list[0].id);
       }
-      
-      console.log('Valore finale tipoSel:', tipoSel.value);
     }
 
     areaSel?.addEventListener('change', async () => { 
@@ -1203,7 +1197,12 @@ function showEventModal(event = null, startDate = null, endDate = null) {
   });
   
   document.getElementById('btnTakePhoto')?.addEventListener('click', () => {
-    document.getElementById('calendarCameraInput').click();
+    const cameraInput = document.getElementById('calendarCameraInput');
+    if (isMobile()) {
+      // Su mobile, prova a attivare la fotocamera
+      cameraInput.setAttribute('capture', 'environment');
+    }
+    cameraInput.click();
   });
   
   document.getElementById('calendarFileInput')?.addEventListener('change', handleCalendarFileUpload);

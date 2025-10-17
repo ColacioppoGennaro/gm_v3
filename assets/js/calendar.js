@@ -1482,14 +1482,17 @@ async function createEvent() {
     await ensureEventCategoryExists(tipoSelVal, eventCategory);
   }
 
+  console.log('🔍 CREATE - Area selezionata:', areaSelVal);
+  console.log('🔍 CREATE - Tipo selezionato:', tipoSelVal);
+
   const fd = new FormData();
   fd.append('title', title);
   fd.append('description', description || '');
   fd.append('type', eventType);
   fd.append('status', 'pending');
   fd.append('trigger', 'manual');
-  if (areaId) fd.append('area_id', areaId);
-  if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
+  if (areaSelVal) fd.append('area_id', areaSelVal);
+  if (tipoSelVal) fd.append('tipo_attivita_id', tipoSelVal);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
   if (documentId) fd.append('document_id', documentId);

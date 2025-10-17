@@ -1259,15 +1259,25 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const savedAreaId = event.extendedProps.area_id;
     const savedTipoId = event.extendedProps.tipo_attivita_id;
     
+    console.log('🔍 EDIT MODE - extendedProps completi:', event.extendedProps);
+    console.log('🔍 EDIT MODE - Area salvata:', savedAreaId);
+    console.log('🔍 EDIT MODE - Tipo salvato:', savedTipoId);
+    
     // Pre-seleziona Area e Tipo se disponibili
     const areaSel = document.getElementById('eventArea');
     if (areaSel && savedAreaId) {
       areaSel.value = savedAreaId;
+      console.log('✅ Area pre-selezionata:', areaSel.value);
+    } else {
+      console.warn('⚠️ Area NON pre-selezionata. areaSel:', areaSel, 'savedAreaId:', savedAreaId);
     }
     
     const tipoSel = document.getElementById('eventTipoSelect');
     if (tipoSel && savedTipoId) {
       tipoSel.value = savedTipoId;
+      console.log('✅ Tipo pre-selezionato:', tipoSel.value);
+    } else {
+      console.warn('⚠️ Tipo NON pre-selezionato. tipoSel:', tipoSel, 'savedTipoId:', savedTipoId);
     }
     
     const recurSel = document.getElementById('eventRecurrence');
@@ -1530,6 +1540,10 @@ async function updateEvent(event) {
 
   const areaSelVal2 = document.getElementById('eventArea')?.value || '';
   const tipoSelVal2 = document.getElementById('eventTipoSelect')?.value || '';
+  
+  console.log('🔍 UPDATE - Area selezionata:', areaSelVal2);
+  console.log('🔍 UPDATE - Tipo selezionato:', tipoSelVal2);
+  
   if (eventCategory && tipoSelVal2) {
     await ensureEventCategoryExists(tipoSelVal2, eventCategory);
   }

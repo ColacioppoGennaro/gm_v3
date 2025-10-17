@@ -1290,18 +1290,26 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     
     // In edit mode, carica Area/Tipo in modo da pre-selezionare i valori
     console.log('🚀 Edit mode: caricamento Area/Tipo...');
+    console.log('🔍 savedAreaId:', savedAreaId, 'savedTipoId:', savedTipoId);
+    
     if (window.loadAreaTipo) {
+      console.log('🔄 Chiamando window.loadAreaTipo()...');
       window.loadAreaTipo().then(() => {
         // DOPO che le opzioni sono caricate, imposta i valori salvati
         console.log('✅ Area/Tipo caricati, ora imposto i valori salvati...');
+        console.log('🔍 Valori da impostare - Area:', savedAreaId, 'Tipo:', savedTipoId);
         
         const areaSel = document.getElementById('eventArea');
+        console.log('🔍 Elemento Area trovato:', areaSel, 'Valore attuale:', areaSel?.value);
+        
         if (areaSel && savedAreaId) {
           areaSel.value = savedAreaId;
           console.log('✅ Area impostata a:', areaSel.value);
           
           // Triggera il change event per caricare i tipi filtrati
           areaSel.dispatchEvent(new Event('change'));
+        } else {
+          console.warn('⚠️ Area NON impostata. areaSel:', !!areaSel, 'savedAreaId:', savedAreaId);
         }
         
         // Aspetta un attimo che i tipi si carichino, poi imposta il tipo
@@ -1310,6 +1318,8 @@ function showEventModal(event = null, startDate = null, endDate = null) {
           if (tipoSel && savedTipoId) {
             tipoSel.value = savedTipoId;
             console.log('✅ Tipo impostato a:', tipoSel.value);
+          } else {
+            console.warn('⚠️ Tipo NON impostato. tipoSel:', !!tipoSel, 'savedTipoId:', savedTipoId);
           }
         }, 100);
       }).catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));

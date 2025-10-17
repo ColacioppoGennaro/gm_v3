@@ -173,12 +173,19 @@ try {
 
                 $category = null;
 
+                $areaId = null;
+                $tipoAttivitaId = null;
+                $documentId = null;
+
                 if ($privateProps) {
                     $eventType = $privateProps['type'] ?? 'personal';
                     $eventStatus = $privateProps['status'] ?? 'pending';
                     $entityId = $privateProps['entity_id'] ?? null;
                     $trigger = $privateProps['trigger'] ?? null;
                     $category = $privateProps['category'] ?? null;
+                    $areaId = $privateProps['area_id'] ?? null;
+                    $tipoAttivitaId = $privateProps['tipo_attivita_id'] ?? null;
+                    $documentId = $privateProps['document_id'] ?? null;
 
                     
                     $showInDashboard = isset($privateProps['show_in_dashboard']) 
@@ -205,8 +212,11 @@ try {
                         'status'      => $eventStatus,
                         'entity_id'   => $entityId,
                         'trigger'     => $trigger,
-                    'category'    => $category,
+                        'category'    => $category,
                         'show_in_dashboard' => $showInDashboard,
+                        'area_id'     => $areaId,
+                        'tipo_attivita_id' => $tipoAttivitaId,
+                        'document_id' => $documentId,
                     ]
                 ];
             }

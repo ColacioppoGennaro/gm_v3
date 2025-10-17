@@ -178,14 +178,14 @@ async function openCameraModal() {
         <div class="modal" style="max-width: 500px;">
           <div class="modal-header">
             <h3>📷 Scatta Foto</h3>
-            <button class="btn icon-only secondary" onclick="closeCameraModal()">✕</button>
+            <button class="btn icon-only secondary" onclick="window.closeCameraModal()">✕</button>
           </div>
           <div class="modal-body" style="text-align: center;">
             <div id="cameraStatus">🔄 Attivazione fotocamera...</div>
             <video id="cameraVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px; display: none;"></video>
             <canvas id="cameraCanvas" style="display: none;"></canvas>
             <div style="margin-top: 16px;">
-              <button class="btn secondary" onclick="closeCameraModal()">Annulla</button>
+              <button class="btn secondary" onclick="window.closeCameraModal()">Annulla</button>
               <button class="btn" id="captureBtn" style="display: none;">📸 Scatta</button>
             </div>
           </div>
@@ -209,11 +209,14 @@ async function openCameraModal() {
     
     async function tryCamera(constraintIndex = 0) {
       if (constraintIndex >= constraints.length) {
-        status.textContent = '❌ Fotocamera non disponibile';
         setTimeout(() => {
-          closeCameraModal();
-          reject(new Error('Nessuna fotocamera disponibile'));
-        }, 2000);
+          status.textContent = '❌ Fotocamera non disponibile';
+          console.error('All camera constraints failed');
+          setTimeout(() => {
+            window.closeCameraModal();
+            reject(new Error('Nessuna fotocamera disponibile'));
+          }, 2000);
+        }, 100);
         return;
       }
       
@@ -235,7 +238,7 @@ async function openCameraModal() {
           canvas.toBlob(blob => {
             // Stop camera
             stream.getTracks().forEach(track => track.stop());
-            closeCameraModal();
+            window.closeCameraModal();
             
             // Simula file upload
             const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
@@ -258,7 +261,7 @@ async function openCameraModal() {
 }
 
 // Chiude modal fotocamera
-function closeCameraModal() {
+window.closeCameraModal = function() {
   const modal = document.getElementById('cameraModal');
   if (modal) {
     // Stop video stream
@@ -1302,21 +1305,40 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const mobile = isMobile();
     const hasCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
     
-    console.log('Camera button clicked:', { mobile, hasCamera, userAgent: navigator.userAgent });
+    console.log('Camera button clicked:', { 
+      mobile, 
+      hasCamera, 
+      userAgent: navigator.userAgent,
+      orientation: typeof window.orientation,
+      maxTouchPoints: navigator.maxTouchPoints 
+    });
     
-    if (mobile && hasCamera) {
+    // Su mobile, prova prima il capture attribute che è più affidabile
+    if (mobile) {
+      console.log('Mobile detected, trying capture attribute first');
+      const cameraInput = document.getElementById('calendarCameraInput');
+      cameraInput.setAttribute('capture', 'environment');
+      cameraInput.click();
+      
+      // Se l'utente vuole provare getUserMedia, può cliccare di nuovo
+      // Per ora usiamo il metodo più semplice
+      return;
+    }
+    
+    // Solo su desktop o se capture fallisce, prova getUserMedia
+    if (hasCamera) {
       try {
-        // Prova fotocamera vera su mobile
+        console.log('Trying getUserMedia camera modal');
         await openCameraModal();
       } catch (error) {
-        console.warn('Fotocamera non disponibile, uso file picker:', error);
-        // Fallback a file picker con capture
+        console.warn('getUserMedia failed, fallback to file picker:', error);
         const cameraInput = document.getElementById('calendarCameraInput');
-        cameraInput.setAttribute('capture', 'environment');
+        cameraInput.removeAttribute('capture');
         cameraInput.click();
       }
     } else {
-      // Desktop o browser senza supporto - usa file picker
+      // Fallback - file picker normale
+      console.log('No camera support, using file picker');
       const cameraInput = document.getElementById('calendarCameraInput');
       cameraInput.removeAttribute('capture');
       cameraInput.click();

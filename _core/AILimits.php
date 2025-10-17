@@ -28,20 +28,41 @@ class AILimits {
         $limits = self::getMonthlyLimits($isPro);
         $plan = $isPro ? 'pro' : 'free';
         
-        // Conta analisi questo mese
+        // Conta analisi questo mese - gestisce caso in cui colonna analysis_status non esiste ancora
         $db = db();
-        $stmt = $db->prepare("
-            SELECT COUNT(*) as count 
-            FROM documents 
-            WHERE user_id = ? 
-            AND analysis_status = 'completed' 
-            AND analyzed_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
-        ");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $result = $stmt->get_result()->fetch_assoc();
         
-        $used = $result['count'] ?? 0;
+        // Prova prima con i nuovi campi
+        try {
+            $stmt = $db->prepare("
+                SELECT COUNT(*) as count 
+                FROM documents 
+                WHERE user_id = ? 
+                AND analysis_status = 'completed' 
+                AND analyzed_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+            ");
+            $stmt->bind_param("i", $userId);
+            $stmt->execute();
+            $result = $stmt->get_result()->fetch_assoc();
+            $used = $result['count'] ?? 0;
+        } catch (Exception $e) {
+            // Fallback: se i campi non esistono, conta tutti i documenti del mese come proxy
+            try {
+                $stmt = $db->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM documents 
+                    WHERE user_id = ? 
+                    AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+                ");
+                $stmt->bind_param("i", $userId);
+                $stmt->execute();
+                $result = $stmt->get_result()->fetch_assoc();
+                $used = $result['count'] ?? 0;
+            } catch (Exception $e2) {
+                // Ultimo fallback: considera 0 analisi usate
+                $used = 0;
+            }
+        }
+        
         $limit = $limits[$plan]['gemini_analysis'];
         
         return [

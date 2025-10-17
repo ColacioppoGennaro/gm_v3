@@ -247,6 +247,9 @@ try {
             $category = $in['category'] ?? null;
             $trigger = $in['trigger'] ?? 'manual';
             $showInDashboard = isset($in['show_in_dashboard']) ? ($in['show_in_dashboard'] === 'true') : true;
+            $areaId = $in['area_id'] ?? null;
+            $tipoAttivitaId = $in['tipo_attivita_id'] ?? null;
+            $documentId = $in['document_id'] ?? null;
 
             // Promemoria
             $remOverrides = [];
@@ -342,6 +345,9 @@ try {
             if ($entityId) $privateData['entity_id'] = $entityId;
             if ($category) $privateData['category'] = $category;
             if ($trigger) $privateData['trigger'] = $trigger;
+            if ($areaId) $privateData['area_id'] = $areaId;
+            if ($tipoAttivitaId) $privateData['tipo_attivita_id'] = $tipoAttivitaId;
+            if ($documentId) $privateData['document_id'] = $documentId;
             
             $extProps->setPrivate($privateData);
             $ev->setExtendedProperties($extProps);
@@ -452,7 +458,7 @@ try {
             }
 
             // ✅ AGGIORNA TIPIZZAZIONE
-            if (isset($in['type']) || isset($in['status']) || isset($in['entity_id']) || isset($in['trigger']) || isset($in['show_in_dashboard'])) {
+            if (isset($in['type']) || isset($in['status']) || isset($in['entity_id']) || isset($in['trigger']) || isset($in['show_in_dashboard']) || isset($in['area_id']) || isset($in['tipo_attivita_id']) || isset($in['document_id'])) {
                 $existingExtProps = $ev->getExtendedProperties();
                 $existingPrivate = $existingExtProps ? $existingExtProps->getPrivate() : [];
                 
@@ -468,16 +474,23 @@ try {
                 if (isset($in['entity_id'])) {
                     $existingPrivate['entity_id'] = $in['entity_id'];
                 }
-
                 if (isset($in['category'])) {
-    $existingPrivate['category'] = $in['category'];
-}
-                
+                    $existingPrivate['category'] = $in['category'];
+                }
                 if (isset($in['trigger'])) {
                     $existingPrivate['trigger'] = $in['trigger'];
                 }
                 if (isset($in['show_in_dashboard'])) {
                     $existingPrivate['show_in_dashboard'] = ($in['show_in_dashboard'] === 'true') ? 'true' : 'false';
+                }
+                if (isset($in['area_id'])) {
+                    $existingPrivate['area_id'] = $in['area_id'];
+                }
+                if (isset($in['tipo_attivita_id'])) {
+                    $existingPrivate['tipo_attivita_id'] = $in['tipo_attivita_id'];
+                }
+                if (isset($in['document_id'])) {
+                    $existingPrivate['document_id'] = $in['document_id'];
                 }
                 
                 $extProps = new Google_Service_Calendar_EventExtendedProperties();

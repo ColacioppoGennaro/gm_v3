@@ -1454,16 +1454,20 @@ async function createEvent() {
   const documentId = document.getElementById('eventDocumentId')?.value || '';
 
 
+  const areaSelVal = document.getElementById('eventArea')?.value || '';
+  const tipoSelVal = document.getElementById('eventTipoSelect')?.value || '';
+
   if (!title || !start || !end) {
     return alert('Compila tutti i campi obbligatori (titolo e date)');
   }
-  if (!tipoAttivitaId) {
-    return alert('Seleziona Area e Tipo');
+  if (!areaSelVal) {
+    return alert('Seleziona un\'Area');
+  }
+  if (!tipoSelVal) {
+    return alert('Seleziona un Tipo di attività');
   }
 
   // Se categoria è testo libero: prova a crearla se non esiste e c'è spazio (<50)
-  const areaSelVal = document.getElementById('eventArea')?.value || '';
-  const tipoSelVal = document.getElementById('eventTipoSelect')?.value || '';
   if (eventCategory && tipoSelVal) {
     await ensureEventCategoryExists(tipoSelVal, eventCategory);
   }
@@ -1535,18 +1539,21 @@ async function updateEvent(event) {
   const documentId = document.getElementById('eventDocumentId')?.value || '';
 
 
-  if (!title) {
-    return alert('Inserisci un titolo');
-  }
-  if (!tipoAttivitaId) {
-    return alert('Seleziona Area e Tipo');
-  }
-
   const areaSelVal2 = document.getElementById('eventArea')?.value || '';
   const tipoSelVal2 = document.getElementById('eventTipoSelect')?.value || '';
   
   console.log('🔍 UPDATE - Area selezionata:', areaSelVal2);
   console.log('🔍 UPDATE - Tipo selezionato:', tipoSelVal2);
+  
+  if (!title) {
+    return alert('Inserisci un titolo');
+  }
+  if (!areaSelVal2) {
+    return alert('Seleziona un\'Area');
+  }
+  if (!tipoSelVal2) {
+    return alert('Seleziona un Tipo di attività');
+  }
   
   if (eventCategory && tipoSelVal2) {
     await ensureEventCategoryExists(tipoSelVal2, eventCategory);

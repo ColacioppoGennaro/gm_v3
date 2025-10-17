@@ -1276,10 +1276,13 @@ function showEventModal(event = null, startDate = null, endDate = null) {
       _attendees = attendees.map(a => a.email);
       renderAttendeeChips();
     }
-
+    
+    // In edit mode, carica Area/Tipo in modo da pre-selezionare i valori
+    console.log('🚀 Edit mode: caricamento Area/Tipo...');
+    loadAreaTipo().catch(e => console.error('❌ Errore caricamento Area/Tipo in edit:', e));
   }
 
-  // Caricamento documento - funziona sia per edit che per view
+  // Caricamento documento - funziona sia per edit che per new event
   const docId = event?.extendedProps?.document_id;
   if (docId) {
     document.getElementById('eventDocumentSection').classList.remove('hidden');

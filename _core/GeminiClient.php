@@ -262,4 +262,111 @@ Rispondi SOLO con il JSON, niente altro testo.";
             ];
         }
     }
+    
+    /**
+     * ✅ NUOVO: Estrae testo da immagine usando Vision API
+     */
+    public function extractTextFromImage($imagePath) {
+        if (!file_exists($imagePath)) {
+            throw new Exception("Immagine non trovata: $imagePath");
+        }
+        
+        $imageData = base64_encode(file_get_contents($imagePath));
+        $mimeType = mime_content_type($imagePath);
+        
+        $payload = [
+            'contents' => [[
+                'parts' => [
+                    ['text' => 'Estrai tutto il testo presente in questa immagine. Restituisci solo il testo estratto, senza commenti aggiuntivi.'],
+                    [
+                        'inline_data' => [
+                            'mime_type' => $mimeType,
+                            'data' => $imageData
+                        ]
+                    ]
+                ]
+            ]],
+            'generationConfig' => [
+                'temperature' => 0.1, // Bassa temperatura per OCR preciso
+                'maxOutputTokens' => 2048,
+            ]
+        ];
+        
+        $response = $this->callGenerateContent($this->apiBase, $this->model, $payload);
+        return is_array($response) ? ($response['text'] ?? '') : $response;
+    }
+    
+    /**
+     * ✅ NUOVO: Genera embedding del testo usando text-embedding-004
+     */
+    public function embedText($text) {
+        if (empty($text)) {
+            throw new Exception("Testo vuoto per embedding");
+        }
+        
+        // Usa il modello di embedding specializzato
+        $embeddingModel = 'text-embedding-004';
+        $url = "{$this->apiBase}/models/{$embeddingModel}:embedContent?key={$this->apiKey}";
+        
+        $payload = [
+            'model' => "models/{$embeddingModel}",
+            'content' => [
+                'parts' => [
+                    ['text' => substr($text, 0, 10000)] // Max 10k caratteri
+                ]
+            ]
+        ];
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            error_log("Gemini Embedding Error: HTTP $httpCode - $response");
+            throw new Exception("Gemini Embedding Error: HTTP $httpCode");
+        }
+        
+        $result = json_decode($response, true);
+        
+        if (!isset($result['embedding']['values'])) {
+            throw new Exception("Embedding response malformato");
+        }
+        
+        return [
+            'values' => $result['embedding']['values'],
+            'dimension' => count($result['embedding']['values'])
+        ];
+    }
+    
+    /**
+     * ✅ NUOVO: Genera riassunto conciso del testo
+     */
+    public function summarizeText($text, $maxLength = 200) {
+        if (empty($text)) {
+            return "Nessun contenuto da riassumere";
+        }
+        
+        $prompt = "Riassumi il seguente testo in massimo $maxLength caratteri. Sii conciso e preciso.\n\n$text";
+        
+        $payload = [
+            'contents' => [['parts' => [['text' => $prompt]]]],
+            'generationConfig' => [
+                'temperature' => 0.3,
+                'maxOutputTokens' => 100,
+            ]
+        ];
+        
+        $response = $this->callGenerateContent($this->apiBase, $this->model, $payload);
+        $summary = is_array($response) ? ($response['text'] ?? '') : $response;
+        
+        // Trunca se ancora troppo lungo
+        return substr($summary, 0, $maxLength);
+    }
 }

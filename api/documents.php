@@ -96,38 +96,29 @@ try {
             json_out(['success' => false, 'message' => 'Tipo file non supportato'], 400);
         }
 
-        // Determina categoria
-        if (is_pro()) {
-            if (!$category) {
-                ob_end_clean();
-                json_out(['success' => false, 'message' => 'Categoria richiesta'], 400);
-            }
-            
-            $stmt = $db->prepare("SELECT id, docanalyzer_label_id FROM labels WHERE user_id=? AND name=?");
-            $stmt->bind_param("is", $user['id'], $category);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $label = $result->fetch_assoc();
-            
-            if (!$label) {
-                ob_end_clean();
-                json_out(['success' => false, 'message' => 'Categoria non trovata'], 404);
-            }
-        } else {
-            $stmt = $db->prepare("SELECT id, docanalyzer_label_id FROM labels WHERE user_id=? AND name='master'");
-            $stmt->bind_param("i", $user['id']);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $label = $result->fetch_assoc();
-            
-            if (!$label) {
-                ob_end_clean();
-                json_out(['success' => false, 'message' => 'Label master non trovata'], 500);
-            }
+        // ✅ NUOVO SISTEMA: area_id e tipo_id
+        $areaId = isset($_POST['area_id']) ? (int)$_POST['area_id'] : null;
+        $tipoId = isset($_POST['tipo_id']) ? (int)$_POST['tipo_id'] : null;
+        
+        if (!$areaId) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Area richiesta'], 400);
+        }
+        
+        // Verifica che area esista
+        $stmt = $db->prepare("SELECT id, nome FROM settori WHERE id=?");
+        $stmt->bind_param("i", $areaId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $area = $result->fetch_assoc();
+        
+        if (!$area) {
+            ob_end_clean();
+            json_out(['success' => false, 'message' => 'Area non trovata'], 404);
         }
 
         // Salva file localmente
-        $uploadDir = __DIR__ . "/../_var/uploads/{$user['id']}/" . ($category ?: 'master');
+        $uploadDir = __DIR__ . "/../_var/uploads/{$user['id']}/" . preg_replace('/[^a-zA-Z0-9_-]/', '_', $area['nome']);
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
@@ -141,23 +132,137 @@ try {
             json_out(['success' => false, 'message' => 'Errore salvataggio file'], 500);
         }
 
-        // Upload su DocAnalyzer
-        try {
-            $docAnalyzer = new DocAnalyzerClient();
-            $result = $docAnalyzer->uploadAndTag($localPath, $fileName, $label['docanalyzer_label_id']);
+        // ✅ LOGICA PESANTE/LEGGERO
+        $fileSize = $file['size'];
+        $heavyThreshold = 5 * 1024 * 1024; // 5MB
+        $isHeavy = $fileSize > $heavyThreshold;
+        
+        $docAnalyzerDocId = null;
+        $geminiEmbedding = null;
+        $summary = null;
+        $ocrText = null;
+        $labelId = null; // Backward compatibility con vecchio sistema
+        
+        if ($isHeavy) {
+            // ═══════════════════════════════════════════
+            // DOCUMENTO PESANTE → DocAnalyzer
+            // ═══════════════════════════════════════════
+            try {
+                require_once __DIR__ . '/../_core/DocAnalyzerClient.php';
+                
+                // Cerca/crea label DocAnalyzer corrispondente all'area
+                $stmt = $db->prepare("SELECT id, docanalyzer_label_id FROM labels WHERE user_id=? AND name=?");
+                $stmt->bind_param("is", $user['id'], $area['nome']);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $label = $result->fetch_assoc();
+                
+                if (!$label) {
+                    // Crea label nel DB locale (DocAnalyzer la creerà al primo upload)
+                    $stmt = $db->prepare("INSERT INTO labels(user_id, name, docanalyzer_label_id) VALUES(?,?,?)");
+                    $docAnalyzerLabelId = $area['nome']; // Usa nome area come label ID
+                    $stmt->bind_param("iss", $user['id'], $area['nome'], $docAnalyzerLabelId);
+                    $stmt->execute();
+                    $labelId = $db->insert_id;
+                } else {
+                    $labelId = $label['id'];
+                    $docAnalyzerLabelId = $label['docanalyzer_label_id'];
+                }
+                
+                $docAnalyzer = new DocAnalyzerClient();
+                $result = $docAnalyzer->uploadAndTag($localPath, $fileName, $docAnalyzerLabelId);
+                $docAnalyzerDocId = $result['docid'];
+                
+                error_log("✅ Documento PESANTE uploadato su DocAnalyzer: docid={$docAnalyzerDocId}, label={$area['nome']}");
+                
+            } catch (Exception $e) {
+                error_log("❌ Errore upload DocAnalyzer: " . $e->getMessage());
+                @unlink($localPath);
+                ob_end_clean();
+                json_out(['success' => false, 'message' => 'Errore upload DocAnalyzer: ' . $e->getMessage()], 500);
+            }
             
-            // Salva nel DB
-            $stmt = $db->prepare("INSERT INTO documents(user_id, label_id, file_name, file_path, mime, size, docanalyzer_doc_id) VALUES(?,?,?,?,?,?,?)");
-            $stmt->bind_param("iisssis", $user['id'], $label['id'], $fileName, $localPath, $mime, $file['size'], $result['docid']);
-            $stmt->execute();
+        } else {
+            // ═══════════════════════════════════════════
+            // DOCUMENTO LEGGERO → Gemini Embedding
+            // ═══════════════════════════════════════════
             
-            $documentId = $db->insert_id;
-            $aiAnalysis = null;
+            if (!$tipoId) {
+                @unlink($localPath);
+                ob_end_clean();
+                json_out(['success' => false, 'message' => 'Tipo richiesto per documenti leggeri'], 400);
+            }
             
-            // Se richiesta analisi AI, processa con Gemini
-            if (isset($_POST['analyze_with_ai']) && $_POST['analyze_with_ai'] === 'true') {
+            try {
                 require_once __DIR__ . '/../_core/GeminiClient.php';
                 require_once __DIR__ . '/../_core/AILimits.php';
+                
+                // Verifica limiti AI
+                $limits = AILimits::checkAnalysisLimit($user['id']);
+                if (!$limits['allowed']) {
+                    @unlink($localPath);
+                    ob_end_clean();
+                    json_out([
+                        'success' => false, 
+                        'message' => "Limite analisi AI raggiunto ({$limits['used']}/{$limits['limit']})"
+                    ], 403);
+                }
+                
+                $gemini = new GeminiClient();
+                
+                // OCR/Vision
+                if (in_array($mime, ['image/jpeg', 'image/png', 'image/jpg'])) {
+                    $ocrText = $gemini->extractTextFromImage($localPath);
+                } else {
+                    // Per PDF/doc usa metodo alternativo (TODO: implementare)
+                    $ocrText = "Testo estratto da " . $fileName;
+                }
+                
+                // Genera riassunto
+                $summary = $gemini->summarizeText($ocrText, 200); // Max 200 caratteri
+                
+                // Genera embedding
+                $embeddingResult = $gemini->embedText($ocrText);
+                $geminiEmbedding = json_encode($embeddingResult['values'] ?? []);
+                
+                // Registra uso AI
+                AILimits::recordAnalysis($user['id']);
+                
+                error_log("✅ Documento LEGGERO processato con Gemini: embedding_size=" . strlen($geminiEmbedding));
+                
+            } catch (Exception $e) {
+                error_log("⚠️ Errore Gemini (non critico): " . $e->getMessage());
+                // Non blocchiamo il salvataggio, solo logghiamo l'errore
+                $summary = "Errore analisi: " . $e->getMessage();
+            }
+        }
+        
+        // Salva nel DB con nuovo schema
+        $stmt = $db->prepare(
+            "INSERT INTO documents(user_id, label_id, area_id, tipo_id, file_name, file_path, mime, size, 
+                                   docanalyzer_doc_id, gemini_embedding, summary, ocr_text) 
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"
+        );
+        $stmt->bind_param(
+            "iiiisssissss", 
+            $user['id'], $labelId, $areaId, $tipoId, $fileName, $localPath, $mime, $fileSize,
+            $docAnalyzerDocId, $geminiEmbedding, $summary, $ocrText
+        );
+        $stmt->execute();
+        
+        $documentId = $db->insert_id;
+        
+        ob_end_clean();
+        json_out([
+            'success' => true, 
+            'document_id' => $documentId,
+            'document_name' => $fileName,
+            'is_heavy' => $isHeavy,
+            'processor' => $isHeavy ? 'DocAnalyzer' : 'Gemini',
+            'summary' => $summary
+        ]);
+        
+    } catch (Exception $e) {
                 
                 // Verifica limiti AI
                 $limits = AILimits::checkAnalysisLimit($user['id']);

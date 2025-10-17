@@ -1255,15 +1255,19 @@ function showEventModal(event = null, startDate = null, endDate = null) {
     const colorId = event.extendedProps.colorId;
     if (colorId) document.getElementById('eventColor').value = colorId;
     
+    // Estrai area_id e tipo_attivita_id dalle extendedProps
+    const savedAreaId = event.extendedProps.area_id;
+    const savedTipoId = event.extendedProps.tipo_attivita_id;
+    
     // Pre-seleziona Area e Tipo se disponibili
     const areaSel = document.getElementById('eventArea');
-    if (areaSel && areaId) {
-      areaSel.value = areaId;
+    if (areaSel && savedAreaId) {
+      areaSel.value = savedAreaId;
     }
     
     const tipoSel = document.getElementById('eventTipoSelect');
-    if (tipoSel && tipoAttivitaId) {
-      tipoSel.value = tipoAttivitaId;
+    if (tipoSel && savedTipoId) {
+      tipoSel.value = savedTipoId;
     }
     
     const recurSel = document.getElementById('eventRecurrence');
@@ -1535,7 +1539,7 @@ async function updateEvent(event) {
   fd.append('description', description || '');
   fd.append('type', eventType);
   fd.append('status', eventStatus);
-  if (areaId) fd.append('area_id', areaId);
+  if (areaSelVal2) fd.append('area_id', areaSelVal2);
   if (tipoAttivitaId) fd.append('tipo_attivita_id', tipoAttivitaId);
   if (entityId) fd.append('entity_id', entityId);
   if (eventCategory) fd.append('category', eventCategory);
